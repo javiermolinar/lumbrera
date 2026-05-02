@@ -542,29 +542,45 @@ Agents may use an LLM to inspect the conflict context and propose a semantic res
 
 Future option: provide a helper command or integration for LLM-assisted reconciliation, but keep it outside the hidden automatic write path.
 
+## Distribution model
+
+Use a Go CLI for v1 so Lumbrera can ship as a small self-contained binary. This fits the product boundary: agents, humans, and Git hooks should all call the same stable executable without requiring a Node/npm runtime.
+
+Distribution during early development can still be source-based with `go install`. Once the protocol is stable, publish platform-specific binaries through GitHub Releases and optionally Homebrew.
+
+Keep the code portable and bundle-friendly:
+- avoid native dependencies unless necessary,
+- keep filesystem assumptions explicit,
+- keep hook scripts thin wrappers around the `lumbrera` binary,
+- keep the repo format and write protocol language-independent.
+
 ## Implementation language
 
-Use TypeScript for v1.
+Use Go for v1.
 
 Reasons:
-- Pi is TypeScript/npm-based.
-- npm distribution fits Pi skills and CLI installation.
-- Good ecosystem for Markdown, optional frontmatter validation, CLI parsing, JSON schema, and Git wrappers.
+- Go produces standalone binaries by default.
+- Lumbrera is primarily filesystem, Git, checksums, deterministic validation, and Markdown scanning.
+- Git hooks can call a Go binary reliably.
+- Go has strong standard-library support for paths, hashing, process execution, temporary directories, and tests.
+- Pi and other agents can shell out to a Go CLI without making the core Pi-specific.
 
 Possible package layout:
 
 ```text
 lumbrera/
-  src/
-    cli.ts
-    core/
-      init.ts
-      sync.ts
-      write.ts
-      git.ts
-      manifest.ts
-      generators.ts
-      hooks.ts
+  cmd/
+    lumbrera/
+      main.go
+  internal/
+    initcmd/
+    synccmd/
+    writecmd/
+    git/
+    manifest/
+    generate/
+    verify/
+    hooks/
   skills/
     pi/
       SKILL.md
