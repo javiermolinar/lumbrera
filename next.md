@@ -27,7 +27,7 @@ The index is a derived cache, not source of truth. Markdown files, generated Lum
 ## Proposed command
 
 ```sh
-lumbrera search "atomic write protocol" --brain ./brain --limit 8
+lumbrera search "atomic write protocol" --brain ./brain --limit 5
 lumbrera search "source immutability" --kind wiki --json
 lumbrera search "SQLite index" --rebuild
 ```
@@ -36,7 +36,7 @@ Options to consider:
 
 ```text
 --brain <path>       target brain directory, default current directory
---limit <n>          max results, default 10
+--limit <n>          max results, default 5, maximum 20
 --kind <all|wiki|source>
 --path <prefix>      restrict to a repo path prefix
 --tag <tag>          restrict wiki documents by generated tag
@@ -45,7 +45,7 @@ Options to consider:
 --rebuild            force rebuild before searching
 ```
 
-Default behavior: if the index is missing or stale, `search` rebuilds it automatically. Failed rebuilds should exit non-zero and point to `lumbrera verify` if the brain has deterministic integrity problems.
+Default behavior: if the index is missing or stale, `search` rebuilds it automatically. Failed rebuilds should exit non-zero and point to `lumbrera verify` if the brain has deterministic integrity problems. The default result limit should stay small so agents do not treat search as an invitation to explore the full repo.
 
 ## Proposed index shape
 
@@ -121,9 +121,29 @@ JSON output should be stable for agents:
       "sources": ["sources/2026/05/04/raw-discussion.md"],
       "links": ["wiki/architecture/provenance.md"]
     }
-  ]
+  ],
+  "recommended_read_order": [
+    "wiki/architecture/write-protocol.md"
+  ],
+  "stop_rule": "Read the top 3 wiki pages first. Do not scan the repo unless those are insufficient."
 }
 ```
+
+## Agent search-first workflow
+
+The goal of `lumbrera search` is to stop LLMs from doing broad repo exploration.
+
+Generated query skills should instruct agents to:
+
+1. Run `lumbrera search "<user question>" --json` before reading files.
+2. Read only the top 3 wiki pages initially.
+3. Do not scan the whole repo, run `find`, run broad `rg`, or read every `INDEX.md` entry unless search fails.
+4. Stop reading when the answer is supported by the pages already read.
+5. Read preserved sources only for numeric limits, operational/destructive actions, surprising claims, conflicts, uncertainty, or user-requested evidence.
+6. If top results are insufficient, run one refined search query before broad exploration.
+7. If broad repo exploration is still needed, state why search was insufficient before doing it.
+
+Search output should reinforce this behavior with a small default limit, `recommended_read_order`, and a `stop_rule` field in JSON mode.
 
 ## Implementation plan
 
@@ -133,7 +153,7 @@ JSON output should be stable for agents:
 4. Implement `lumbrera search` argument parsing, help text, human output, and JSON output.
 5. Make search rebuild missing/stale indexes automatically and support explicit `--rebuild`.
 6. Add ranking: title/path/tag hits > heading hits > body hits; wiki results slightly boosted over sources; exact path and source-citation matches boosted.
-7. Update generated `AGENTS.md` and `.agents/skills/lumbrera-query/SKILL.md` so agents start with `lumbrera search`, then read the best files fully.
+7. Update generated `AGENTS.md` and `.agents/skills/lumbrera-query/SKILL.md` so agents start with `lumbrera search`, read only the top 3 wiki pages first, and stop once the answer is supported.
 8. Update README command docs.
 9. Add tests with fixture brains covering wiki/source indexing, heading anchors, tags, source filters, stale rebuilds, JSON output, and verification failure behavior.
 

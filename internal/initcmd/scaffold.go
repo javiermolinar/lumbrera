@@ -360,45 +360,62 @@ description: Ingest a referenced Markdown source into a Lumbrera LLM Wiki by pre
 
 # Lumbrera Ingest
 
-Use when the user asks to ingest, process, summarize, or integrate a raw source.
+Use when asked to turn source material into durable wiki pages.
 
-## Workflow
+## Contract
 
-- Read the raw resource referenced by the user.
-- Do not alter the raw resource.
-- Preserve source granularity when possible; avoid aggregating unrelated source documents into one huge source unless necessary.
-- If a combined source is already provided, preserve it as-is but write wiki pages by durable topic or task.
-- Read INDEX.md, tags.md, and relevant existing wiki/ pages before writing, so new synthesis updates or complements existing knowledge instead of duplicating it.
-- Inspect the source heading structure and identify durable topics.
-- Create or update distilled Markdown documents under wiki/ with durable knowledge from the source.
-- A good wiki page is atomic, source-grounded, useful without reopening the source, small, searchable, and linked when the relationship is real.
-- Wiki pages have a hard maximum of 400 Markdown body lines. Split pages before they exceed the limit.
-- Chunk large sources only for reading. Write wiki pages by durable topic, not by source chunk number. Do not create pages named like part-1 or part-2 unless the source itself is sequential knowledge.
-- For large sources, produce a short ingest plan before writing: target wiki paths, create/update decisions, source sections covered, proposed title, mandatory single-line summary, and 1-5 tags.
-- Prefer task-oriented synthesis pages when useful, not only topic summaries.
-- Split when a draft covers multiple independent concepts, has sections that can be read independently, needs more than 5 tags, or becomes a grab bag.
-- Avoid pages that are just "everything from source X", chunk dumps, giant mixed-topic notes, filler tags, unsupported synthesis, or duplicates of existing pages.
-- For operational content, mark whether synthesized knowledge is public, internal, or mixed in the wiki body when that distinction is relevant.
-- When ingesting troubleshooting or runbook material, prefer symptom → cause → fix tables where durable.
-- Every wiki page needs a single-line --summary and 1-5 --tag values. Reuse existing lowercase slug tags from tags.md when they fit; create a new stable tag only when existing tags are clearly wrong. Do not invent filler tags.
-- Prefer page-level provenance through --source. For large combined sources, add inline [source: ../sources/path.md#heading-anchor] citations to exact headings for important, surprising, version-sensitive, numeric, operational-limit, destructive, customer-impacting, or easily disputed claims.
-- Provide wiki Markdown body content only. Do not create wiki document IDs, frontmatter, tag registry entries, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those for wiki pages.
-- Use lumbrera write to add the distilled document. For a new wiki file, pass --title, --summary, and 1-5 --tag flags. For wiki writes, pass --source. Always pass --reason.
-- After writing, run lumbrera verify and report coverage: created or updated pages, covered source sections, skipped sections, uncertainties, and recommended follow-up pages.
+- Do not edit files directly; write only with lumbrera write.
+- Preserve raw source material; do not alter existing sources/ files.
+- Provide wiki body Markdown only. Lumbrera generates document IDs, frontmatter, Sources sections, indexes, changelog, checksums, and tags.
 
-## Required wiki linking pass
+## Process
 
-Before writing wiki content:
+1. Read the source. Chunk large sources only for reading.
+2. Read INDEX.md, tags.md, and relevant existing wiki pages.
+3. Choose target wiki pages by durable topic/task, not by source chunk.
+4. Draft small pages: one concept, task, runbook, decision, or reference per page.
+5. Keep every wiki page under the hard maximum of 400 Markdown body lines.
+6. Choose a clear title, single-line summary, and 1-5 --tag values, reusing tags.md when possible.
+7. Add real wiki links and precise source citations where needed.
+8. Write with lumbrera write, then run lumbrera verify.
 
-- Read INDEX.md and tags.md.
-- Identify 3-7 existing wiki pages that may overlap, depend on this page, or act as prerequisites.
-- Read the relevant existing wiki pages, or at least their title, summary, tags, and headings.
-- Add contextual wiki-to-wiki links where the relationship is real: prerequisite, related task, deeper reference, operational follow-up, or contrasting behavior.
-- Prefer contextual inline links over a large link dump.
-- If contextual inline links would be awkward, add a short '## Related pages' section.
-- Every new wiki page should have at least one wiki link unless it is genuinely standalone.
-- If no wiki links are added, explain why in the final report.
-- Do not add unrelated links just to satisfy the rule.
+## Good wiki page
+
+- Atomic, source-grounded, searchable, and useful without reopening the source.
+- Troubleshooting/runbooks prefer symptom → cause → fix structure.
+- Split when a draft covers multiple concepts, has independent sections, needs more than 5 tags, or becomes a grab bag.
+- Avoid pages like "everything from source X", "part 1", giant mixed-topic notes, filler tags, unsupported synthesis, or duplicates of existing pages.
+
+## Links
+
+- Before writing, identify 3-7 existing wiki pages that may overlap, depend on this page, or act as prerequisites.
+- Add contextual wiki links for real relationships: prerequisite, related task, deeper reference, operational follow-up, or contrasting behavior.
+- Prefer inline links; use a short "Related pages" section only when inline links are awkward.
+- Every new wiki page should have at least one wiki link unless genuinely standalone. If no links are added, explain why in the final report.
+
+## Inline source citations
+
+Inline citations are allowed and encouraged when exact provenance matters.
+
+~~~md
+Large Mimir series-limit increases should be reviewed against ingester capacity
+[source: ../sources/mimir-docs.compact.md#reviewing-changes-to-per-tenant-limits].
+~~~
+
+- Prefer stable heading anchors over line numbers.
+- Use inline citations for operationally important, numeric, destructive, version-sensitive, surprising, customer-impacting, or easily disputed claims.
+- Still pass file-level provenance with lumbrera write --source; inline citations complement it, they do not replace it.
+- Do not add citations to every sentence.
+
+## Write command
+
+For a new wiki page, pass --title, --summary, 1-5 --tag flags, --source, and --reason:
+
+~~~sh
+lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --source sources/<source>.md --reason "Distill source" < page.md
+~~~
+
+After writing, run lumbrera verify and report created/updated pages, covered source sections, skipped sections, uncertainties, and follow-up pages.
 `
 
 const querySkillContent = `---
