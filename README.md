@@ -2,7 +2,7 @@
 
 Lumbrera is a backendless, Markdown-native second brain for humans and LLM agents.
 
-It is inspired by the LLM Wiki pattern: preserve raw source material, distill it into a durable human-readable Markdown wiki, and let agents help maintain that knowledge base over time.
+It is inspired by the Karpathy [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): preserve raw source material, distill it into a durable human-readable Markdown wiki, and let agents help maintain that knowledge base over time.
 
 ## What problem does it solve?
 
@@ -29,6 +29,35 @@ go install github.com/javiermolinar/lumbrera/cmd/lumbrera@main
 ```
 
 The module root is not an installable command package; use `/cmd/lumbrera`.
+
+
+## How to use it
+
+Start by initializing a new brain:
+
+```sh
+lumbrera init ./brain
+```
+
+Then drop new markdown content into the sources folder. You can convert almost anything to markdown these days.
+Ask your LLM to ingest it using the skill:
+
+```
+/skill:lumbrera-ingest @sources/whatever.md
+```
+
+Start asking questions using the skill:
+
+```
+/skill:lumbrera-query how can I do X or Y?
+```
+
+Time to time run the linter to fix semantic drifts:
+
+```
+/skill:lumbrera-lint
+```
+
 
 ## Commands
 
