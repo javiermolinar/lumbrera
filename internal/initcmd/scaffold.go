@@ -417,6 +417,18 @@ Use when the user asks to ingest, process, summarize, or integrate a raw source.
 - Provide wiki Markdown body content only. Do not create wiki frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those for wiki pages.
 - Use lumbrera write to add the distilled document. For a new wiki file, pass --title. For wiki writes, pass --source. Always pass --reason.
 - After writing, run lumbrera verify and report coverage: created or updated pages, covered source sections, skipped sections, uncertainties, and recommended follow-up pages.
+
+## Wiki linking pass
+
+Before writing wiki content:
+
+- Read INDEX.md.
+- Identify existing wiki pages that overlap with the new source.
+- Read the relevant existing wiki pages or at least their headings/summaries.
+- Add wiki-to-wiki links where they help navigation or explain prerequisites.
+- Prefer contextual inline links over a large link dump.
+- If the page is mostly standalone, add a short '## Related pages' section.
+- Do not force unrelated links.
 `
 
 const querySkillContent = `---
@@ -464,4 +476,13 @@ Lumbrera handles deterministic consistency for managed wiki content: wiki frontm
 - Report task-navigation gaps, such as missing troubleshooting quick references, FAQ-style pages, or symptom → cause → fix runbooks.
 - Report findings with affected paths, evidence, and suggested next actions.
 - If asked to fix semantic issues, use lumbrera write. Do not edit files directly or create wiki generated metadata.
+
+## Semantic link health
+
+- Read INDEX.md as the wiki map.
+- Identify orphan or weakly connected wiki pages.
+- Check whether related concepts are linked contextually.
+- Look for pages that duplicate or depend on another page without linking to it.
+- Suggest inline links or a short 'Related pages' section where useful.
+- Do not report lack of links as a problem unless there is a clear semantic relationship.
 `
