@@ -4,6 +4,9 @@ Lumbrera is a backendless, Markdown-native second brain for humans and LLM agent
 
 It is inspired by the Karpathy [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): preserve raw source material, distill it into a durable human-readable Markdown wiki, and let agents help maintain that knowledge base over time.
 
+<img width="1983" height="793" alt="0f75f597-5cc1-432e-a61a-ebc581baed22" src="https://github.com/user-attachments/assets/d7903531-149b-481e-b4c5-68004aa115dd" />
+
+
 ## What problem does it solve?
 
 LLM agents are useful for summarizing, organizing, and updating knowledge, but they need a safe way to write durable shared memory. Plain folders of Markdown are easy to read and edit, but direct edits by humans and agents can drift, lose provenance, or silently overwrite important context. Hosted knowledge tools solve some of this with backends and product-specific workflows, but they can make the data less portable and harder to audit.
