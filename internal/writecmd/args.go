@@ -117,8 +117,8 @@ Options:
   --repo <path>       deprecated alias for --brain
   --actor <actor>     actor label for changelog, default LUMBRERA_ACTOR, USER, USERNAME, or human
   --title <title>     required when creating a new wiki file
-  --summary <text>    optional generated wiki frontmatter summary
-  --tag <tag>         optional generated wiki frontmatter tag, repeatable
+  --summary <text>    required single-line generated wiki frontmatter summary for new wiki files
+  --tag <tag>         required generated wiki frontmatter tag for new wiki files, repeatable up to 5
   --source <path>     provenance source for wiki writes, repeatable
   --append <section>  append stdin content to a named section in an existing wiki page
   --delete            delete an existing wiki page
@@ -126,10 +126,11 @@ Options:
 Rules:
   - source writes preserve stdin as raw Markdown
   - wiki stdin must contain Markdown body only; Lumbrera generates wiki frontmatter
+  - new wiki pages require single-line --summary and 1-5 lowercase slug --tag values
   - source files are immutable after creation
   - wiki writes require at least one --source
   - local Markdown links and heading anchors must resolve
   - optional inline claim citations use [source: ../sources/path.md#heading-anchor]
-  - successful writes update INDEX.md, CHANGELOG.md, and BRAIN.sum
+  - successful writes update INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md
   - Git, cloud sync, backup, and sharing are external to Lumbrera`)
 }

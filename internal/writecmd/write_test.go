@@ -19,8 +19,8 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	if frontmatter.StartsWithFrontmatter([]byte(readFile(t, repo, "sources/2026/05/04/raw.md"))) {
 		t.Fatal("source writes should preserve raw source content without generated frontmatter")
 	}
-	runWrite(t, repo, "# Related\n\nCompanion page.\n", "wiki/related.md", "--title", "Related", "--source", "sources/2026/05/04/raw.md", "--reason", "Create related", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nSee [Related](./related.md).\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/2026/05/04/raw.md", "--reason", "Create topic", "--actor", "test", "--tag", "design")
+	runWrite(t, repo, "# Related\n\nCompanion page.\n", "wiki/related.md", "--title", "Related", "--summary", "Related companion page.", "--tag", "related", "--source", "sources/2026/05/04/raw.md", "--reason", "Create related", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nSee [Related](./related.md).\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--source", "sources/2026/05/04/raw.md", "--reason", "Create topic", "--actor", "test", "--tag", "design")
 
 	wiki := readFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
@@ -52,13 +52,15 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/topic.md sha256:")
 	assertFileContains(t, repo, "CHANGELOG.md", "[source] [test]: Preserve raw source")
 	assertFileContains(t, repo, "CHANGELOG.md", "[create] [test]: Create topic")
+	assertFileContains(t, repo, "tags.md", "## design")
+	assertFileContains(t, repo, "tags.md", "- [Topic](wiki/topic.md) — Topic summary.")
 	assertFileContains(t, repo, ".brain/ops.log", `"operation":"create"`)
 }
 
 func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\n## Notes\n\nInitial.\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\n## Notes\n\nInitial.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	runWrite(t, repo, "Appended note.\n", "wiki/topic.md", "--append", "Notes", "--source", "sources/raw.md", "--reason", "Append note", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Initial.\n\nAppended note.")
@@ -76,7 +78,7 @@ func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 func TestWriteRejectsEmptyAppendFlag(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\n## Notes\n\nInitial.\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\n## Notes\n\nInitial.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	assertWriteError(t, repo, "Should append.\n", "wiki/topic.md", "--append=", "--source", "sources/raw.md", "--reason", "Append with empty section", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Initial.")
@@ -88,7 +90,7 @@ func TestWriteRejectsEmptyAppendFlag(t *testing.T) {
 func TestWriteRejectsAppendToGeneratedSourcesSection(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	assertWriteError(t, repo, "This would be discarded.\n", "wiki/topic.md", "--append", "Sources", "--source", "sources/raw.md", "--reason", "Append to generated sources", "--actor", "test")
 	if strings.Contains(readFile(t, repo, "wiki/topic.md"), "This would be discarded") {
@@ -114,7 +116,7 @@ func TestWriteRejectsMissingInternalLinksAndRollsBack(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
 
-	assertWriteError(t, repo, "# Missing link\n\nSee [Missing](./missing.md).\n", "wiki/missing-link.md", "--title", "Missing link", "--source", "sources/raw.md", "--reason", "Create missing link", "--actor", "test")
+	assertWriteError(t, repo, "# Missing link\n\nSee [Missing](./missing.md).\n", "wiki/missing-link.md", "--title", "Missing link", "--summary", "Missing link summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create missing link", "--actor", "test")
 	assertMissing(t, repo, "wiki/missing-link.md")
 	if strings.Contains(readFile(t, repo, "CHANGELOG.md"), "Create missing link") {
 		t.Fatal("failed write left pending changelog entry")
@@ -128,7 +130,7 @@ func TestWriteAllowsRawSourceLinksWhenCheckingAnchors(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nSee [external relative doc](../outside.md).\n\n## Evidence\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
 
-	runWrite(t, repo, "# Topic\n\nSee [Evidence](../sources/raw.md#evidence).\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nSee [Evidence](../sources/raw.md#evidence).\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 }
 
 func TestWriteRejectsMissingAnchorsAndRollsBack(t *testing.T) {
@@ -147,7 +149,7 @@ func TestWriteRejectsMissingAnchorsAndRollsBack(t *testing.T) {
 		{"wiki/bad-citation-anchor.md", "Bad citation anchor", "# Bad citation anchor\n\nClaim. [source: ../sources/raw.md#missing]\n", "Create bad citation anchor"},
 	}
 	for _, tc := range cases {
-		assertWriteError(t, repo, tc.body, tc.target, "--title", tc.title, "--source", "sources/raw.md", "--reason", tc.reason, "--actor", "test")
+		assertWriteError(t, repo, tc.body, tc.target, "--title", tc.title, "--summary", tc.title+" summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", tc.reason, "--actor", "test")
 		assertMissing(t, repo, tc.target)
 		if strings.Contains(readFile(t, repo, "CHANGELOG.md"), tc.reason) {
 			t.Fatalf("failed write left changelog entry for %q", tc.reason)
@@ -160,7 +162,7 @@ func TestWriteExtractsSourceCitationsIntoGeneratedSources(t *testing.T) {
 	runWrite(t, repo, "# Raw A\n\n## Context\n\nA.\n", "sources/raw-a.md", "--title", "Raw A", "--reason", "Preserve raw A", "--actor", "test")
 	runWrite(t, repo, "# Raw B\n\n## Claim Detail\n\nB.\n", "sources/raw-b.md", "--title", "Raw B", "--reason", "Preserve raw B", "--actor", "test")
 
-	runWrite(t, repo, "# Topic\n\nImportant claim. [source: ../sources/raw-b.md#claim-detail]\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw-a.md", "--reason", "Create cited topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nImportant claim. [source: ../sources/raw-b.md#claim-detail]\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw-a.md", "--reason", "Create cited topic", "--actor", "test")
 	wiki := readFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
 	if err != nil {
@@ -184,7 +186,7 @@ func TestWriteIgnoresInlineCodeAndExternalSourceText(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw text can mention external markers. [source: https://example.com/report]\n\nRaw text can also mention local-looking markers without turning into citations. [source: ../sources/missing.md#missing]\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
 
-	runWrite(t, repo, "# Topic\n\nLiteral citation syntax: `[source: ../sources/raw.md#missing]`.\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nLiteral citation syntax: `[source: ../sources/raw.md#missing]`.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 	wiki := readFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
 	if err != nil {
@@ -204,7 +206,7 @@ func TestWriteIgnoresInlineCodeAndExternalSourceText(t *testing.T) {
 func TestWritePreflightRejectsExistingBrokenAnchor(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\n## Evidence\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nSee [Evidence](../sources/raw.md#evidence).\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nSee [Evidence](../sources/raw.md#evidence).\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	rawPath := filepath.Join(repo, "sources", "raw.md")
 	raw := strings.Replace(readFile(t, repo, "sources/raw.md"), "## Evidence", "## Renamed", 1)
@@ -220,7 +222,7 @@ func TestWritePreflightRejectsExistingBrokenAnchor(t *testing.T) {
 func TestValidateDocumentRejectsStaleGeneratedFrontmatter(t *testing.T) {
 	repo := initBrain(t)
 	path := filepath.Join(repo, "wiki", "stale.md")
-	meta := frontmatter.New("wiki", "Stale", "", nil, []string{"sources/other.md"}, []string{"wiki/wrong.md"})
+	meta := frontmatter.New("wiki", "Stale", "Stale summary.", []string{"stale"}, []string{"sources/other.md"}, []string{"wiki/wrong.md"})
 	content, err := frontmatter.Attach(meta, "# Stale\n\nSee [Right](./right.md).\n\n## Sources\n\n- [Raw](../sources/raw.md)\n")
 	if err != nil {
 		t.Fatal(err)
@@ -241,10 +243,13 @@ func TestWriteRejectsInvalidMutations(t *testing.T) {
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
 
 	assertWriteError(t, repo, "# Raw source\n\nChanged.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Change raw source", "--actor", "test")
-	assertWriteError(t, repo, "---\ntitle: Manual\n---\n\n# Manual\n", "wiki/manual.md", "--title", "Manual", "--source", "sources/raw.md", "--reason", "Create manual", "--actor", "test")
-	assertWriteError(t, repo, "# Manual sources\n\n## Sources\n\n- [Raw](../sources/raw.md)\n", "wiki/manual-sources.md", "--title", "Manual sources", "--source", "sources/raw.md", "--reason", "Create manual sources", "--actor", "test")
-	assertWriteError(t, repo, "# Missing source\n", "wiki/missing.md", "--title", "Missing source", "--source", "sources/missing.md", "--reason", "Create missing", "--actor", "test")
+	assertWriteError(t, repo, "---\ntitle: Manual\n---\n\n# Manual\n", "wiki/manual.md", "--title", "Manual", "--summary", "Manual summary.", "--tag", "manual", "--source", "sources/raw.md", "--reason", "Create manual", "--actor", "test")
+	assertWriteError(t, repo, "# Manual sources\n\n## Sources\n\n- [Raw](../sources/raw.md)\n", "wiki/manual-sources.md", "--title", "Manual sources", "--summary", "Manual sources summary.", "--tag", "manual", "--source", "sources/raw.md", "--reason", "Create manual sources", "--actor", "test")
+	assertWriteError(t, repo, "# Missing source\n", "wiki/missing.md", "--title", "Missing source", "--summary", "Missing source summary.", "--tag", "missing", "--source", "sources/missing.md", "--reason", "Create missing", "--actor", "test")
 	assertWriteError(t, repo, "# Untitled\n", "wiki/untitled.md", "--source", "sources/raw.md", "--reason", "Create untitled", "--actor", "test")
+	assertWriteError(t, repo, "# No summary\n", "wiki/no-summary.md", "--title", "No summary", "--tag", "missing", "--source", "sources/raw.md", "--reason", "Create no summary", "--actor", "test")
+	assertWriteError(t, repo, "# No tags\n", "wiki/no-tags.md", "--title", "No tags", "--summary", "No tags summary.", "--source", "sources/raw.md", "--reason", "Create no tags", "--actor", "test")
+	assertWriteError(t, repo, "# Too many tags\n", "wiki/too-many-tags.md", "--title", "Too many tags", "--summary", "Too many tags summary.", "--tag", "one", "--tag", "two", "--tag", "three", "--tag", "four", "--tag", "five", "--tag", "six", "--source", "sources/raw.md", "--reason", "Create too many tags", "--actor", "test")
 	assertWriteError(t, repo, "# Bad\n", "../bad.md", "--title", "Bad", "--reason", "Bad path", "--actor", "test")
 	assertWriteError(t, repo, "# Bad\n", "sources/../wiki/bad.md", "--title", "Bad", "--source", "sources/raw.md", "--reason", "Bad clean path", "--actor", "test")
 }

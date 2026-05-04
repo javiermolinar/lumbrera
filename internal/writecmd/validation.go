@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
@@ -48,10 +49,23 @@ func validateOptionsForOperation(repo, target, kind string, exists bool, op oper
 		if err := validateSourcePaths(repo, opts.Sources); err != nil {
 			return err
 		}
+		if len(opts.Tags) > 0 {
+			if err := frontmatter.ValidateTags(opts.Tags); err != nil {
+				return err
+			}
+		}
 	}
 
-	if op == opCreate && strings.TrimSpace(opts.Title) == "" {
-		return fmt.Errorf("--title is required when creating a new wiki file")
+	if op == opCreate && kind == "wiki" {
+		if strings.TrimSpace(opts.Title) == "" {
+			return fmt.Errorf("--title is required when creating a new wiki file")
+		}
+		if strings.TrimSpace(opts.Summary) == "" {
+			return fmt.Errorf("--summary is required when creating a new wiki file")
+		}
+		if len(opts.Tags) == 0 {
+			return fmt.Errorf("at least one --tag is required when creating a new wiki file")
+		}
 	}
 	if op == opAppend {
 		if !exists {

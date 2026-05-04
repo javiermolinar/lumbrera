@@ -13,6 +13,7 @@ const (
 	IndexPath     = "INDEX.md"
 	ChangelogPath = "CHANGELOG.md"
 	BrainSumPath  = "BRAIN.sum"
+	TagsPath      = "tags.md"
 )
 
 func ValidateRepo(repo string) error {

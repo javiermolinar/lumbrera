@@ -87,7 +87,7 @@ Checks:
   - wiki documents have valid generated frontmatter
   - wiki pages have resolving source references
   - local Markdown links and heading anchors resolve
-  - INDEX.md, CHANGELOG.md, and wiki BRAIN.sum match regenerated output
+  - INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md match regenerated output
 
 Options:
   --brain <path>      target brain directory, defaults to the current directory

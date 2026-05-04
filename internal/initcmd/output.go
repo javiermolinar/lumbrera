@@ -16,6 +16,7 @@ Creates:
   INDEX.md          generated navigation map
   CHANGELOG.md      generated semantic history from .brain/ops.log
   BRAIN.sum         generated wiki checksum manifest
+  tags.md           generated read-only tag registry from wiki frontmatter
   AGENTS.md         standing instructions for agents
   CLAUDE.md         symlink to AGENTS.md for Claude
   .agents/skills/   bundled Lumbrera ingest, query, and lint skills
@@ -54,6 +55,7 @@ Created:
   INDEX.md
   CHANGELOG.md
   BRAIN.sum
+  tags.md
   AGENTS.md
   CLAUDE.md -> AGENTS.md
   .agents/skills/lumbrera-ingest/SKILL.md

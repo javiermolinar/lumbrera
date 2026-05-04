@@ -3,13 +3,19 @@ package frontmatter
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-const Schema = "document-v1"
+const (
+	Schema  = "document-v1"
+	MaxTags = 5
+)
+
+var tagPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 type Document struct {
 	Title    string       `yaml:"title"`
@@ -115,6 +121,34 @@ func Validate(doc Document) error {
 	}
 	if doc.Lumbrera.Kind != "source" && doc.Lumbrera.Kind != "wiki" {
 		return fmt.Errorf("frontmatter lumbrera.kind must be source or wiki")
+	}
+	if doc.Lumbrera.Kind == "wiki" {
+		summary := strings.TrimSpace(doc.Summary)
+		if summary == "" {
+			return fmt.Errorf("frontmatter summary is required for wiki documents")
+		}
+		if strings.ContainsAny(summary, "\r\n") {
+			return fmt.Errorf("frontmatter summary must be a single line")
+		}
+		if err := ValidateTags(doc.Tags); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ValidateTags(tags []string) error {
+	normalized := sortedUnique(tags)
+	if len(normalized) == 0 {
+		return fmt.Errorf("frontmatter tags are required for wiki documents")
+	}
+	if len(normalized) > MaxTags {
+		return fmt.Errorf("frontmatter tags exceed maximum of %d", MaxTags)
+	}
+	for _, tag := range normalized {
+		if !tagPattern.MatchString(tag) {
+			return fmt.Errorf("frontmatter tag %q must be a lowercase slug using a-z, 0-9, and hyphen", tag)
+		}
 	}
 	return nil
 }

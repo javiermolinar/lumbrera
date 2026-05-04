@@ -19,6 +19,7 @@ var allowedRootFiles = map[string]struct{}{
 	brain.IndexPath:     {},
 	brain.ChangelogPath: {},
 	brain.BrainSumPath:  {},
+	brain.TagsPath:      {},
 	"AGENTS.md":         {},
 	"CLAUDE.md":         {},
 	".gitignore":        {},
@@ -213,6 +214,7 @@ func VerifyGeneratedFiles(repo string) error {
 		brain.IndexPath:     files.Index,
 		brain.ChangelogPath: files.Changelog,
 		brain.BrainSumPath:  files.BrainSum,
+		brain.TagsPath:      files.Tags,
 	}
 	for rel, want := range checks {
 		got, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))

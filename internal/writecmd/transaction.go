@@ -50,6 +50,7 @@ func newWriteBackup(brainDir, target string) (*writeBackup, error) {
 		brain.IndexPath,
 		brain.ChangelogPath,
 		brain.BrainSumPath,
+		brain.TagsPath,
 		ops.LogPath,
 	}
 	seen := map[string]struct{}{}

@@ -21,7 +21,7 @@ func TestVerifyPassesForInitializedBrain(t *testing.T) {
 func TestVerifyRejectsManifestDrift(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	path := filepath.Join(repo, "wiki", "topic.md")
 	content := strings.Replace(readFile(t, repo, "wiki/topic.md"), "Body.", "Changed body.", 1)
@@ -74,6 +74,22 @@ func TestVerifyRejectsChangelogDrift(t *testing.T) {
 
 	if err := Run([]string{"--brain", repo}); err == nil {
 		t.Fatal("expected verify to reject changelog drift")
+	}
+}
+
+func TestVerifyRejectsTagsDrift(t *testing.T) {
+	repo := initBrain(t)
+	tags := readFile(t, repo, "tags.md") + "\nManual tag edit.\n"
+	if err := os.WriteFile(filepath.Join(repo, "tags.md"), []byte(tags), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Run([]string{"--brain", repo})
+	if err == nil {
+		t.Fatal("expected verify to reject tags.md drift")
+	}
+	if !strings.Contains(err.Error(), "tags.md") {
+		t.Fatalf("expected error to mention tags.md, got %v", err)
 	}
 }
 

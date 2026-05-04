@@ -6,7 +6,7 @@ import (
 )
 
 func TestRenderAndSplitGeneratedFrontmatter(t *testing.T) {
-	doc := New("wiki", "Write command", "", []string{"cli", "brain", "cli"}, []string{"sources/raw.md"}, []string{"wiki/related.md"})
+	doc := New("wiki", "Write command", "Describes how the write command works.", []string{"cli", "brain", "cli"}, []string{"sources/raw.md"}, []string{"wiki/related.md"})
 	content, err := Attach(doc, "# Write command\n\nBody.\n")
 	if err != nil {
 		t.Fatal(err)
@@ -36,17 +36,28 @@ func TestRenderAndSplitGeneratedFrontmatter(t *testing.T) {
 	}
 }
 
-func TestRenderOmitsEmptyOptionalFields(t *testing.T) {
-	doc := New("wiki", "Tempo architecture", "", nil, []string{"sources/tempo-docs-combined.md"}, nil)
-	content, err := Render(doc)
-	if err != nil {
-		t.Fatal(err)
+func TestRenderRejectsMissingWikiSummaryAndTags(t *testing.T) {
+	if _, err := Render(New("wiki", "Tempo architecture", "", []string{"tempo"}, []string{"sources/tempo-docs-combined.md"}, nil)); err == nil {
+		t.Fatal("expected missing summary to be rejected")
 	}
-	if strings.Contains(content, "summary:") {
-		t.Fatalf("empty summary should be omitted:\n%s", content)
+	if _, err := Render(New("wiki", "Tempo architecture", "Tempo architecture summary.", nil, []string{"sources/tempo-docs-combined.md"}, nil)); err == nil {
+		t.Fatal("expected missing tags to be rejected")
 	}
-	if strings.Contains(content, "tags:") {
-		t.Fatalf("empty tags should be omitted:\n%s", content)
+}
+
+func TestRenderRejectsInvalidWikiSummary(t *testing.T) {
+	if _, err := Render(New("wiki", "Summary", "Line one.\nLine two.", []string{"summary"}, []string{"sources/raw.md"}, nil)); err == nil {
+		t.Fatal("expected multiline summary to be rejected")
+	}
+}
+
+func TestRenderRejectsInvalidWikiTags(t *testing.T) {
+	tooMany := []string{"one", "two", "three", "four", "five", "six"}
+	if _, err := Render(New("wiki", "Tagged", "Tagged summary.", tooMany, []string{"sources/raw.md"}, nil)); err == nil {
+		t.Fatal("expected too many tags to be rejected")
+	}
+	if _, err := Render(New("wiki", "Tagged", "Tagged summary.", []string{"Bad Tag"}, []string{"sources/raw.md"}, nil)); err == nil {
+		t.Fatal("expected invalid tag slug to be rejected")
 	}
 }
 

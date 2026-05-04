@@ -61,5 +61,5 @@ Run:
 
 Examples:
   lumbrera init ./brain
-  lumbrera write wiki/topic.md --title "Topic" --source sources/input.md --reason "Create topic page" < topic.md`)
+  lumbrera write wiki/topic.md --title "Topic" --summary "Durable summary" --tag topic --source sources/input.md --reason "Create topic page" < topic.md`)
 }
