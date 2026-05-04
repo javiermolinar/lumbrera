@@ -402,10 +402,21 @@ Use when the user asks to ingest, process, summarize, or integrate a raw source.
 
 - Read the raw resource referenced by the user.
 - Do not alter the raw resource.
-- Create or update a distilled Markdown document under wiki/ with the durable knowledge from the source.
-- When a specific claim benefits from pinpoint provenance, cite it inline as [source: ../sources/path.md#heading-anchor].
+- Preserve source granularity when possible; avoid aggregating unrelated source documents into one huge source unless necessary.
+- If a combined source is already provided, preserve it as-is but write wiki pages by durable topic or task.
+- Read INDEX.md and relevant existing wiki/ pages before writing, so new synthesis updates or complements existing knowledge instead of duplicating it.
+- Inspect the source heading structure and identify durable topics.
+- Create or update distilled Markdown documents under wiki/ with durable knowledge from the source.
+- Chunk large sources only for reading. Write wiki pages by durable topic, not by source chunk number. Do not create pages named like part-1 or part-2 unless the source itself is sequential knowledge.
+- For large sources, produce a short ingest plan before writing: target wiki paths, create/update decisions, source sections covered, proposed title, summary, and tags.
+- Prefer task-oriented synthesis pages when useful, not only topic summaries.
+- For operational content, mark whether synthesized knowledge is public, internal, or mixed in the wiki body when that distinction is relevant.
+- When ingesting troubleshooting or runbook material, prefer symptom → cause → fix tables where durable.
+- Use --summary when a concise durable page summary is available. Use --tag for existing or obvious stable tags. Do not invent filler tags.
+- Prefer page-level provenance through --source. Add inline [source: ../sources/path.md#heading-anchor] citations only for important, surprising, version-sensitive, numeric, operational-limit, or easily disputed claims.
 - Provide wiki Markdown body content only. Do not create wiki frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those for wiki pages.
 - Use lumbrera write to add the distilled document. For a new wiki file, pass --title. For wiki writes, pass --source. Always pass --reason.
+- After writing, run lumbrera verify and report coverage: created or updated pages, covered source sections, skipped sections, uncertainties, and recommended follow-up pages.
 `
 
 const querySkillContent = `---
@@ -420,9 +431,13 @@ Use when the user asks a question about knowledge in the brain.
 ## Workflow
 
 - Start with INDEX.md to find candidate wiki/ pages. Use it for navigation, not evidence.
+- If a user term is ambiguous, state the likely interpretations and either ask for clarification or answer with the assumed scope.
 - Read the relevant wiki/ pages first.
 - Check preserved sources/ documents when claims need verification.
+- Do not infer frequency, priority, popularity, or prevalence unless the wiki/source explicitly supports it.
+- When using internal/private operational sources, label the answer as internal-sourced and avoid presenting it as public documentation.
 - Answer with citations to the wiki pages or source documents used.
+- When asked, list the specific wiki/source files used.
 - If the answer is durable knowledge worth keeping, ask whether to save it.
 - Save only through lumbrera write. Do not create wiki frontmatter or generated metadata.
 `
@@ -442,8 +457,11 @@ Lumbrera handles deterministic consistency for managed wiki content: wiki frontm
 
 - Read the relevant wiki/ pages and their preserved sources/ documents.
 - Look for semantic drift: stale claims, contradictions, synthesis that no longer matches sources, or claims not actually supported by cited sources.
+- Identify high-risk claims that need claim-level citations: limits, breaking changes, destructive procedures, security/auth behavior, and internal operational workflows.
+- Check whether internal-only knowledge is clearly marked and not presented as public documentation.
 - Look for duplicated or fragmented concepts that should be merged or clarified.
 - Identify important open questions or data gaps that need new sources.
+- Report task-navigation gaps, such as missing troubleshooting quick references, FAQ-style pages, or symptom → cause → fix runbooks.
 - Report findings with affected paths, evidence, and suggested next actions.
 - If asked to fix semantic issues, use lumbrera write. Do not edit files directly or create wiki generated metadata.
 `

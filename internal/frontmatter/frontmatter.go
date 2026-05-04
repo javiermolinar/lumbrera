@@ -13,8 +13,8 @@ const Schema = "document-v1"
 
 type Document struct {
 	Title    string       `yaml:"title"`
-	Summary  string       `yaml:"summary"`
-	Tags     []string     `yaml:"tags"`
+	Summary  string       `yaml:"summary,omitempty"`
+	Tags     []string     `yaml:"tags,omitempty"`
 	Lumbrera LumbreraMeta `yaml:"lumbrera"`
 }
 

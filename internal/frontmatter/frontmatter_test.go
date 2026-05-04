@@ -36,6 +36,20 @@ func TestRenderAndSplitGeneratedFrontmatter(t *testing.T) {
 	}
 }
 
+func TestRenderOmitsEmptyOptionalFields(t *testing.T) {
+	doc := New("wiki", "Tempo architecture", "", nil, []string{"sources/tempo-docs-combined.md"}, nil)
+	content, err := Render(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(content, "summary:") {
+		t.Fatalf("empty summary should be omitted:\n%s", content)
+	}
+	if strings.Contains(content, "tags:") {
+		t.Fatalf("empty tags should be omitted:\n%s", content)
+	}
+}
+
 func TestSplitRejectsNonLumbreraFrontmatter(t *testing.T) {
 	_, _, has, err := Split([]byte("---\ntitle: Manual\n---\n\n# Manual\n"))
 	if !has {
