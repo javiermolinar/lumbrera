@@ -22,6 +22,14 @@ Lumbrera keeps the data as ordinary files and makes the CLI the mutation boundar
 
 Lumbrera is not trying to be a new chat UI or a full knowledge-management app. It is a small protocol and CLI boundary for maintaining source-grounded Markdown knowledge safely in local files. Git, cloud sync, backups, and sharing are external choices.
 
+## Install
+
+```sh
+go install github.com/javiermolinar/lumbrera/cmd/lumbrera@main
+```
+
+The module root is not an installable command package; use `/cmd/lumbrera`.
+
 ## Commands
 
 Humans usually start with:
