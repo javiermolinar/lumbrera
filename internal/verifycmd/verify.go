@@ -95,6 +95,7 @@ Checks:
   - .brain/VERSION matches the supported brain format
   - content paths obey Lumbrera policy
   - wiki documents have valid generated frontmatter
+  - wiki pages are at most 400 Markdown body lines
   - wiki pages have resolving source references
   - local Markdown links and heading anchors resolve
   - INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md match regenerated output

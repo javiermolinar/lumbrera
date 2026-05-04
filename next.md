@@ -2,7 +2,7 @@
 
 ## Context
 
-The old `2026-05-02-lumbrera-plan.md` has been renamed to this `next.md`. The current implementation has the local v1 shape mostly in place: `init`, `write`, and `verify`; generated `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, and read-only `tags.md`; immutable raw sources; stable generated wiki document IDs; mandatory single-line wiki summary and 1-5 tags; generated wiki frontmatter and source sections; link, heading-anchor, and inline source-citation validation; rollback on failed writes; and bundled ingest/query/lint skills.
+The old `2026-05-02-lumbrera-plan.md` has been renamed to this `next.md`. The current implementation has the local v1 shape mostly in place: `init`, `write`, and `verify`; generated `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, and read-only `tags.md`; immutable raw sources; stable generated wiki document IDs; mandatory single-line wiki summary, 1-5 tags, and 400-line max wiki body; generated wiki frontmatter and source sections; link, heading-anchor, and inline source-citation validation; rollback on failed writes; and bundled ingest/query/lint skills.
 
 The next milestone is v2: make Lumbrera easier for LLM agents to query by adding a derived SQLite search index and a new `lumbrera search` command.
 
@@ -17,7 +17,7 @@ The index is a derived cache, not source of truth. Markdown files, generated Lum
 - SQLite-backed derived index stored under `.brain/`, likely `.brain/search.sqlite`.
 - Incremental updates keyed by stable generated Lumbrera document IDs in wiki frontmatter; `verify` repairs missing IDs in older wiki pages.
 - Index schema versioning and rebuild/staleness detection.
-- Markdown section extraction for both `wiki/` and `sources/`.
+- Markdown section extraction for both `wiki/` and `sources/`; wiki pages are intentionally capped at 400 body lines so section indexing stays predictable.
 - Full-text search over titles, summaries, tags, headings, body text, paths, and source citations.
 - Search ranking that prefers wiki synthesis first, uses path/title/summary/tags for document routing and embeddings, but still exposes raw sources when evidence matters.
 - Agent-readable `lumbrera search` command output with citations and stable JSON mode.

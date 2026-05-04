@@ -8,12 +8,13 @@ import (
 )
 
 const (
-	Version       = "lumbrera-brain-v1"
-	MarkerPath    = ".brain/VERSION"
-	IndexPath     = "INDEX.md"
-	ChangelogPath = "CHANGELOG.md"
-	BrainSumPath  = "BRAIN.sum"
-	TagsPath      = "tags.md"
+	Version          = "lumbrera-brain-v1"
+	MarkerPath       = ".brain/VERSION"
+	IndexPath        = "INDEX.md"
+	ChangelogPath    = "CHANGELOG.md"
+	BrainSumPath     = "BRAIN.sum"
+	TagsPath         = "tags.md"
+	MaxWikiBodyLines = 400
 )
 
 func ValidateRepo(repo string) error {

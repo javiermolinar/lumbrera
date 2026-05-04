@@ -101,6 +101,18 @@ func TestWriteRejectsEmptyAppendFlag(t *testing.T) {
 	}
 }
 
+func TestWriteRejectsOversizedWikiPage(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+
+	body := "# Large\n\n" + strings.Repeat("Line.\n", 401)
+	assertWriteError(t, repo, body, "wiki/large.md", "--title", "Large", "--summary", "Large summary.", "--tag", "large", "--source", "sources/raw.md", "--reason", "Create large", "--actor", "test")
+	assertMissing(t, repo, "wiki/large.md")
+	if strings.Contains(readFile(t, repo, "CHANGELOG.md"), "Create large") {
+		t.Fatal("failed oversized write left changelog entry")
+	}
+}
+
 func TestWriteRejectsAppendToGeneratedSourcesSection(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")

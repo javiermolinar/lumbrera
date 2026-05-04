@@ -54,7 +54,7 @@ Time to time run the linter to fix semantic drifts:
 - Preserve source material as raw Markdown before distilling it into wiki pages.
 - Generate `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, and read-only `tags.md` from the managed wiki state.
 - Require source references for distilled knowledge so claims can be traced back to preserved material.
-- Generate stable Lumbrera document IDs in wiki frontmatter, require single-line wiki summaries and 1-5 lowercase slug tags, then validate local Markdown links, heading anchors, and optional inline source citations such as `[source: ../sources/input.md#section]` during writes.
+- Generate stable Lumbrera document IDs in wiki frontmatter, require single-line wiki summaries, 1-5 lowercase slug tags, and wiki pages of at most 400 body lines, then validate local Markdown links, heading anchors, and optional inline source citations such as `[source: ../sources/input.md#section]` during writes.
 - Support bring-your-own-agent workflows, including Pi, Claude Code, Cursor, Slack bots, scripts, and humans.
 - Avoid a database, custom backend, CRDT layer, hosted service, or mandatory Git workflow in the first version.
 

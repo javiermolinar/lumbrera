@@ -126,7 +126,7 @@ Options:
 Rules:
   - source writes preserve stdin as raw Markdown
   - wiki stdin must contain Markdown body only; Lumbrera generates wiki document IDs and frontmatter
-  - new wiki pages require single-line --summary and 1-5 lowercase slug --tag values
+  - new wiki pages require single-line --summary, 1-5 lowercase slug --tag values, and at most 400 body lines
   - source files are immutable after creation
   - wiki writes require at least one --source
   - local Markdown links and heading anchors must resolve

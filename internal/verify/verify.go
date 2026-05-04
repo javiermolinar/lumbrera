@@ -246,6 +246,9 @@ func validateWikiDocument(repo, absPath, relPath string) (string, error) {
 	if meta.Lumbrera.Kind != "wiki" {
 		return "", fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, "wiki")
 	}
+	if lines := markdownLineCount(body); lines > brain.MaxWikiBodyLines {
+		return "", fmt.Errorf("%s exceeds max wiki page length: %d lines, max %d. Split it into smaller topic/task pages", relPath, lines, brain.MaxWikiBodyLines)
+	}
 	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: true})
 	if err != nil {
 		return "", fmt.Errorf("%s has invalid Markdown links: %w", relPath, err)
@@ -301,6 +304,15 @@ func VerifyGeneratedFiles(repo string) error {
 		}
 	}
 	return nil
+}
+
+func markdownLineCount(body string) int {
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+	body = strings.TrimRight(body, "\n")
+	if body == "" {
+		return 0
+	}
+	return strings.Count(body, "\n") + 1
 }
 
 func validateSourceCitations(repo, relPath string, citations []md.Reference) error {

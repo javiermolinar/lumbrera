@@ -77,6 +77,25 @@ func TestVerifyRejectsDuplicateWikiDocumentIDs(t *testing.T) {
 	}
 }
 
+func TestVerifyRejectsOversizedWikiPage(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+
+	content := strings.Replace(readFile(t, repo, "wiki/topic.md"), "Body.", strings.Repeat("Line.\n", 401), 1)
+	if err := os.WriteFile(filepath.Join(repo, "wiki", "topic.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Run([]string{"--brain", repo})
+	if err == nil {
+		t.Fatal("expected oversized wiki page to be rejected")
+	}
+	if !strings.Contains(err.Error(), "exceeds max wiki page length") {
+		t.Fatalf("expected max length error, got %v", err)
+	}
+}
+
 func TestVerifyAllowsRawSourceWithoutGeneratedFrontmatter(t *testing.T) {
 	repo := initBrain(t)
 	path := filepath.Join(repo, "sources", "raw.md")

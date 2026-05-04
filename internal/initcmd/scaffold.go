@@ -369,6 +369,12 @@ Agents handle semantic work:
 3. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map and tags.md as the tag registry, then read relevant wiki/ pages, then check sources/ when evidence is needed.
 4. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
 
+## Wiki page quality
+
+A good wiki page is atomic, source-grounded, useful without reopening the source, and small. Keep each page focused on one durable concept, decision, task, runbook, or reference topic. Wiki pages have a hard maximum of 400 Markdown body lines; split broad pages before writing them.
+
+Prefer searchable pages with clear titles, a single-line summary, 1-5 reused tags, contextual links to related wiki pages, and direct source provenance. Bad wiki pages include "everything from source X", chunk dumps like "part 1", huge mixed-topic pages, filler tags, unsupported synthesis, or duplicates of existing pages.
+
 ## What to do
 
 - Assume paths are relative to this repository root.
@@ -420,9 +426,13 @@ Use when the user asks to ingest, process, summarize, or integrate a raw source.
 - Read INDEX.md, tags.md, and relevant existing wiki/ pages before writing, so new synthesis updates or complements existing knowledge instead of duplicating it.
 - Inspect the source heading structure and identify durable topics.
 - Create or update distilled Markdown documents under wiki/ with durable knowledge from the source.
+- A good wiki page is atomic, source-grounded, useful without reopening the source, small, searchable, and linked when the relationship is real.
+- Wiki pages have a hard maximum of 400 Markdown body lines. Split pages before they exceed the limit.
 - Chunk large sources only for reading. Write wiki pages by durable topic, not by source chunk number. Do not create pages named like part-1 or part-2 unless the source itself is sequential knowledge.
 - For large sources, produce a short ingest plan before writing: target wiki paths, create/update decisions, source sections covered, proposed title, mandatory single-line summary, and 1-5 tags.
 - Prefer task-oriented synthesis pages when useful, not only topic summaries.
+- Split when a draft covers multiple independent concepts, has sections that can be read independently, needs more than 5 tags, or becomes a grab bag.
+- Avoid pages that are just "everything from source X", chunk dumps, giant mixed-topic notes, filler tags, unsupported synthesis, or duplicates of existing pages.
 - For operational content, mark whether synthesized knowledge is public, internal, or mixed in the wiki body when that distinction is relevant.
 - When ingesting troubleshooting or runbook material, prefer symptom → cause → fix tables where durable.
 - Every wiki page needs a single-line --summary and 1-5 --tag values. Reuse existing lowercase slug tags from tags.md when they fit; create a new stable tag only when existing tags are clearly wrong. Do not invent filler tags.
