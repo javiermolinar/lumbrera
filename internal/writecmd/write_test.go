@@ -55,8 +55,9 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/topic.md sha256:")
 	assertFileContains(t, repo, "CHANGELOG.md", "[source] [test]: Preserve raw source")
 	assertFileContains(t, repo, "CHANGELOG.md", "[create] [test]: Create topic")
-	assertFileContains(t, repo, "tags.md", "## design")
-	assertFileContains(t, repo, "tags.md", "- [Topic](wiki/topic.md) — Topic summary.")
+	assertFileContains(t, repo, "tags.md", "## Tags")
+	assertFileContains(t, repo, "tags.md", "- design (1)")
+	assertFileNotContains(t, repo, "tags.md", "wiki/topic.md")
 	assertFileContains(t, repo, ".brain/ops.log", `"operation":"create"`)
 }
 

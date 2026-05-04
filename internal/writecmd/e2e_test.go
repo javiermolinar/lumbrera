@@ -36,7 +36,7 @@ func TestE2EInitSourceWriteWikiWriteInTmp(t *testing.T) {
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/e2e-write-page.md sha256:")
 	assertFileContains(t, repo, "CHANGELOG.md", "[source] [e2e]: Preserve E2E source")
 	assertFileContains(t, repo, "CHANGELOG.md", "[create] [e2e]: Distill E2E source")
-	assertFileContains(t, repo, "tags.md", "## e2e")
+	assertFileContains(t, repo, "tags.md", "- e2e (1)")
 }
 
 func runCommand(t *testing.T, dir, stdin, name string, args ...string) {

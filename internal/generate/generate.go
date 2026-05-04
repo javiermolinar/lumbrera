@@ -61,12 +61,6 @@ type indexDoc struct {
 	Title string
 }
 
-type tagDoc struct {
-	Path    string
-	Title   string
-	Summary string
-}
-
 func IndexForRepo(repo string) (string, error) {
 	sources, err := sourceIndexDocsFromWiki(repo)
 	if err != nil {
@@ -102,22 +96,14 @@ func TagsForRepo(repo string) (string, error) {
 		return b.String(), nil
 	}
 
+	b.WriteString("\n## Tags\n\n")
 	keys := make([]string, 0, len(tags))
 	for tag := range tags {
 		keys = append(keys, tag)
 	}
 	sort.Strings(keys)
 	for _, tag := range keys {
-		docs := tags[tag]
-		sort.Slice(docs, func(i, j int) bool { return docs[i].Path < docs[j].Path })
-		fmt.Fprintf(&b, "\n## %s\n\n", tag)
-		for _, doc := range docs {
-			fmt.Fprintf(&b, "- [%s](%s)", doc.Title, doc.Path)
-			if doc.Summary != "" {
-				fmt.Fprintf(&b, " — %s", doc.Summary)
-			}
-			b.WriteByte('\n')
-		}
+		fmt.Fprintf(&b, "- %s (%d)\n", tag, tags[tag])
 	}
 	return b.String(), nil
 }
@@ -262,11 +248,12 @@ func sourceIndexDocsFromWiki(repo string) ([]indexDoc, error) {
 	return docs, nil
 }
 
-func tagDocsFromWiki(repo string) (map[string][]tagDoc, error) {
-	tags := map[string][]tagDoc{}
+func tagDocsFromWiki(repo string) (map[string]int, error) {
+	tags := map[string]int{}
 	err := walkWikiMetadata(repo, func(rel string, meta frontmatter.Document) error {
+		_ = rel
 		for _, tag := range meta.Tags {
-			tags[tag] = append(tags[tag], tagDoc{Path: rel, Title: meta.Title, Summary: meta.Summary})
+			tags[tag]++
 		}
 		return nil
 	})
