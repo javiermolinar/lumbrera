@@ -9,9 +9,15 @@ import (
 )
 
 const (
-	brainVersion      = "lumbrera-brain-v1"
-	initCommitSubject = "[init] [lumbrera]: Initialize Lumbrera brain"
-	markerPath        = ".brain/VERSION"
+	brainVersion        = "lumbrera-brain-v1"
+	initCommitSubject   = "[init] [lumbrera]: Initialize Lumbrera brain"
+	markerPath          = ".brain/VERSION"
+	agentsPath          = "AGENTS.md"
+	claudePath          = "CLAUDE.md"
+	claudeSymlinkTarget = agentsPath
+	agentsDir           = ".agents"
+	claudeDir           = ".claude"
+	claudeDirTarget     = agentsDir
 )
 
 var scaffoldDirs = []string{
@@ -19,33 +25,41 @@ var scaffoldDirs = []string{
 	"wiki",
 	".brain/conflicts",
 	".brain/hooks",
+	".agents/skills/lumbrera",
 }
 
 var scaffoldFiles = map[string]string{
-	markerPath:     brainVersion + "\n",
-	"INDEX.md":     indexContent,
-	"CHANGELOG.md": changelogContent,
-	"BRAIN.sum":    brainSumContent,
-	"AGENTS.md":    agentsContent,
+	markerPath:                         brainVersion + "\n",
+	"INDEX.md":                         indexContent,
+	"CHANGELOG.md":                     changelogContent,
+	"BRAIN.sum":                        brainSumContent,
+	agentsPath:                         agentsContent,
+	".agents/skills/lumbrera/SKILL.md": skillContent,
 }
 
 var partialDirs = map[string]struct{}{
-	".brain":           {},
-	".brain/conflicts": {},
-	".brain/hooks":     {},
-	"sources":          {},
-	"wiki":             {},
+	".agents":                 {},
+	".agents/skills":          {},
+	".agents/skills/lumbrera": {},
+	".brain":                  {},
+	".brain/conflicts":        {},
+	".brain/hooks":            {},
+	"sources":                 {},
+	"wiki":                    {},
 }
 
 var partialFiles = map[string]struct{}{
-	markerPath:                {},
-	".brain/hooks/commit-msg": {},
-	".brain/hooks/pre-commit": {},
-	".brain/hooks/pre-push":   {},
-	"AGENTS.md":               {},
-	"BRAIN.sum":               {},
-	"CHANGELOG.md":            {},
-	"INDEX.md":                {},
+	markerPath:                         {},
+	".agents/skills/lumbrera/SKILL.md": {},
+	".brain/hooks/commit-msg":          {},
+	".brain/hooks/pre-commit":          {},
+	".brain/hooks/pre-push":            {},
+	agentsPath:                         {},
+	claudeDir:                          {},
+	claudePath:                         {},
+	"BRAIN.sum":                        {},
+	"CHANGELOG.md":                     {},
+	"INDEX.md":                         {},
 }
 
 func ensureScaffold(repo string) error {
@@ -59,7 +73,10 @@ func ensureScaffold(repo string) error {
 			return err
 		}
 	}
-	return nil
+	if err := ensureSymlink(filepath.Join(repo, claudePath), claudeSymlinkTarget); err != nil {
+		return err
+	}
+	return ensureSymlink(filepath.Join(repo, claudeDir), claudeDirTarget)
 }
 
 func writeExpectedFile(path, content string) error {
@@ -81,6 +98,27 @@ func writeExpectedFile(path, content string) error {
 	defer file.Close()
 	_, err = file.WriteString(content)
 	return err
+}
+
+func ensureSymlink(path, target string) error {
+	info, err := os.Lstat(path)
+	if err == nil {
+		if info.Mode()&os.ModeSymlink == 0 {
+			return fmt.Errorf("refusing to overwrite existing file %s; expected symlink to %s", path, target)
+		}
+		current, err := os.Readlink(path)
+		if err != nil {
+			return err
+		}
+		if current != target {
+			return fmt.Errorf("refusing to replace existing symlink %s -> %s; expected %s", path, current, target)
+		}
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return os.Symlink(target, path)
 }
 
 func validateFreshBoilerplate(repo string) error {
@@ -147,10 +185,16 @@ func validatePartialScaffold(repo string) error {
 			return fmt.Errorf("refusing to resume initialization in %s: existing directory %q is not part of a partial Lumbrera scaffold", repo, rel)
 		}
 		if _, ok := partialFiles[rel]; ok {
-			if rel == markerPath {
+			switch rel {
+			case markerPath:
 				return validateMarkerFile(repo, path)
+			case claudePath:
+				return validateSymlink(repo, path, claudeSymlinkTarget)
+			case claudeDir:
+				return validateSymlink(repo, path, claudeDirTarget)
+			default:
+				return nil
 			}
-			return nil
 		}
 		if !strings.Contains(rel, "/") && isAllowedBoilerplateFile(rel) {
 			return nil
@@ -167,6 +211,24 @@ func validateMarkerFile(repo, path string) error {
 	marker := strings.TrimSpace(string(content))
 	if marker != brainVersion {
 		return fmt.Errorf("refusing to resume initialization in %s: unsupported Lumbrera marker %q", repo, marker)
+	}
+	return nil
+}
+
+func validateSymlink(repo, path, target string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		return fmt.Errorf("refusing to resume initialization in %s: %q is not a symlink", repo, filepath.Base(path))
+	}
+	current, err := os.Readlink(path)
+	if err != nil {
+		return err
+	}
+	if current != target {
+		return fmt.Errorf("refusing to resume initialization in %s: %q points to %q, expected %q", repo, filepath.Base(path), current, target)
 	}
 	return nil
 }
@@ -251,7 +313,7 @@ You must not:
 - create, edit, move, delete, or overwrite files directly,
 - edit generated files,
 - run Git mutation commands directly for knowledge changes,
-- modify files under .brain/.
+- modify files under .brain/, .agents/, or .claude.
 
 All mutations must use lumbrera write.
 
@@ -262,4 +324,19 @@ Knowledge rules:
 - sources are immutable after creation.
 
 Remote setup is administrative. Humans usually configure the remote. Agents may do so only when explicitly instructed.
+`
+
+const skillContent = `---
+name: lumbrera
+description: Use the Lumbrera CLI contract for backendless, Git-backed Markdown knowledge bases.
+---
+
+# Lumbrera Agent Contract
+
+- Read Markdown files directly.
+- Do not create, edit, move, delete, or overwrite files directly in a Lumbrera brain repo.
+- Run lumbrera sync --repo <repo> before relying on local state.
+- Use lumbrera write for every mutation.
+- Do not edit generated files: INDEX.md, CHANGELOG.md, or BRAIN.sum.
+- Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
 `

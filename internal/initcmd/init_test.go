@@ -23,6 +23,9 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertExists(t, repo, "CHANGELOG.md")
 	assertExists(t, repo, "BRAIN.sum")
 	assertExists(t, repo, "AGENTS.md")
+	assertSymlink(t, repo, "CLAUDE.md", "AGENTS.md")
+	assertFileContains(t, repo, ".agents/skills/lumbrera/SKILL.md", "name: lumbrera")
+	assertSymlink(t, repo, ".claude", ".agents")
 	assertGitOutput(t, repo, []string{"config", "core.hooksPath"}, ".brain/hooks")
 	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[init] [lumbrera]: Initialize Lumbrera brain")
 	assertGitOutput(t, repo, []string{"log", "--format=%an <%ae>", "-1"}, "Test <test@example.invalid>")
@@ -178,6 +181,28 @@ func assertFile(t *testing.T, repo, rel, want string) {
 	got := strings.TrimSpace(string(content))
 	if got != want {
 		t.Fatalf("unexpected %s content: got %q want %q", rel, got, want)
+	}
+}
+
+func assertSymlink(t *testing.T, repo, rel, wantTarget string) {
+	t.Helper()
+	target, err := os.Readlink(filepath.Join(repo, rel))
+	if err != nil {
+		t.Fatalf("expected %s to be a symlink: %v", rel, err)
+	}
+	if target != wantTarget {
+		t.Fatalf("unexpected %s symlink target: got %q want %q", rel, target, wantTarget)
+	}
+}
+
+func assertFileContains(t *testing.T, repo, rel, want string) {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join(repo, rel))
+	if err != nil {
+		t.Fatalf("expected to read %s: %v", rel, err)
+	}
+	if !strings.Contains(string(content), want) {
+		t.Fatalf("expected %s to contain %q", rel, want)
 	}
 }
 
