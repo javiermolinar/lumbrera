@@ -357,8 +357,8 @@ Agents handle semantic work:
 ## What to do
 
 - Assume paths are relative to this repository root.
-- Use Markdown body content only; let Lumbrera add protocol metadata.
-- Use lumbrera write for every mutation, supplying source path and reason through CLI flags.
+- Use Markdown body content only; let Lumbrera add protocol metadata and frontmatter.
+- Use lumbrera write for every mutation, supplying title for new files, source path for wiki writes, and reason through CLI flags.
 - If local state may be stale, run lumbrera sync from the repository root.
 
 ## What not to do
@@ -387,8 +387,8 @@ Use when the user asks to ingest, process, summarize, or integrate a raw source.
 - Read the raw resource referenced by the user.
 - Do not alter the raw resource.
 - Create or update a distilled Markdown document under wiki/ with the durable knowledge from the source.
-- Do not create frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those.
-- Use lumbrera write to add the distilled document, with the source path and reason supplied to the CLI.
+- Provide Markdown body content only. Do not create frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those.
+- Use lumbrera write to add the distilled document. For a new file, pass --title. For wiki writes, pass --source. Always pass --reason.
 `
 
 const querySkillContent = `---

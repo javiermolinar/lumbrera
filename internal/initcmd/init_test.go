@@ -25,6 +25,7 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertExists(t, repo, "AGENTS.md")
 	assertSymlink(t, repo, "CLAUDE.md", "AGENTS.md")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "name: lumbrera-ingest")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "pass --title")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "name: lumbrera-query")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-lint/SKILL.md", "name: lumbrera-lint")
 	assertSymlink(t, repo, ".claude", ".agents")
