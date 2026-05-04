@@ -53,14 +53,7 @@ Time to time run the linter to fix semantic drifts:
 
 ## Goals
 
-- Keep knowledge in ordinary Markdown files that humans and agents can read directly.
-- Preserve source material as raw Markdown before distilling it into wiki pages.
-- Generate `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, and read-only `tags.md` from the managed wiki state.
-- Require source references for distilled knowledge so claims can be traced back to preserved material.
-- Generate stable Lumbrera document IDs in wiki frontmatter, require single-line wiki summaries, 1-5 lowercase slug tags, and wiki pages of at most 400 body lines, then validate local Markdown links, heading anchors, and optional inline source citations such as `[source: ../sources/input.md#section]` during writes.
-- Support bring-your-own-agent workflows, including Pi, Claude Code, Cursor, Slack bots, scripts, and humans.
-- Avoid a database, custom backend, CRDT layer, hosted service, or mandatory Git workflow in the first version.
-
+The goal is simple, a way to summary the content so both human and agents can benefit from it.
 Lumbrera is not trying to be a new chat UI or a full knowledge-management app. It is a small protocol and CLI boundary for maintaining source-grounded Markdown knowledge safely in local files. Git, cloud sync, backups, and sharing are external choices.
 
 ## Commands
