@@ -381,22 +381,24 @@ Use when the user asks to ingest, process, summarize, or integrate a raw source.
 - For operational content, mark whether synthesized knowledge is public, internal, or mixed in the wiki body when that distinction is relevant.
 - When ingesting troubleshooting or runbook material, prefer symptom → cause → fix tables where durable.
 - Every wiki page needs a single-line --summary and 1-5 --tag values. Reuse existing lowercase slug tags from tags.md when they fit; create a new stable tag only when existing tags are clearly wrong. Do not invent filler tags.
-- Prefer page-level provenance through --source. Add inline [source: ../sources/path.md#heading-anchor] citations only for important, surprising, version-sensitive, numeric, operational-limit, or easily disputed claims.
+- Prefer page-level provenance through --source. For large combined sources, add inline [source: ../sources/path.md#heading-anchor] citations to exact headings for important, surprising, version-sensitive, numeric, operational-limit, destructive, customer-impacting, or easily disputed claims.
 - Provide wiki Markdown body content only. Do not create wiki document IDs, frontmatter, tag registry entries, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those for wiki pages.
 - Use lumbrera write to add the distilled document. For a new wiki file, pass --title, --summary, and 1-5 --tag flags. For wiki writes, pass --source. Always pass --reason.
 - After writing, run lumbrera verify and report coverage: created or updated pages, covered source sections, skipped sections, uncertainties, and recommended follow-up pages.
 
-## Wiki linking pass
+## Required wiki linking pass
 
 Before writing wiki content:
 
 - Read INDEX.md and tags.md.
-- Identify existing wiki pages that overlap with the new source.
-- Read the relevant existing wiki pages or at least their headings/summaries.
-- Add wiki-to-wiki links where they help navigation or explain prerequisites.
+- Identify 3-7 existing wiki pages that may overlap, depend on this page, or act as prerequisites.
+- Read the relevant existing wiki pages, or at least their title, summary, tags, and headings.
+- Add contextual wiki-to-wiki links where the relationship is real: prerequisite, related task, deeper reference, operational follow-up, or contrasting behavior.
 - Prefer contextual inline links over a large link dump.
-- If the page is mostly standalone, add a short '## Related pages' section.
-- Do not force unrelated links.
+- If contextual inline links would be awkward, add a short '## Related pages' section.
+- Every new wiki page should have at least one wiki link unless it is genuinely standalone.
+- If no wiki links are added, explain why in the final report.
+- Do not add unrelated links just to satisfy the rule.
 `
 
 const querySkillContent = `---
