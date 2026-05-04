@@ -126,11 +126,12 @@ func Run(args []string, stdin io.Reader) (err error) {
 	commitSubject := fmt.Sprintf("[%s] [%s]: %s", op, opts.Actor, opts.Reason)
 
 	mutated := false
+	committed := false
 	fail := func(err error) error {
 		if err == nil {
 			return nil
 		}
-		if mutated {
+		if mutated && !committed {
 			if rollbackErr := rollbackWrite(repo, base); rollbackErr != nil {
 				return fmt.Errorf("%w; rollback failed: %v", err, rollbackErr)
 			}
@@ -159,6 +160,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 	if err := git.Commit(repo, commitSubject); err != nil {
 		return fail(err)
 	}
+	committed = true
 	clean, err := git.IsClean(repo)
 	if err != nil {
 		return fail(err)
@@ -167,7 +169,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 		return fail(fmt.Errorf("write committed but working tree is not clean"))
 	}
 	if err := git.Push(repo); err != nil {
-		return fail(fmt.Errorf("failed to push Lumbrera write: %w", err))
+		return fmt.Errorf("write committed locally as %q but push failed; local commit was preserved; run lumbrera sync or inspect the remote before retrying: %w", commitSubject, err)
 	}
 	fmt.Printf("Committed and pushed Lumbrera write: %s\n", commitSubject)
 	return nil

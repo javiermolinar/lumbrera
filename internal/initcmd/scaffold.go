@@ -27,6 +27,7 @@ var scaffoldDirs = []string{
 	".brain/hooks",
 	".agents/skills/lumbrera-ingest",
 	".agents/skills/lumbrera-query",
+	".agents/skills/lumbrera-sync",
 	".agents/skills/lumbrera-lint",
 }
 
@@ -38,6 +39,7 @@ var scaffoldFiles = map[string]string{
 	agentsPath:     agentsContent,
 	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
 	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,
+	".agents/skills/lumbrera-sync/SKILL.md":   syncSkillContent,
 	".agents/skills/lumbrera-lint/SKILL.md":   lintSkillContent,
 }
 
@@ -46,6 +48,7 @@ var partialDirs = map[string]struct{}{
 	".agents/skills":                 {},
 	".agents/skills/lumbrera-ingest": {},
 	".agents/skills/lumbrera-query":  {},
+	".agents/skills/lumbrera-sync":   {},
 	".agents/skills/lumbrera-lint":   {},
 	".brain":                         {},
 	".brain/conflicts":               {},
@@ -58,6 +61,7 @@ var partialFiles = map[string]struct{}{
 	markerPath: {},
 	".agents/skills/lumbrera-ingest/SKILL.md": {},
 	".agents/skills/lumbrera-query/SKILL.md":  {},
+	".agents/skills/lumbrera-sync/SKILL.md":   {},
 	".agents/skills/lumbrera-lint/SKILL.md":   {},
 	".brain/hooks/commit-msg":                 {},
 	".brain/hooks/pre-commit":                 {},
@@ -325,6 +329,7 @@ Use the matching bundled skill for the operation:
 
 - .agents/skills/lumbrera-ingest/SKILL.md for ingesting a raw source into distilled wiki knowledge.
 - .agents/skills/lumbrera-query/SKILL.md for answering questions from the maintained wiki and preserved sources.
+- .agents/skills/lumbrera-sync/SKILL.md for safely converging the local clone before reading or writing.
 - .agents/skills/lumbrera-lint/SKILL.md for semantic health checks: stale synthesis, contradictions, unsupported claims, duplicated concepts, and useful follow-up questions.
 
 ## What Lumbrera handles
@@ -349,10 +354,11 @@ Agents handle semantic work:
 
 ## Common workflow
 
-1. Source arrives: the user adds or references a new Markdown source. Treat the raw source as immutable.
-2. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles frontmatter, source sections, index, changelog, checksums, commits, and sync metadata.
-3. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map, then read relevant wiki/ pages, then check sources/ when evidence is needed.
-4. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
+1. Sync first when local state may be stale: use the sync skill to run lumbrera sync and stop on conflicts or invalid state.
+2. Source arrives: the user adds or references a new Markdown source. Treat the raw source as immutable.
+3. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles frontmatter, source sections, index, changelog, checksums, commits, and sync metadata.
+4. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map, then read relevant wiki/ pages, then check sources/ when evidence is needed.
+5. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
 
 ## What to do
 
@@ -410,6 +416,37 @@ Use when the user asks a question about knowledge in the brain.
 - Answer with citations to the wiki pages or source documents used.
 - If the answer is durable knowledge worth keeping, ask whether to save it.
 - Save only through lumbrera write. Do not create frontmatter or generated metadata.
+`
+
+const syncSkillContent = `---
+name: lumbrera-sync
+description: Safely converge a Lumbrera brain clone before reading or writing by running lumbrera sync and reporting blocking conflicts, drift, or invalid state.
+---
+
+# Lumbrera Sync
+
+Use when starting work in a Lumbrera brain, when the user asks to update or synchronize the brain, when lumbrera write says to run sync first, or when local generated metadata may be stale.
+
+## Workflow
+
+- Run lumbrera sync from the repository root or pass --repo with the target brain path.
+- If sync succeeds, continue with the user's read, query, ingest, or lint task.
+- If sync reports generated-file repairs, mention that Lumbrera committed and pushed a sync repair.
+- If sync fails because of invalid knowledge state, broken links, missing sources, or source immutability violations, stop and report the exact blocking paths and error.
+- If sync fails because of Git conflicts or remote divergence, stop and report the conflict. Do not edit files directly to resolve it.
+- After a failed sync, mutations must still go through lumbrera write. Do not repair INDEX.md, CHANGELOG.md, BRAIN.sum, sources/, or wiki/ manually.
+
+## Commands
+
+~~~sh
+lumbrera sync --repo <repo>
+~~~
+
+If already inside the brain repository:
+
+~~~sh
+lumbrera sync
+~~~
 `
 
 const lintSkillContent = `---

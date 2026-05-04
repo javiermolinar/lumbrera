@@ -224,6 +224,23 @@ func TestWritePreflightRejectsExistingBrokenAnchor(t *testing.T) {
 	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
+func TestWritePreservesLocalCommitWhenPushFails(t *testing.T) {
+	repo := initBrain(t)
+	runCommand(t, repo, "", "git", "remote", "set-url", "--push", "origin", filepath.Join(t.TempDir(), "missing.git"))
+
+	err := Run([]string{"sources/raw.md", "--repo", repo, "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test"}, strings.NewReader("# Raw source\n\nRaw notes.\n"))
+	if err == nil {
+		t.Fatal("expected push failure")
+	}
+	if !strings.Contains(err.Error(), "local commit was preserved") {
+		t.Fatalf("expected preserved local commit error, got %v", err)
+	}
+	assertFileContains(t, repo, "sources/raw.md", "Raw notes.")
+	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
+	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[source] [test]: Preserve raw source")
+	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
+}
+
 func TestWriteRollsBackWhenCommitFails(t *testing.T) {
 	repo := initBrain(t)
 	hook := filepath.Join(repo, ".brain", "hooks", "commit-msg")

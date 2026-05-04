@@ -27,6 +27,8 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "name: lumbrera-ingest")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "pass --title")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "name: lumbrera-query")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-sync/SKILL.md", "name: lumbrera-sync")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-sync/SKILL.md", "lumbrera sync --repo <repo>")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-lint/SKILL.md", "name: lumbrera-lint")
 	assertSymlink(t, repo, ".claude", ".agents")
 	assertGitOutput(t, repo, []string{"config", "core.hooksPath"}, ".brain/hooks")
