@@ -21,7 +21,7 @@ Creates:
   BRAIN.sum         generated checksum manifest
   AGENTS.md         standing instructions for agents
   CLAUDE.md         symlink to AGENTS.md for Claude
-  .agents/skills/   bundled Lumbrera agent skill
+  .agents/skills/   bundled Lumbrera ingest, query, and lint skills
   .claude           symlink to .agents for Claude skills
   sources/          preserved raw source material
   wiki/             distilled knowledge
@@ -63,7 +63,9 @@ Created:
   BRAIN.sum
   AGENTS.md
   CLAUDE.md -> AGENTS.md
-  .agents/skills/lumbrera/SKILL.md
+  .agents/skills/lumbrera-ingest/SKILL.md
+  .agents/skills/lumbrera-query/SKILL.md
+  .agents/skills/lumbrera-lint/SKILL.md
   .claude -> .agents
   .brain/VERSION
   .brain/hooks/
@@ -85,5 +87,5 @@ Created initial local commit:
 		}
 		fmt.Printf("No remote configured. Before the first lumbrera write, configure a push remote:\n  git remote add origin <url>\n  git push -u origin %s\n\n", branch)
 	}
-	fmt.Println("Agents should follow AGENTS.md, CLAUDE.md, or the bundled lumbrera skill and use lumbrera write for all future mutations.")
+	fmt.Println("Agents should follow AGENTS.md, CLAUDE.md, or the bundled Lumbrera ingest/query/lint skills and use lumbrera write for all future mutations.")
 }

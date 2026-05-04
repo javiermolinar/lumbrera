@@ -25,41 +25,49 @@ var scaffoldDirs = []string{
 	"wiki",
 	".brain/conflicts",
 	".brain/hooks",
-	".agents/skills/lumbrera",
+	".agents/skills/lumbrera-ingest",
+	".agents/skills/lumbrera-query",
+	".agents/skills/lumbrera-lint",
 }
 
 var scaffoldFiles = map[string]string{
-	markerPath:                         brainVersion + "\n",
-	"INDEX.md":                         indexContent,
-	"CHANGELOG.md":                     changelogContent,
-	"BRAIN.sum":                        brainSumContent,
-	agentsPath:                         agentsContent,
-	".agents/skills/lumbrera/SKILL.md": skillContent,
+	markerPath:     brainVersion + "\n",
+	"INDEX.md":     indexContent,
+	"CHANGELOG.md": changelogContent,
+	"BRAIN.sum":    brainSumContent,
+	agentsPath:     agentsContent,
+	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
+	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,
+	".agents/skills/lumbrera-lint/SKILL.md":   lintSkillContent,
 }
 
 var partialDirs = map[string]struct{}{
-	".agents":                 {},
-	".agents/skills":          {},
-	".agents/skills/lumbrera": {},
-	".brain":                  {},
-	".brain/conflicts":        {},
-	".brain/hooks":            {},
-	"sources":                 {},
-	"wiki":                    {},
+	".agents":                        {},
+	".agents/skills":                 {},
+	".agents/skills/lumbrera-ingest": {},
+	".agents/skills/lumbrera-query":  {},
+	".agents/skills/lumbrera-lint":   {},
+	".brain":                         {},
+	".brain/conflicts":               {},
+	".brain/hooks":                   {},
+	"sources":                        {},
+	"wiki":                           {},
 }
 
 var partialFiles = map[string]struct{}{
-	markerPath:                         {},
-	".agents/skills/lumbrera/SKILL.md": {},
-	".brain/hooks/commit-msg":          {},
-	".brain/hooks/pre-commit":          {},
-	".brain/hooks/pre-push":            {},
-	agentsPath:                         {},
-	claudeDir:                          {},
-	claudePath:                         {},
-	"BRAIN.sum":                        {},
-	"CHANGELOG.md":                     {},
-	"INDEX.md":                         {},
+	markerPath: {},
+	".agents/skills/lumbrera-ingest/SKILL.md": {},
+	".agents/skills/lumbrera-query/SKILL.md":  {},
+	".agents/skills/lumbrera-lint/SKILL.md":   {},
+	".brain/hooks/commit-msg":                 {},
+	".brain/hooks/pre-commit":                 {},
+	".brain/hooks/pre-push":                   {},
+	agentsPath:                                {},
+	claudeDir:                                 {},
+	claudePath:                                {},
+	"BRAIN.sum":                               {},
+	"CHANGELOG.md":                            {},
+	"INDEX.md":                                {},
 }
 
 func ensureScaffold(repo string) error {
@@ -300,43 +308,125 @@ No Lumbrera writes yet.
 const brainSumContent = `lumbrera-sum-v1 sha256
 `
 
-const agentsContent = `# Lumbrera Brain Agent Contract
+const agentsContent = `# Lumbrera Brain Agent Guide
 
-This repository is managed by Lumbrera.
+This repository is a Lumbrera brain: a backendless, Git-backed implementation of Andrej Karpathy's LLM Wiki pattern.
 
-You may:
-- read Markdown files directly,
-- inspect INDEX.md, CHANGELOG.md, and BRAIN.sum,
-- run lumbrera sync --repo <repo> before relying on local state.
+The model:
+- sources/ contains immutable Markdown source material.
+- wiki/ contains LLM-maintained Markdown synthesis.
+- Lumbrera owns the write boundary and deterministic bookkeeping.
 
-You must not:
-- create, edit, move, delete, or overwrite files directly,
-- edit generated files,
-- run Git mutation commands directly for knowledge changes,
-- modify files under .brain/, .agents/, or .claude.
+The goal is not one-shot RAG. The wiki is a persistent, compounding artifact that agents keep current by ingesting sources, answering questions, and checking semantic drift over time.
 
-All mutations must use lumbrera write.
+## Bundled skills
 
-Knowledge rules:
-- preserve raw material under sources/,
-- write distilled knowledge under wiki/,
-- wiki/ pages require source references,
-- sources are immutable after creation.
+Use the matching bundled skill for the operation:
+
+- .agents/skills/lumbrera-ingest/SKILL.md for ingesting a raw source into distilled wiki knowledge.
+- .agents/skills/lumbrera-query/SKILL.md for answering questions from the maintained wiki and preserved sources.
+- .agents/skills/lumbrera-lint/SKILL.md for semantic health checks: stale synthesis, contradictions, unsupported claims, duplicated concepts, and useful follow-up questions.
+
+## What Lumbrera handles
+
+Lumbrera handles deterministic and protocol work:
+
+- frontmatter and protocol metadata,
+- required source references from write flags,
+- INDEX.md, CHANGELOG.md, and BRAIN.sum,
+- checksums, commits, pushes, hooks, and sync,
+- deterministic consistency such as paths, generated files, source immutability, and broken links.
+
+## What agents handle
+
+Agents handle semantic work:
+
+- read Markdown sources and wiki pages,
+- distill raw sources into durable wiki knowledge,
+- synthesize answers from the maintained wiki,
+- identify semantic drift between wiki pages and source material,
+- suggest new questions or missing sources.
+
+## Common workflow
+
+1. Source arrives: the user adds or references a new Markdown source. Treat the raw source as immutable.
+2. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles frontmatter, source sections, index, changelog, checksums, commits, and sync metadata.
+3. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map, then read relevant wiki/ pages, then check sources/ when evidence is needed.
+4. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
+
+## What to do
+
+- Assume paths are relative to this repository root.
+- Use Markdown body content only; let Lumbrera add protocol metadata.
+- Use lumbrera write for every mutation, supplying source path and reason through CLI flags.
+- If local state may be stale, run lumbrera sync from the repository root.
+
+## What not to do
+
+- Do not create, edit, move, delete, or overwrite files directly.
+- Do not modify existing source files under sources/.
+- Do not create or maintain frontmatter, INDEX.md, CHANGELOG.md, BRAIN.sum, checksums, or generated metadata manually.
+- Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
+- Do not run Git mutation commands for knowledge changes.
+- Do not spend LLM linting effort on deterministic consistency; Lumbrera handles that.
 
 Remote setup is administrative. Humans usually configure the remote. Agents may do so only when explicitly instructed.
 `
 
-const skillContent = `---
-name: lumbrera
-description: Use the Lumbrera CLI contract for backendless, Git-backed Markdown knowledge bases.
+const ingestSkillContent = `---
+name: lumbrera-ingest
+description: Ingest a referenced Markdown source into a Lumbrera LLM Wiki by preserving the raw resource and adding distilled wiki knowledge through lumbrera write.
 ---
 
-# Lumbrera Agent Contract
+# Lumbrera Ingest
 
-- Read Markdown files directly.
-- Do not create, edit, move, delete, or overwrite files directly in a Lumbrera brain repo.
-- Run lumbrera sync --repo <repo> before relying on local state.
-- Use lumbrera write for every mutation.
-- Do not edit generated files: INDEX.md, CHANGELOG.md, or BRAIN.sum.
-- Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
+Use when the user asks to ingest, process, summarize, or integrate a raw source.
+
+## Workflow
+
+- Read the raw resource referenced by the user.
+- Do not alter the raw resource.
+- Create or update a distilled Markdown document under wiki/ with the durable knowledge from the source.
+- Do not create frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those.
+- Use lumbrera write to add the distilled document, with the source path and reason supplied to the CLI.
+`
+
+const querySkillContent = `---
+name: lumbrera-query
+description: Answer questions from a Lumbrera LLM Wiki by using the maintained wiki first and checking preserved Markdown sources when needed.
+---
+
+# Lumbrera Query
+
+Use when the user asks a question about knowledge in the brain.
+
+## Workflow
+
+- Start with INDEX.md to find candidate wiki/ pages. Use it for navigation, not evidence.
+- Read the relevant wiki/ pages first.
+- Check preserved sources/ documents when claims need verification.
+- Answer with citations to the wiki pages or source documents used.
+- If the answer is durable knowledge worth keeping, ask whether to save it.
+- Save only through lumbrera write. Do not create frontmatter or generated metadata.
+`
+
+const lintSkillContent = `---
+name: lumbrera-lint
+description: Semantically health-check a Lumbrera LLM Wiki for stale synthesis, contradictions, unsupported claims, duplicated concepts, and useful follow-up questions.
+---
+
+# Lumbrera Lint
+
+Use when the user asks for a semantic health check of the wiki.
+
+Lumbrera handles deterministic consistency: frontmatter, index, changelog, checksums, source sections, broken links, path policy, and generated files. Do not spend LLM linting effort on those.
+
+## Workflow
+
+- Read the relevant wiki/ pages and their preserved sources/ documents.
+- Look for semantic drift: stale claims, contradictions, synthesis that no longer matches sources, or claims not actually supported by cited sources.
+- Look for duplicated or fragmented concepts that should be merged or clarified.
+- Identify important open questions or data gaps that need new sources.
+- Report findings with affected paths, evidence, and suggested next actions.
+- If asked to fix semantic issues, use lumbrera write. Do not edit files directly or create generated metadata.
 `
