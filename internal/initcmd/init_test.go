@@ -28,6 +28,8 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFileContains(t, repo, "AGENTS.md", "Do not edit generated files")
 	assertFileContains(t, repo, "AGENTS.md", "at most 400 Markdown body lines")
 	assertFileContains(t, repo, "AGENTS.md", "lumbrera verify --brain .")
+	assertFileContains(t, repo, "AGENTS.md", "Team Git/GitHub errors")
+	assertFileContains(t, repo, "AGENTS.md", "Do not commit conflict markers")
 	assertSymlink(t, repo, "CLAUDE.md", "AGENTS.md")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "name: lumbrera-ingest")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "Chunk large sources only for reading")

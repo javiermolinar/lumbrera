@@ -346,6 +346,16 @@ lumbrera write sources/<path>.md --reason "Preserve source" < source.md
 lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --source sources/<path>.md --reason "Distill source" < page.md
 ~~~
 
+## Team Git/GitHub errors
+
+- Git/GitHub is external coordination; lumbrera write remains the only content mutation path.
+- If commit, pull, merge, rebase, or push fails, stop and report the exact error and repository state.
+- Do not resolve merge conflicts by directly editing sources/, wiki/, generated files, or Lumbrera internals.
+- Do not commit conflict markers.
+- Prefer returning to a clean tree, updating from remote, rerunning the Lumbrera operation, then running lumbrera verify.
+- If a wiki conflict needs semantic resolution, ask for human direction; the final resolved wiki content must still be written through lumbrera write.
+- Before any commit or push, run lumbrera verify --brain . and require it to pass.
+
 ## Skills
 
 - Ingest sources into wiki pages: .agents/skills/lumbrera-ingest/SKILL.md
