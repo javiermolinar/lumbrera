@@ -2,8 +2,10 @@ package markdown
 
 import (
 	"fmt"
+	"net/url"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -13,26 +15,62 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-type Analysis struct {
-	FirstH1 string
-	Sources []string
-	Links   []string
+type Reference struct {
+	Path   string
+	Anchor string
 }
 
+func (r Reference) String() string {
+	if r.Anchor == "" {
+		return r.Path
+	}
+	return r.Path + "#" + r.Anchor
+}
+
+type Heading struct {
+	Level  int
+	Text   string
+	Anchor string
+}
+
+type Analysis struct {
+	FirstH1          string
+	Sources          []string
+	Links            []string
+	Headings         []Heading
+	Anchors          []string
+	LinkReferences   []Reference
+	SourceReferences []Reference
+	SourceCitations  []Reference
+}
+
+type AnalyzeOptions struct {
+	SourceCitations bool
+}
+
+var sourceCitationPattern = regexp.MustCompile(`(?i)\[source:\s*([^\]\r\n]+?)\]`)
+
 func Analyze(repoRelativePath, body string) (Analysis, error) {
+	return AnalyzeWithOptions(repoRelativePath, body, AnalyzeOptions{SourceCitations: true})
+}
+
+func AnalyzeWithOptions(repoRelativePath, body string, opts AnalyzeOptions) (Analysis, error) {
 	source := []byte(body)
 	doc := goldmark.DefaultParser().Parse(text.NewReader(source))
 
 	var analysis Analysis
 	inSources := false
+	anchorCounts := map[string]int{}
 	err := ast.Walk(doc, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
-		}
-
 		switch n := node.(type) {
 		case *ast.Heading:
+			if !entering {
+				return ast.WalkContinue, nil
+			}
 			text := strings.TrimSpace(string(n.Text(source)))
+			anchor := uniqueHeadingAnchor(text, anchorCounts)
+			analysis.Headings = append(analysis.Headings, Heading{Level: n.Level, Text: text, Anchor: anchor})
+			analysis.Anchors = append(analysis.Anchors, anchor)
 			if n.Level == 1 && analysis.FirstH1 == "" {
 				analysis.FirstH1 = text
 			}
@@ -40,19 +78,38 @@ func Analyze(repoRelativePath, body string) (Analysis, error) {
 				inSources = n.Level == 2 && strings.EqualFold(text, "Sources")
 			}
 		case *ast.Link:
-			destination := string(n.Destination)
-			if isIgnorableLink(destination) {
+			if !entering {
 				return ast.WalkContinue, nil
 			}
-			normalized, err := NormalizeLink(repoRelativePath, destination)
+			ref, ok, err := NormalizeReference(repoRelativePath, string(n.Destination))
 			if err != nil {
 				return ast.WalkStop, err
 			}
-			if inSources {
-				analysis.Sources = append(analysis.Sources, normalized)
-			} else {
-				analysis.Links = append(analysis.Links, normalized)
+			if ok {
+				if inSources {
+					analysis.SourceReferences = append(analysis.SourceReferences, ref)
+					analysis.Sources = append(analysis.Sources, ref.Path)
+				} else {
+					analysis.LinkReferences = append(analysis.LinkReferences, ref)
+					if !isSelfAnchorReference(repoRelativePath, ref) {
+						analysis.Links = append(analysis.Links, ref.Path)
+					}
+				}
 			}
+			return ast.WalkSkipChildren, nil
+		case *ast.CodeSpan:
+			if entering {
+				return ast.WalkSkipChildren, nil
+			}
+		case *ast.Paragraph:
+			if !entering || inSources || !opts.SourceCitations {
+				return ast.WalkContinue, nil
+			}
+			refs, err := sourceCitationReferences(repoRelativePath, paragraphCitationText(n, source))
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			analysis.SourceCitations = append(analysis.SourceCitations, refs...)
 		}
 		return ast.WalkContinue, nil
 	})
@@ -61,17 +118,88 @@ func Analyze(repoRelativePath, body string) (Analysis, error) {
 	}
 	analysis.Sources = sortedUnique(analysis.Sources)
 	analysis.Links = sortedUnique(analysis.Links)
+	analysis.Anchors = sortedUnique(analysis.Anchors)
+	analysis.LinkReferences = sortedUniqueReferences(analysis.LinkReferences)
+	analysis.SourceReferences = sortedUniqueReferences(analysis.SourceReferences)
+	analysis.SourceCitations = sortedUniqueReferences(analysis.SourceCitations)
 	return analysis, nil
 }
 
 func NormalizeLink(fromPath, destination string) (string, error) {
+	ref, ok, err := NormalizeReference(fromPath, destination)
+	if err != nil || !ok || isFragmentOnly(destination) {
+		return "", err
+	}
+	return ref.Path, nil
+}
+
+func NormalizeReference(fromPath, destination string) (Reference, bool, error) {
 	destination = strings.TrimSpace(destination)
-	if destination == "" || strings.HasPrefix(destination, "#") || isExternal(destination) {
-		return "", nil
+	if destination == "" || isExternal(destination) {
+		return Reference{}, false, nil
 	}
-	if i := strings.IndexAny(destination, "#?"); i >= 0 {
-		destination = destination[:i]
+
+	linkPath, fragment, hasFragment := splitDestination(destination)
+	if linkPath == "" {
+		if !hasFragment {
+			return Reference{}, false, nil
+		}
+		anchor := NormalizeAnchor(fragment)
+		if anchor == "" {
+			return Reference{}, false, nil
+		}
+		return Reference{Path: path.Clean(fromPath), Anchor: anchor}, true, nil
 	}
+
+	normalized, err := normalizeLinkPath(fromPath, linkPath)
+	if err != nil {
+		return Reference{}, false, err
+	}
+	ref := Reference{Path: normalized}
+	if hasFragment {
+		ref.Anchor = NormalizeAnchor(fragment)
+	}
+	return ref, true, nil
+}
+
+func NormalizeAnchor(anchor string) string {
+	anchor = strings.TrimSpace(strings.TrimPrefix(anchor, "#"))
+	if anchor == "" {
+		return ""
+	}
+	if decoded, err := url.PathUnescape(anchor); err == nil {
+		anchor = decoded
+	}
+	return strings.TrimSpace(anchor)
+}
+
+func AnchorForHeading(text string) string {
+	text = strings.TrimSpace(text)
+	var b strings.Builder
+	lastDash := false
+	for _, r := range text {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsNumber(r):
+			b.WriteRune(unicode.ToLower(r))
+			lastDash = false
+		case r == '_':
+			b.WriteRune(r)
+			lastDash = false
+		case unicode.IsSpace(r) || r == '-':
+			if b.Len() > 0 && !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	slug := strings.Trim(b.String(), "-")
+	if slug == "" {
+		return "section"
+	}
+	return slug
+}
+
+func normalizeLinkPath(fromPath, destination string) (string, error) {
 	destination = strings.TrimSpace(destination)
 	if destination == "" {
 		return "", nil
@@ -248,9 +376,99 @@ func togglesFence(line string) bool {
 	return strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
 }
 
-func isIgnorableLink(destination string) bool {
+func splitDestination(destination string) (string, string, bool) {
+	linkPath := destination
+	fragment := ""
+	hasFragment := false
+	if i := strings.Index(linkPath, "#"); i >= 0 {
+		hasFragment = true
+		fragment = linkPath[i+1:]
+		linkPath = linkPath[:i]
+	}
+	if i := strings.Index(linkPath, "?"); i >= 0 {
+		linkPath = linkPath[:i]
+	}
+	return strings.TrimSpace(linkPath), strings.TrimSpace(fragment), hasFragment
+}
+
+func isFragmentOnly(destination string) bool {
 	destination = strings.TrimSpace(destination)
-	return destination == "" || strings.HasPrefix(destination, "#") || isExternal(destination)
+	return strings.HasPrefix(destination, "#")
+}
+
+func isSelfAnchorReference(fromPath string, ref Reference) bool {
+	return ref.Anchor != "" && ref.Path == path.Clean(fromPath)
+}
+
+func uniqueHeadingAnchor(text string, counts map[string]int) string {
+	base := AnchorForHeading(text)
+	count := counts[base]
+	counts[base] = count + 1
+	if count == 0 {
+		return base
+	}
+	return fmt.Sprintf("%s-%d", base, count)
+}
+
+func paragraphCitationText(paragraph ast.Node, source []byte) string {
+	var b strings.Builder
+	for child := paragraph.FirstChild(); child != nil; child = child.NextSibling() {
+		appendCitationText(&b, child, source)
+	}
+	return b.String()
+}
+
+func appendCitationText(b *strings.Builder, node ast.Node, source []byte) {
+	switch n := node.(type) {
+	case *ast.CodeSpan, *ast.Link:
+		b.WriteByte('\n')
+		return
+	case *ast.Text:
+		b.Write(n.Text(source))
+		return
+	}
+	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+		appendCitationText(b, child, source)
+	}
+}
+
+func sourceCitationReferences(fromPath, text string) ([]Reference, error) {
+	matches := sourceCitationPattern.FindAllStringSubmatchIndex(text, -1)
+	if len(matches) == 0 {
+		return nil, nil
+	}
+	refs := make([]Reference, 0, len(matches))
+	for _, match := range matches {
+		if len(match) < 4 || citationIsLinkLabel(text, match[1]) {
+			continue
+		}
+		destination := strings.TrimSpace(text[match[2]:match[3]])
+		if !looksLikeSourceCitationDestination(destination) {
+			continue
+		}
+		ref, ok, err := NormalizeReference(fromPath, destination)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source citation %q: %w", destination, err)
+		}
+		if !ok {
+			return nil, fmt.Errorf("source citation %q must reference a local Markdown source", destination)
+		}
+		refs = append(refs, ref)
+	}
+	return refs, nil
+}
+
+func citationIsLinkLabel(text string, citationEnd int) bool {
+	return citationEnd < len(text) && text[citationEnd] == '('
+}
+
+func looksLikeSourceCitationDestination(destination string) bool {
+	destination = strings.TrimSpace(destination)
+	return strings.HasPrefix(destination, "#") ||
+		strings.HasPrefix(destination, "./") ||
+		strings.HasPrefix(destination, "../") ||
+		strings.HasPrefix(destination, "sources/") ||
+		strings.HasPrefix(destination, "wiki/")
 }
 
 func isExternal(destination string) bool {
@@ -282,6 +500,31 @@ func sortedUnique(values []string) []string {
 		out = append(out, value)
 	}
 	sort.Strings(out)
+	return out
+}
+
+func sortedUniqueReferences(values []Reference) []Reference {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]Reference, 0, len(values))
+	for _, value := range values {
+		value.Path = strings.TrimSpace(value.Path)
+		value.Anchor = strings.TrimSpace(value.Anchor)
+		if value.Path == "" {
+			continue
+		}
+		key := value.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Path == out[j].Path {
+			return out[i].Anchor < out[j].Anchor
+		}
+		return out[i].Path < out[j].Path
+	})
 	return out
 }
 

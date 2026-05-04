@@ -335,7 +335,7 @@ Lumbrera handles deterministic and protocol work:
 - required source references from write flags,
 - INDEX.md, CHANGELOG.md, and BRAIN.sum,
 - checksums, commits, pushes, hooks, and sync,
-- deterministic consistency such as paths, generated files, source immutability, and broken links.
+- deterministic consistency such as paths, generated files, source immutability, broken links, and broken heading anchors.
 
 ## What agents handle
 
@@ -358,6 +358,7 @@ Agents handle semantic work:
 
 - Assume paths are relative to this repository root.
 - Use Markdown body content only; let Lumbrera add protocol metadata and frontmatter.
+- For claim-level provenance, optionally add inline citations as [source: ../sources/path.md#heading-anchor]. Lumbrera validates the target file and heading anchor.
 - Use lumbrera write for every mutation, supplying title for new files, source path for wiki writes, and reason through CLI flags.
 - If local state may be stale, run lumbrera sync from the repository root.
 
@@ -387,6 +388,7 @@ Use when the user asks to ingest, process, summarize, or integrate a raw source.
 - Read the raw resource referenced by the user.
 - Do not alter the raw resource.
 - Create or update a distilled Markdown document under wiki/ with the durable knowledge from the source.
+- When a specific claim benefits from pinpoint provenance, cite it inline as [source: ../sources/path.md#heading-anchor].
 - Provide Markdown body content only. Do not create frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those.
 - Use lumbrera write to add the distilled document. For a new file, pass --title. For wiki writes, pass --source. Always pass --reason.
 `
@@ -419,7 +421,7 @@ description: Semantically health-check a Lumbrera LLM Wiki for stale synthesis, 
 
 Use when the user asks for a semantic health check of the wiki.
 
-Lumbrera handles deterministic consistency: frontmatter, index, changelog, checksums, source sections, broken links, path policy, and generated files. Do not spend LLM linting effort on those.
+Lumbrera handles deterministic consistency: frontmatter, index, changelog, checksums, source sections, broken links, heading anchors, path policy, and generated files. Do not spend LLM linting effort on those.
 
 ## Workflow
 

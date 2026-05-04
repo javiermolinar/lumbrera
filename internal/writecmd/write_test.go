@@ -129,6 +129,97 @@ func TestWriteRejectsMissingInternalLinksAndRollsBack(t *testing.T) {
 	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
+func TestWriteRejectsMissingAnchorsAndRollsBack(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\n## Evidence\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
+
+	cases := []struct {
+		target string
+		title  string
+		body   string
+		reason string
+	}{
+		{"wiki/bad-anchor.md", "Bad anchor", "# Bad anchor\n\nSee [Evidence](../sources/raw.md#missing).\n", "Create bad anchor"},
+		{"wiki/bad-punctuation-anchor.md", "Bad punctuation anchor", "# Bad punctuation anchor\n\nSee [Evidence](../sources/raw.md#evidence.).\n", "Create bad punctuation anchor"},
+		{"wiki/bad-query-anchor.md", "Bad query anchor", "# Bad query anchor\n\nSee [Evidence](../sources/raw.md#evidence?bad).\n", "Create bad query anchor"},
+		{"wiki/bad-citation-anchor.md", "Bad citation anchor", "# Bad citation anchor\n\nClaim. [source: ../sources/raw.md#missing]\n", "Create bad citation anchor"},
+	}
+	for _, tc := range cases {
+		assertWriteError(t, repo, tc.body, tc.target, "--title", tc.title, "--source", "sources/raw.md", "--reason", tc.reason, "--actor", "test")
+		assertMissing(t, repo, tc.target)
+		if strings.Contains(readFile(t, repo, "CHANGELOG.md"), tc.reason) {
+			t.Fatalf("failed write left pending changelog entry for %q", tc.reason)
+		}
+	}
+	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
+	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
+}
+
+func TestWriteExtractsSourceCitationsIntoGeneratedSources(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw A\n\n## Context\n\nA.\n", "sources/raw-a.md", "--title", "Raw A", "--reason", "Preserve raw A", "--actor", "test")
+	runWrite(t, repo, "# Raw B\n\n## Claim Detail\n\nB.\n", "sources/raw-b.md", "--title", "Raw B", "--reason", "Preserve raw B", "--actor", "test")
+
+	runWrite(t, repo, "# Topic\n\nImportant claim. [source: ../sources/raw-b.md#claim-detail]\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw-a.md", "--reason", "Create cited topic", "--actor", "test")
+	wiki := readFile(t, repo, "wiki/topic.md")
+	meta, body, has, err := frontmatter.Split([]byte(wiki))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !has {
+		t.Fatal("expected generated frontmatter")
+	}
+	if len(meta.Lumbrera.Sources) != 2 || meta.Lumbrera.Sources[0] != "sources/raw-a.md" || meta.Lumbrera.Sources[1] != "sources/raw-b.md" {
+		t.Fatalf("unexpected sources from claim citation: %#v", meta.Lumbrera.Sources)
+	}
+	if !strings.Contains(body, "[source: ../sources/raw-b.md#claim-detail]") {
+		t.Fatalf("expected inline source citation to be preserved, got:\n%s", body)
+	}
+	if !strings.Contains(body, "- [Raw A](../sources/raw-a.md)") || !strings.Contains(body, "- [Raw B](../sources/raw-b.md)") {
+		t.Fatalf("expected generated Sources section to include cited source, got:\n%s", body)
+	}
+}
+
+func TestWriteIgnoresInlineCodeAndExternalSourceText(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw text can mention external markers. [source: https://example.com/report]\n\nRaw text can also mention local-looking markers without turning into citations. [source: ../sources/missing.md#missing]\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
+
+	runWrite(t, repo, "# Topic\n\nLiteral citation syntax: `[source: ../sources/raw.md#missing]`.\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	wiki := readFile(t, repo, "wiki/topic.md")
+	meta, body, has, err := frontmatter.Split([]byte(wiki))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !has {
+		t.Fatal("expected generated frontmatter")
+	}
+	if len(meta.Lumbrera.Sources) != 1 || meta.Lumbrera.Sources[0] != "sources/raw.md" {
+		t.Fatalf("unexpected sources from literal citation text: %#v", meta.Lumbrera.Sources)
+	}
+	if !strings.Contains(body, "`[source: ../sources/raw.md#missing]`") {
+		t.Fatalf("expected inline code citation text to be preserved, got:\n%s", body)
+	}
+}
+
+func TestWritePreflightRejectsExistingBrokenAnchor(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\n## Evidence\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nSee [Evidence](../sources/raw.md#evidence).\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+
+	rawPath := filepath.Join(repo, "sources", "raw.md")
+	raw := strings.Replace(readFile(t, repo, "sources/raw.md"), "## Evidence", "## Renamed", 1)
+	if err := os.WriteFile(rawPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runCommand(t, repo, "", "git", "add", "sources/raw.md")
+	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "commit", "-m", "test: break source anchor")
+
+	assertWriteError(t, repo, "# New source\n\nNotes.\n", "sources/new.md", "--title", "New source", "--reason", "Preserve new source", "--actor", "test")
+	assertMissing(t, repo, "sources/new.md")
+	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "4")
+	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
+}
+
 func TestWriteRollsBackWhenCommitFails(t *testing.T) {
 	repo := initBrain(t)
 	hook := filepath.Join(repo, ".brain", "hooks", "commit-msg")

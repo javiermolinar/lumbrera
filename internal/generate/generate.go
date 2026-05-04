@@ -204,7 +204,7 @@ func titleForFile(absPath, relPath string) (string, error) {
 	if err != nil && hasFrontmatter {
 		return "", fmt.Errorf("%s has invalid frontmatter: %w", relPath, err)
 	}
-	analysis, err := md.Analyze(relPath, body)
+	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{})
 	if err != nil {
 		return "", err
 	}

@@ -16,6 +16,7 @@ Lumbrera treats a Git repository as the shared source of truth. Raw sources are 
 - Preserve source material before distilling it into wiki pages.
 - Make knowledge changes auditable through Git history and generated changelogs.
 - Require source references for distilled knowledge so claims can be traced back to preserved material.
+- Validate local Markdown links, heading anchors, and optional inline source citations such as `[source: ../sources/input.md#section]` during writes.
 - Support bring-your-own-agent workflows, including Pi, Claude Code, Cursor, Slack bots, scripts, and humans.
 - Avoid a database, custom backend, CRDT layer, or hosted service in the first version.
 
