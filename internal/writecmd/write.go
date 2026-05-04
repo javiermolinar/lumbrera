@@ -10,6 +10,7 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/git"
+	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 type options struct {
@@ -135,10 +136,7 @@ func Run(args []string, stdin io.Reader) error {
 	if err := generate.WriteFiles(repo, files); err != nil {
 		return fail(err)
 	}
-	if err := validateDocuments(repo); err != nil {
-		return fail(err)
-	}
-	if err := verifyGeneratedFiles(repo, []generate.PendingChangelogEntry{{Date: commitTime, Subject: commitSubject}}); err != nil {
+	if err := verify.Run(repo, verify.Options{PendingChangelog: []generate.PendingChangelogEntry{{Date: commitTime, Subject: commitSubject}}}); err != nil {
 		return fail(err)
 	}
 
@@ -155,6 +153,9 @@ func Run(args []string, stdin io.Reader) error {
 	if !clean {
 		return fail(fmt.Errorf("write committed but working tree is not clean"))
 	}
-	fmt.Printf("Committed Lumbrera write: %s\n", commitSubject)
+	if err := git.Push(repo); err != nil {
+		return fail(fmt.Errorf("failed to push Lumbrera write: %w", err))
+	}
+	fmt.Printf("Committed and pushed Lumbrera write: %s\n", commitSubject)
 	return nil
 }

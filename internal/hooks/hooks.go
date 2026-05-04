@@ -9,13 +9,29 @@ import (
 
 const preCommitHook = `#!/bin/sh
 # Installed by Lumbrera.
-# Full verification is not implemented yet.
+# The commit subject does not exist yet in pre-commit, so CHANGELOG.md is
+# checked later by pre-push after the commit has been created.
+lumbrera_bin=${LUMBRERA_BIN:-lumbrera}
+if command -v "$lumbrera_bin" >/dev/null 2>&1 && "$lumbrera_bin" verify --help >/dev/null 2>&1; then
+  exec "$lumbrera_bin" verify --repo . --skip-changelog
+fi
+cat >&2 <<'EOF'
+Lumbrera warning: could not find a lumbrera binary with verify support; skipping pre-commit verification.
+Set LUMBRERA_BIN=/path/to/lumbrera to enable hook verification.
+EOF
 exit 0
 `
 
 const prePushHook = `#!/bin/sh
 # Installed by Lumbrera.
-# Full verification is not implemented yet.
+lumbrera_bin=${LUMBRERA_BIN:-lumbrera}
+if command -v "$lumbrera_bin" >/dev/null 2>&1 && "$lumbrera_bin" verify --help >/dev/null 2>&1; then
+  exec "$lumbrera_bin" verify --repo .
+fi
+cat >&2 <<'EOF'
+Lumbrera warning: could not find a lumbrera binary with verify support; skipping pre-push verification.
+Set LUMBRERA_BIN=/path/to/lumbrera to enable hook verification.
+EOF
 exit 0
 `
 

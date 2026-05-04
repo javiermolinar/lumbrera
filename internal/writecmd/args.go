@@ -106,7 +106,7 @@ func printHelp() {
 	fmt.Println(`Usage:
   lumbrera write <path> [options] < content.md
 
-Performs one local Lumbrera write transaction and commits all content and generated metadata changes.
+Performs one Lumbrera write transaction, commits all content and generated metadata changes, and pushes the transaction commit.
 
 Required:
   <path>              repo-relative Markdown path under sources/ or wiki/
@@ -128,6 +128,6 @@ Rules:
   - wiki writes require at least one --source
   - local Markdown links and heading anchors must resolve
   - optional inline claim citations use [source: ../sources/path.md#heading-anchor]
-  - successful writes create exactly one Git commit
-  - push/sync behavior is not implemented in this command yet`)
+  - successful writes create exactly one Git commit and push it
+  - write requires a configured upstream remote; init is local-only`)
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -167,6 +168,50 @@ func AddAll(repo string) error {
 func Commit(repo, message string) error {
 	_, err := Run(repo, "commit", "-m", message)
 	return err
+}
+
+func Upstream(repo string) (string, error) {
+	result, err := Run(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	if err != nil {
+		return "", err
+	}
+	upstream := strings.TrimSpace(result.Stdout)
+	if upstream == "" {
+		return "", errors.New("git upstream is empty")
+	}
+	return upstream, nil
+}
+
+func Fetch(repo string) error {
+	_, err := Run(repo, "fetch", "--prune")
+	return err
+}
+
+func Rebase(repo, upstream string) error {
+	_, err := Run(repo, "rebase", upstream)
+	return err
+}
+
+func RebaseAbort(repo string) error {
+	_, err := Run(repo, "rebase", "--abort")
+	return err
+}
+
+func Push(repo string) error {
+	_, err := Run(repo, "push")
+	return err
+}
+
+func AheadCount(repo, upstream string) (int, error) {
+	result, err := Run(repo, "rev-list", "--count", upstream+"..HEAD")
+	if err != nil {
+		return 0, err
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(result.Stdout))
+	if err != nil {
+		return 0, fmt.Errorf("invalid git rev-list count %q: %w", strings.TrimSpace(result.Stdout), err)
+	}
+	return count, nil
 }
 
 func Config(repo, key, value string) error {

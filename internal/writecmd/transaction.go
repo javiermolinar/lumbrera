@@ -8,6 +8,7 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/git"
+	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 func resolveRepo(repo string) (string, error) {
@@ -70,10 +71,39 @@ func preflight(repo string) error {
 	if !clean {
 		return fmt.Errorf("working tree is not clean; run lumbrera sync or commit/revert unrelated changes before write")
 	}
-	if err := validateDocuments(repo); err != nil {
+	if err := fetchAndRebaseBeforeWrite(repo); err != nil {
 		return err
 	}
-	return verifyGeneratedFiles(repo, nil)
+	return verify.Run(repo, verify.Options{})
+}
+
+func fetchAndRebaseBeforeWrite(repo string) error {
+	upstream, err := git.Upstream(repo)
+	if err != nil {
+		return fmt.Errorf("write requires a configured upstream remote; after init run git remote add origin <url> and git push -u origin main: %w", err)
+	}
+	if err := git.Fetch(repo); err != nil {
+		return fmt.Errorf("failed to fetch remote changes before write: %w", err)
+	}
+	if err := git.Rebase(repo, upstream); err != nil {
+		_ = git.RebaseAbort(repo)
+		return fmt.Errorf("failed to rebase onto %s before write; run lumbrera sync or resolve conflicts before retrying: %w", upstream, err)
+	}
+	clean, err := git.IsClean(repo)
+	if err != nil {
+		return err
+	}
+	if !clean {
+		return fmt.Errorf("working tree is not clean after remote rebase; resolve local state before write")
+	}
+	ahead, err := git.AheadCount(repo, upstream)
+	if err != nil {
+		return err
+	}
+	if ahead != 0 {
+		return fmt.Errorf("local branch has %d unpushed commit(s); run lumbrera sync before write", ahead)
+	}
+	return nil
 }
 
 func defaultActor(repo string) (string, error) {

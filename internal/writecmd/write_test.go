@@ -21,6 +21,8 @@ func TestWriteSourceAndWikiCreateCommitGeneratedFiles(t *testing.T) {
 	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "4")
 	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[create] [test]: Create topic")
+	assertBareGitOutput(t, remotePath(t, repo), []string{"rev-list", "--count", "main"}, "4")
+	assertBareGitOutput(t, remotePath(t, repo), []string{"log", "--format=%s", "-1", "main"}, "[create] [test]: Create topic")
 
 	wiki := readFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
@@ -213,6 +215,7 @@ func TestWritePreflightRejectsExistingBrokenAnchor(t *testing.T) {
 	}
 	runCommand(t, repo, "", "git", "add", "sources/raw.md")
 	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "commit", "-m", "test: break source anchor")
+	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "push")
 
 	assertWriteError(t, repo, "# New source\n\nNotes.\n", "sources/new.md", "--title", "New source", "--reason", "Preserve new source", "--actor", "test")
 	assertMissing(t, repo, "sources/new.md")
@@ -228,6 +231,7 @@ func TestWriteRollsBackWhenCommitFails(t *testing.T) {
 	}
 	runCommand(t, repo, "", "git", "add", ".brain/hooks/commit-msg")
 	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "commit", "-m", "test: break commit hook")
+	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "push")
 
 	assertWriteError(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
 	assertMissing(t, repo, "sources/raw.md")
@@ -270,6 +274,24 @@ func TestWriteRejectsInvalidMutations(t *testing.T) {
 	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
+func TestWriteRequiresConfiguredUpstream(t *testing.T) {
+	setGitIdentityEnv(t)
+	repo := filepath.Join(t.TempDir(), "brain")
+	if err := initcmd.Run([]string{repo}); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	err := Run([]string{"sources/raw.md", "--repo", repo, "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test"}, strings.NewReader("# Raw source\n"))
+	if err == nil {
+		t.Fatal("expected write to require a configured upstream remote")
+	}
+	if !strings.Contains(err.Error(), "configured upstream remote") {
+		t.Fatalf("expected upstream remote error, got %v", err)
+	}
+	assertMissing(t, repo, "sources/raw.md")
+	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "1")
+}
+
 func initBrain(t *testing.T) string {
 	t.Helper()
 	setGitIdentityEnv(t)
@@ -277,7 +299,17 @@ func initBrain(t *testing.T) string {
 	if err := initcmd.Run([]string{repo}); err != nil {
 		t.Fatalf("init failed: %v", err)
 	}
+	configureRemote(t, repo)
 	return repo
+}
+
+func configureRemote(t *testing.T, repo string) string {
+	t.Helper()
+	remote := filepath.Join(t.TempDir(), "origin.git")
+	runCommand(t, filepath.Dir(remote), "", "git", "init", "--bare", remote)
+	runCommand(t, repo, "", "git", "remote", "add", "origin", remote)
+	runCommand(t, repo, "", "git", "push", "-u", "origin", "main")
+	return remote
 }
 
 func runWrite(t *testing.T, repo, stdin, target string, args ...string) {
@@ -304,6 +336,17 @@ func setGitIdentityEnv(t *testing.T) {
 	t.Setenv("GIT_COMMITTER_EMAIL", "test@example.invalid")
 }
 
+func remotePath(t *testing.T, repo string) string {
+	t.Helper()
+	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git config remote.origin.url failed: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func assertGitOutput(t *testing.T, repo string, args []string, want string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -315,6 +358,20 @@ func assertGitOutput(t *testing.T, repo string, args []string, want string) {
 	got := strings.TrimSpace(string(out))
 	if got != want {
 		t.Fatalf("git %v got %q want %q", args, got, want)
+	}
+}
+
+func assertBareGitOutput(t *testing.T, gitDir string, args []string, want string) {
+	t.Helper()
+	fullArgs := append([]string{"--git-dir", gitDir}, args...)
+	cmd := exec.Command("git", fullArgs...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", fullArgs, err, out)
+	}
+	got := strings.TrimSpace(string(out))
+	if got != want {
+		t.Fatalf("git %v got %q want %q", fullArgs, got, want)
 	}
 }
 
