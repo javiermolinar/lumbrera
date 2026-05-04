@@ -15,7 +15,7 @@ edit brain files directly; they should use lumbrera write.
 Creates:
   INDEX.md          generated navigation map
   CHANGELOG.md      generated semantic history from .brain/ops.log
-  BRAIN.sum         generated checksum manifest
+  BRAIN.sum         generated wiki checksum manifest
   AGENTS.md         standing instructions for agents
   CLAUDE.md         symlink to AGENTS.md for Claude
   .agents/skills/   bundled Lumbrera ingest, query, and lint skills

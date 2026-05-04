@@ -308,7 +308,7 @@ const agentsContent = `# Lumbrera Brain Agent Guide
 This repository is a Lumbrera brain: a backendless, Markdown-native implementation of Andrej Karpathy's LLM Wiki pattern.
 
 The model:
-- sources/ contains immutable Markdown source material.
+- sources/ contains immutable raw Markdown source material.
 - wiki/ contains LLM-maintained Markdown synthesis.
 - Lumbrera owns the write boundary and deterministic bookkeeping.
 
@@ -334,10 +334,10 @@ Lumbrera is agent-driven. Prefer the bundled skills over inventing ad hoc shell 
 
 Lumbrera handles deterministic and protocol work:
 
-- frontmatter and protocol metadata,
+- wiki frontmatter and protocol metadata,
 - required source references from write flags,
 - INDEX.md, CHANGELOG.md, and BRAIN.sum,
-- checksums and generated metadata,
+- wiki checksums and generated metadata,
 - deterministic consistency such as paths, generated files, source immutability, broken links, and broken heading anchors.
 
 ## What agents handle
@@ -353,23 +353,23 @@ Agents handle semantic work:
 ## Common workflow
 
 1. Source arrives: the user adds or references a new Markdown source. Treat the raw source as immutable.
-2. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles frontmatter, source sections, index, changelog, and checksums.
+2. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles wiki frontmatter, source sections, index, changelog, and wiki checksums.
 3. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map, then read relevant wiki/ pages, then check sources/ when evidence is needed.
 4. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
 
 ## What to do
 
 - Assume paths are relative to this repository root.
-- Use Markdown body content only; let Lumbrera add protocol metadata and frontmatter.
+- For wiki writes, use Markdown body content only; let Lumbrera add protocol metadata and frontmatter.
 - For claim-level provenance, optionally add inline citations as [source: ../sources/path.md#heading-anchor]. Lumbrera validates the target file and heading anchor.
-- Use lumbrera write for every mutation, supplying title for new files, source path for wiki writes, and reason through CLI flags.
+- Use lumbrera write for every mutation, supplying title for new wiki files, source path for wiki writes, and reason through CLI flags.
 - Run lumbrera verify when deterministic consistency is in doubt.
 
 ## What not to do
 
 - Do not create, edit, move, delete, or overwrite files directly.
 - Do not modify existing source files under sources/.
-- Do not create or maintain frontmatter, INDEX.md, CHANGELOG.md, BRAIN.sum, checksums, or generated metadata manually.
+- Do not create or maintain wiki frontmatter, INDEX.md, CHANGELOG.md, BRAIN.sum, wiki checksums, or generated metadata manually.
 - Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
 - Do not rely on Git commands for Lumbrera knowledge bookkeeping.
 - Do not spend LLM linting effort on deterministic consistency; Lumbrera handles that.
@@ -386,7 +386,7 @@ lumbrera verify --brain .
 
 Those guardrails are defense-in-depth only. They do not replace lumbrera write, and they do not make direct edits safe. Agents must not create, edit, disable, or bypass external guardrails unless the user explicitly asks.
 
-If generated files drift because someone edited files directly, stop and report the verification error. The usual recovery is to restore the generated files or the whole brain from the user's external versioning/backup system, then retry through lumbrera write.
+If generated files drift because someone edited managed wiki files directly, stop and report the verification error. The usual recovery is to restore the generated files or the whole brain from the user's external versioning/backup system, then retry through lumbrera write.
 `
 
 const ingestSkillContent = `---
@@ -404,8 +404,8 @@ Use when the user asks to ingest, process, summarize, or integrate a raw source.
 - Do not alter the raw resource.
 - Create or update a distilled Markdown document under wiki/ with the durable knowledge from the source.
 - When a specific claim benefits from pinpoint provenance, cite it inline as [source: ../sources/path.md#heading-anchor].
-- Provide Markdown body content only. Do not create frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those.
-- Use lumbrera write to add the distilled document. For a new file, pass --title. For wiki writes, pass --source. Always pass --reason.
+- Provide wiki Markdown body content only. Do not create wiki frontmatter, index entries, changelog entries, checksums, or other generated metadata. Lumbrera owns those for wiki pages.
+- Use lumbrera write to add the distilled document. For a new wiki file, pass --title. For wiki writes, pass --source. Always pass --reason.
 `
 
 const querySkillContent = `---
@@ -424,7 +424,7 @@ Use when the user asks a question about knowledge in the brain.
 - Check preserved sources/ documents when claims need verification.
 - Answer with citations to the wiki pages or source documents used.
 - If the answer is durable knowledge worth keeping, ask whether to save it.
-- Save only through lumbrera write. Do not create frontmatter or generated metadata.
+- Save only through lumbrera write. Do not create wiki frontmatter or generated metadata.
 `
 
 const lintSkillContent = `---
@@ -436,7 +436,7 @@ description: Semantically health-check a Lumbrera LLM Wiki for stale synthesis, 
 
 Use when the user asks for a semantic health check of the wiki.
 
-Lumbrera handles deterministic consistency: frontmatter, index, changelog, checksums, source sections, broken links, heading anchors, path policy, and generated files. Do not spend LLM linting effort on those.
+Lumbrera handles deterministic consistency for managed wiki content: wiki frontmatter, index, changelog, checksums, source sections, broken links, heading anchors, path policy, and generated files. Do not spend LLM linting effort on those.
 
 ## Workflow
 
@@ -445,5 +445,5 @@ Lumbrera handles deterministic consistency: frontmatter, index, changelog, check
 - Look for duplicated or fragmented concepts that should be merged or clarified.
 - Identify important open questions or data gaps that need new sources.
 - Report findings with affected paths, evidence, and suggested next actions.
-- If asked to fix semantic issues, use lumbrera write. Do not edit files directly or create generated metadata.
+- If asked to fix semantic issues, use lumbrera write. Do not edit files directly or create wiki generated metadata.
 `

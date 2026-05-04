@@ -50,8 +50,8 @@ func validateOptionsForOperation(repo, target, kind string, exists bool, op oper
 		}
 	}
 
-	if (op == opSource || op == opCreate) && strings.TrimSpace(opts.Title) == "" {
-		return fmt.Errorf("--title is required when creating a new file")
+	if op == opCreate && strings.TrimSpace(opts.Title) == "" {
+		return fmt.Errorf("--title is required when creating a new wiki file")
 	}
 	if op == opAppend {
 		if !exists {

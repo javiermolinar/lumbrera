@@ -38,8 +38,7 @@ func applyMutation(repo, target, kind string, op operation, opts options, input 
 	case opDelete:
 		return os.Remove(absTarget)
 	case opSource:
-		body := normalizeBody(input)
-		return writeDocument(absTarget, target, kind, opts.Title, opts.Summary, opts.Tags, nil, body)
+		return writeRawFile(absTarget, input)
 	case opCreate:
 		body := normalizeBody(input)
 		sources, err := mergeSourceCitations(target, body, normalizeSources(opts.Sources))
@@ -88,6 +87,13 @@ func applyMutation(repo, target, kind string, op operation, opts options, input 
 	default:
 		return fmt.Errorf("unsupported operation %q", op)
 	}
+}
+
+func writeRawFile(absTarget string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(absTarget), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(absTarget, content, 0o644)
 }
 
 func writeDocument(absTarget, target, kind, title, summary string, tags, sources []string, body string) error {

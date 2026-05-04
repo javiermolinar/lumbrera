@@ -46,6 +46,7 @@ type Analysis struct {
 
 type AnalyzeOptions struct {
 	SourceCitations bool
+	IgnoreLinks     bool
 }
 
 var sourceCitationPattern = regexp.MustCompile(`(?i)\[source:\s*([^\]\r\n]+?)\]`)
@@ -80,6 +81,9 @@ func AnalyzeWithOptions(repoRelativePath, body string, opts AnalyzeOptions) (Ana
 		case *ast.Link:
 			if !entering {
 				return ast.WalkContinue, nil
+			}
+			if opts.IgnoreLinks {
+				return ast.WalkSkipChildren, nil
 			}
 			ref, ok, err := NormalizeReference(repoRelativePath, string(n.Destination))
 			if err != nil {

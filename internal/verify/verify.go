@@ -119,48 +119,43 @@ func isAllowedRootFile(rel string) bool {
 }
 
 func ValidateDocuments(repo string) error {
-	for _, dir := range []string{"sources", "wiki"} {
-		root := filepath.Join(repo, dir)
-		if _, err := os.Stat(root); err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			return err
+	root := filepath.Join(repo, "wiki")
+	if _, err := os.Stat(root); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
 		}
-		if err := filepath.WalkDir(root, func(absPath string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.IsDir() {
-				return nil
-			}
-			if strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
-				return nil
-			}
-			if entry.Type()&os.ModeSymlink != 0 {
-				return fmt.Errorf("%s is not a regular Markdown file", absPath)
-			}
-			info, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			if !info.Mode().IsRegular() {
-				return fmt.Errorf("%s is not a regular Markdown file", absPath)
-			}
-			rel, err := filepath.Rel(repo, absPath)
-			if err != nil {
-				return err
-			}
-			rel = filepath.ToSlash(rel)
-			return validateDocument(repo, absPath, rel, strings.TrimSuffix(dir, "s"))
-		}); err != nil {
-			return err
-		}
+		return err
 	}
-	return nil
+	return filepath.WalkDir(root, func(absPath string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s is not a regular Markdown file", absPath)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("%s is not a regular Markdown file", absPath)
+		}
+		rel, err := filepath.Rel(repo, absPath)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		return validateWikiDocument(repo, absPath, rel)
+	})
 }
 
-func validateDocument(repo, absPath, relPath, wantKind string) error {
+func validateWikiDocument(repo, absPath, relPath string) error {
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return err
@@ -172,10 +167,10 @@ func validateDocument(repo, absPath, relPath, wantKind string) error {
 	if !has {
 		return fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
 	}
-	if meta.Lumbrera.Kind != wantKind {
-		return fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, wantKind)
+	if meta.Lumbrera.Kind != "wiki" {
+		return fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, "wiki")
 	}
-	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: wantKind == "wiki"})
+	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: true})
 	if err != nil {
 		return fmt.Errorf("%s has invalid Markdown links: %w", relPath, err)
 	}
@@ -190,12 +185,6 @@ func validateDocument(repo, absPath, relPath, wantKind string) error {
 	}
 	if !sameStrings(meta.Lumbrera.Links, filterWikiLinks(analysis.Links)) {
 		return fmt.Errorf("%s frontmatter links are stale; regenerate through lumbrera write", relPath)
-	}
-	if wantKind == "source" {
-		if len(meta.Lumbrera.Sources) > 0 {
-			return fmt.Errorf("%s source frontmatter must not list provenance sources", relPath)
-		}
-		return nil
 	}
 	if len(analysis.Sources) == 0 {
 		return fmt.Errorf("%s is missing a ## Sources section with source links", relPath)
@@ -284,14 +273,18 @@ func documentAnchors(repo, relPath string) (map[string]struct{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, body, has, err := frontmatter.Split(content)
-	if err != nil {
-		return nil, fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
+	body := string(content)
+	analyzeOpts := md.AnalyzeOptions{IgnoreLinks: strings.HasPrefix(relPath, "sources/")}
+	if strings.HasPrefix(relPath, "wiki/") {
+		_, splitBody, has, err := frontmatter.Split(content)
+		if err != nil {
+			return nil, fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
+		}
+		if has {
+			body = splitBody
+		}
 	}
-	if !has {
-		body = string(content)
-	}
-	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{})
+	analysis, err := md.AnalyzeWithOptions(relPath, body, analyzeOpts)
 	if err != nil {
 		return nil, fmt.Errorf("%s has invalid Markdown links: %w", relPath, err)
 	}

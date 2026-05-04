@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
@@ -53,7 +54,7 @@ type indexDoc struct {
 }
 
 func IndexForRepo(repo string) (string, error) {
-	sources, err := indexDocs(repo, "sources")
+	sources, err := sourceIndexDocsFromWiki(repo)
 	if err != nil {
 		return "", err
 	}
@@ -181,6 +182,58 @@ func indexDocs(repo, dir string) ([]indexDoc, error) {
 	return docs, nil
 }
 
+func sourceIndexDocsFromWiki(repo string) ([]indexDoc, error) {
+	root := filepath.Join(repo, "wiki")
+	if _, err := os.Stat(root); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	seen := map[string]struct{}{}
+	var docs []indexDoc
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		meta, _, hasFrontmatter, err := frontmatter.Split(content)
+		if err != nil {
+			rel, relErr := filepath.Rel(repo, path)
+			if relErr != nil {
+				return relErr
+			}
+			return fmt.Errorf("%s has invalid frontmatter: %w", filepath.ToSlash(rel), err)
+		}
+		if !hasFrontmatter {
+			return nil
+		}
+		for _, source := range meta.Lumbrera.Sources {
+			if !strings.HasPrefix(source, "sources/") {
+				continue
+			}
+			if _, ok := seen[source]; ok {
+				continue
+			}
+			seen[source] = struct{}{}
+			docs = append(docs, indexDoc{Path: source, Title: titleForPath(source)})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(docs, func(i, j int) bool { return docs[i].Path < docs[j].Path })
+	return docs, nil
+}
+
 func titleForFile(absPath, relPath string) (string, error) {
 	content, err := os.ReadFile(absPath)
 	if err != nil {
@@ -200,8 +253,32 @@ func titleForFile(absPath, relPath string) (string, error) {
 	if analysis.FirstH1 != "" {
 		return analysis.FirstH1, nil
 	}
+	return titleForPath(relPath), nil
+}
+
+func titleForPath(relPath string) string {
 	base := filepath.Base(relPath)
-	return strings.TrimSuffix(base, filepath.Ext(base)), nil
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	base = strings.ReplaceAll(base, "-", " ")
+	base = strings.ReplaceAll(base, "_", " ")
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return relPath
+	}
+	return titleWords(base)
+}
+
+func titleWords(value string) string {
+	parts := strings.Fields(value)
+	for i, part := range parts {
+		runes := []rune(part)
+		if len(runes) == 0 {
+			continue
+		}
+		runes[0] = unicode.ToUpper(runes[0])
+		parts[i] = string(runes)
+	}
+	return strings.Join(parts, " ")
 }
 
 func ChangelogForRepo(repo string) (string, error) {

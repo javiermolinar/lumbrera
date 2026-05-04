@@ -20,10 +20,11 @@ func TestVerifyPassesForInitializedBrain(t *testing.T) {
 
 func TestVerifyRejectsManifestDrift(t *testing.T) {
 	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
-	path := filepath.Join(repo, "sources", "raw.md")
-	content := strings.Replace(readFile(t, repo, "sources/raw.md"), "Raw notes.", "Changed raw notes.", 1)
+	path := filepath.Join(repo, "wiki", "topic.md")
+	content := strings.Replace(readFile(t, repo, "wiki/topic.md"), "Body.", "Changed body.", 1)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -34,6 +35,18 @@ func TestVerifyRejectsManifestDrift(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "BRAIN.sum") {
 		t.Fatalf("expected BRAIN.sum drift error, got %v", err)
+	}
+}
+
+func TestVerifyAllowsRawSourceWithoutGeneratedFrontmatter(t *testing.T) {
+	repo := initBrain(t)
+	path := filepath.Join(repo, "sources", "raw.md")
+	if err := os.WriteFile(path, []byte("# Raw source\n\nRaw notes.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Run([]string{"--brain", repo}); err != nil {
+		t.Fatalf("verify should ignore raw source frontmatter: %v", err)
 	}
 }
 

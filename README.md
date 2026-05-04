@@ -13,8 +13,8 @@ Lumbrera keeps the data as ordinary files and makes the CLI the mutation boundar
 ## Goals
 
 - Keep knowledge in ordinary Markdown files that humans and agents can read directly.
-- Preserve source material before distilling it into wiki pages.
-- Generate `INDEX.md`, `CHANGELOG.md`, and `BRAIN.sum` from the current brain state.
+- Preserve source material as raw Markdown before distilling it into wiki pages.
+- Generate `INDEX.md`, `CHANGELOG.md`, and `BRAIN.sum` from the managed wiki state.
 - Require source references for distilled knowledge so claims can be traced back to preserved material.
 - Validate local Markdown links, heading anchors, and optional inline source citations such as `[source: ../sources/input.md#section]` during writes.
 - Support bring-your-own-agent workflows, including Pi, Claude Code, Cursor, Slack bots, scripts, and humans.
@@ -41,7 +41,7 @@ lumbrera init ./brain
 Agents then use the generated `AGENTS.md` and bundled skills. The core protocol is intentionally small:
 
 - `lumbrera write ...` is the only supported mutation boundary for `sources/` and `wiki/`.
-- `lumbrera verify --brain <path>` checks deterministic integrity: provenance, links, generated files, and checksums.
+- `lumbrera verify --brain <path>` checks deterministic integrity for managed wiki content: provenance, links, generated files, and checksums. Raw files under `sources/` are not required to have Lumbrera frontmatter.
 - `lumbrera init <path>` creates a brain scaffold. It does not initialize Git, install hooks, commit, or push.
 
 ## External guardrails
@@ -52,4 +52,4 @@ Lumbrera does not own Git or GitHub. If a brain is stored in Git, humans can opt
 lumbrera verify --brain .
 ```
 
-These guardrails are defense-in-depth. They catch drift and direct edits, but they do not replace `lumbrera write`. If generated files drift, restore them from your external versioning or backup system, then retry the Lumbrera operation.
+These guardrails are defense-in-depth. They catch drift in managed wiki content and generated metadata, but they do not replace `lumbrera write`. If generated files drift, restore them from your external versioning or backup system, then retry the Lumbrera operation.

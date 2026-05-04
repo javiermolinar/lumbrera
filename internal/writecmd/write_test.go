@@ -15,7 +15,10 @@ import (
 func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	repo := initBrain(t)
 
-	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/2026/05/04/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/2026/05/04/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	if frontmatter.StartsWithFrontmatter([]byte(readFile(t, repo, "sources/2026/05/04/raw.md"))) {
+		t.Fatal("source writes should preserve raw source content without generated frontmatter")
+	}
 	runWrite(t, repo, "# Related\n\nCompanion page.\n", "wiki/related.md", "--title", "Related", "--source", "sources/2026/05/04/raw.md", "--reason", "Create related", "--actor", "test")
 	runWrite(t, repo, "# Topic\n\nSee [Related](./related.md).\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/2026/05/04/raw.md", "--reason", "Create topic", "--actor", "test", "--tag", "design")
 
@@ -43,9 +46,9 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 		t.Fatalf("expected generated Sources section, got:\n%s", body)
 	}
 
-	assertFileContains(t, repo, "INDEX.md", "[Raw source](sources/2026/05/04/raw.md)")
+	assertFileContains(t, repo, "INDEX.md", "[Raw](sources/2026/05/04/raw.md)")
 	assertFileContains(t, repo, "INDEX.md", "[Topic](wiki/topic.md)")
-	assertFileContains(t, repo, "BRAIN.sum", "sources/2026/05/04/raw.md sha256:")
+	assertFileNotContains(t, repo, "BRAIN.sum", "sources/2026/05/04/raw.md sha256:")
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/topic.md sha256:")
 	assertFileContains(t, repo, "CHANGELOG.md", "[source] [test]: Preserve raw source")
 	assertFileContains(t, repo, "CHANGELOG.md", "[create] [test]: Create topic")
@@ -119,6 +122,13 @@ func TestWriteRejectsMissingInternalLinksAndRollsBack(t *testing.T) {
 	if strings.Contains(readFile(t, repo, ".brain/ops.log"), "Create missing link") {
 		t.Fatal("failed write left operation log entry")
 	}
+}
+
+func TestWriteAllowsRawSourceLinksWhenCheckingAnchors(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nSee [external relative doc](../outside.md).\n\n## Evidence\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+
+	runWrite(t, repo, "# Topic\n\nSee [Evidence](../sources/raw.md#evidence).\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 }
 
 func TestWriteRejectsMissingAnchorsAndRollsBack(t *testing.T) {
@@ -316,6 +326,14 @@ func assertFileContains(t *testing.T, repo, rel, want string) {
 	got := readFile(t, repo, rel)
 	if !strings.Contains(got, want) {
 		t.Fatalf("expected %s to contain %q, got:\n%s", rel, want, got)
+	}
+}
+
+func assertFileNotContains(t *testing.T, repo, rel, unwanted string) {
+	t.Helper()
+	got := readFile(t, repo, rel)
+	if strings.Contains(got, unwanted) {
+		t.Fatalf("expected %s not to contain %q, got:\n%s", rel, unwanted, got)
 	}
 }
 

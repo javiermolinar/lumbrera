@@ -111,7 +111,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 		if len(input) == 0 {
 			return fmt.Errorf("write requires Markdown content on stdin")
 		}
-		if frontmatter.StartsWithFrontmatter(input) {
+		if kind == "wiki" && frontmatter.StartsWithFrontmatter(input) {
 			return fmt.Errorf("stdin must contain Markdown body only; Lumbrera generates frontmatter")
 		}
 		if kind == "wiki" && hasSourcesSection(string(input)) {

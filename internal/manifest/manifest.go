@@ -43,48 +43,46 @@ func Generate(entries []Entry) (string, error) {
 
 func EntriesForRepo(repo string) ([]Entry, error) {
 	var entries []Entry
-	for _, dir := range []string{"sources", "wiki"} {
-		root := filepath.Join(repo, dir)
-		if _, err := os.Stat(root); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return nil, err
+	root := filepath.Join(repo, "wiki")
+	if _, err := os.Stat(root); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
 		}
-		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.IsDir() {
-				return nil
-			}
-			if !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
-				return nil
-			}
-			if entry.Type()&os.ModeSymlink != 0 {
-				return fmt.Errorf("manifest refuses non-regular Markdown file %s", path)
-			}
-			info, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			if !info.Mode().IsRegular() {
-				return fmt.Errorf("manifest refuses non-regular Markdown file %s", path)
-			}
-			rel, err := filepath.Rel(repo, path)
-			if err != nil {
-				return err
-			}
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			entries = append(entries, Entry{Path: filepath.ToSlash(rel), Hash: HashContent(content)})
-			return nil
-		})
+		return nil, err
+	}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
-			return nil, err
+			return err
 		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("manifest refuses non-regular Markdown file %s", path)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("manifest refuses non-regular Markdown file %s", path)
+		}
+		rel, err := filepath.Rel(repo, path)
+		if err != nil {
+			return err
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, Entry{Path: filepath.ToSlash(rel), Hash: HashContent(content)})
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
 	return entries, nil

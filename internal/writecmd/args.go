@@ -116,15 +116,16 @@ Options:
   --brain <path>      target brain directory, default current directory
   --repo <path>       deprecated alias for --brain
   --actor <actor>     actor label for changelog, default LUMBRERA_ACTOR, USER, USERNAME, or human
-  --title <title>     required when creating a new file
-  --summary <text>    optional generated frontmatter summary
-  --tag <tag>         optional generated frontmatter tag, repeatable
+  --title <title>     required when creating a new wiki file
+  --summary <text>    optional generated wiki frontmatter summary
+  --tag <tag>         optional generated wiki frontmatter tag, repeatable
   --source <path>     provenance source for wiki writes, repeatable
   --append <section>  append stdin content to a named section in an existing wiki page
   --delete            delete an existing wiki page
 
 Rules:
-  - stdin must contain Markdown body only; Lumbrera generates frontmatter
+  - source writes preserve stdin as raw Markdown
+  - wiki stdin must contain Markdown body only; Lumbrera generates wiki frontmatter
   - source files are immutable after creation
   - wiki writes require at least one --source
   - local Markdown links and heading anchors must resolve
