@@ -316,96 +316,41 @@ No tags yet.
 
 const agentsContent = `# Lumbrera Brain Agent Guide
 
-This repository is a Lumbrera brain: a backendless, Markdown-native implementation of Andrej Karpathy's LLM Wiki pattern.
+This is a Lumbrera brain: a managed Markdown knowledge base for humans and LLM agents.
 
-The model:
-- sources/ contains immutable raw Markdown source material.
-- wiki/ contains LLM-maintained Markdown synthesis.
-- Lumbrera owns the write boundary and deterministic bookkeeping.
-- tags.md is a generated read-only tag registry derived from wiki frontmatter.
+## Read
 
-The goal is not one-shot RAG. The wiki is a persistent, compounding artifact that agents keep current by ingesting sources, answering questions, and checking semantic drift over time.
+- You may read Markdown files directly.
+- Use INDEX.md and tags.md for navigation, not as source evidence.
+- Use .agents/skills/lumbrera-query/SKILL.md when answering questions.
 
-## Bundled skills
-
-Use the matching bundled skill for the operation:
-
-- .agents/skills/lumbrera-ingest/SKILL.md for ingesting a raw source into distilled wiki knowledge.
-- .agents/skills/lumbrera-query/SKILL.md for answering questions from the maintained wiki and preserved sources.
-- .agents/skills/lumbrera-lint/SKILL.md for semantic health checks: stale synthesis, contradictions, unsupported claims, duplicated concepts, and useful follow-up questions.
-
-## Command protocol
-
-Lumbrera is agent-driven. Prefer the bundled skills over inventing ad hoc shell workflows. The CLI commands are narrow protocol boundaries, not a broad human note-taking API:
-
-- lumbrera write is the only mutation boundary for sources/ and wiki/ content.
-- lumbrera verify is for deterministic diagnostics; it proves mechanical consistency, not semantic truth.
-- lumbrera init is a human/admin setup command.
-
-## What Lumbrera handles
-
-Lumbrera handles deterministic and protocol work:
-
-- stable wiki document IDs, wiki frontmatter, and protocol metadata,
-- required source references from write flags,
-- INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md,
-- wiki checksums, tag registry, and generated metadata,
-- deterministic consistency such as paths, generated files, source immutability, broken links, and broken heading anchors.
-
-## What agents handle
-
-Agents handle semantic work:
-
-- read Markdown sources and wiki pages,
-- distill raw sources into durable wiki knowledge,
-- synthesize answers from the maintained wiki,
-- identify semantic drift between wiki pages and source material,
-- suggest new questions or missing sources.
-
-## Common workflow
-
-1. Source arrives: the user adds or references a new Markdown source. Treat the raw source as immutable.
-2. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles wiki document IDs, frontmatter, source sections, tag registry, index, changelog, and wiki checksums.
-3. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map and tags.md as the tag registry, then read relevant wiki/ pages, then check sources/ when evidence is needed.
-4. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
-
-## Wiki page quality
-
-A good wiki page is atomic, source-grounded, useful without reopening the source, and small. Keep each page focused on one durable concept, decision, task, runbook, or reference topic. Wiki pages have a hard maximum of 400 Markdown body lines; split broad pages before writing them.
-
-Prefer searchable pages with clear titles, a single-line summary, 1-5 reused tags, contextual links to related wiki pages, and direct source provenance. Bad wiki pages include "everything from source X", chunk dumps like "part 1", huge mixed-topic pages, filler tags, unsupported synthesis, or duplicates of existing pages.
-
-## What to do
-
-- Assume paths are relative to this repository root.
-- For wiki writes, use Markdown body content only; let Lumbrera add protocol metadata, document IDs, and frontmatter.
-- Read tags.md before wiki writes and reuse existing tags when they fit. Wiki pages require a single-line summary and 1-5 lowercase slug tags.
-- For claim-level provenance, optionally add inline citations as [source: ../sources/path.md#heading-anchor]. Lumbrera validates the target file and heading anchor.
-- Use lumbrera write for every mutation, supplying title, summary, tags, source path for wiki writes, and reason through CLI flags.
-- Run lumbrera verify when deterministic consistency is in doubt.
-
-## What not to do
+## Write
 
 - Do not create, edit, move, delete, or overwrite files directly.
-- Do not modify existing source files under sources/.
-- Do not create or maintain wiki document IDs, wiki frontmatter, INDEX.md, CHANGELOG.md, BRAIN.sum, tags.md, wiki checksums, tag registry, or generated metadata manually.
+- All mutations to sources/ and wiki/ must use lumbrera write.
+- Do not modify existing files under sources/; sources are immutable.
+- Do not edit generated files: INDEX.md, CHANGELOG.md, BRAIN.sum, or tags.md.
 - Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
-- Do not rely on Git commands for Lumbrera knowledge bookkeeping.
-- Do not spend LLM linting effort on deterministic consistency; Lumbrera handles that.
 
-Git, cloud sync, backup, and sharing are external to Lumbrera. Use them only when explicitly instructed.
+## Wiki rules
 
-## Optional external guardrails
+- Wiki pages require a title, single-line summary, 1-5 lowercase slug tags, source references, and at most 400 Markdown body lines.
+- Lumbrera generates document IDs, frontmatter, source sections, index, changelog, checksums, and the tag registry.
+- Read tags.md before wiki writes and reuse existing tags when they fit.
 
-Humans may configure external tools such as Git hooks, GitHub Actions, CI jobs, backup checks, or sync services to run:
+## Commands
 
 ~~~sh
 lumbrera verify --brain .
+lumbrera write sources/<path>.md --reason "Preserve source" < source.md
+lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --source sources/<path>.md --reason "Distill source" < page.md
 ~~~
 
-Those guardrails are defense-in-depth only. They do not replace lumbrera write, and they do not make direct edits safe. Agents must not create, edit, disable, or bypass external guardrails unless the user explicitly asks.
+## Skills
 
-If generated files drift because someone edited managed wiki files directly, stop and report the verification error. The usual recovery is to restore the generated files or the whole brain from the user's external versioning/backup system, then retry through lumbrera write.
+- Ingest sources into wiki pages: .agents/skills/lumbrera-ingest/SKILL.md
+- Answer questions from the brain: .agents/skills/lumbrera-query/SKILL.md
+- Check semantic health: .agents/skills/lumbrera-lint/SKILL.md
 `
 
 const ingestSkillContent = `---
