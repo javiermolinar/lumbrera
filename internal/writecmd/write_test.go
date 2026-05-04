@@ -9,6 +9,7 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/initcmd"
+	"github.com/javiermolinar/lumbrera/internal/repolock"
 )
 
 func TestWriteSourceAndWikiCreateCommitGeneratedFiles(t *testing.T) {
@@ -272,6 +273,26 @@ func TestWriteRejectsInvalidMutations(t *testing.T) {
 
 	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
 	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
+}
+
+func TestWriteRejectsConcurrentRepoLock(t *testing.T) {
+	repo := initBrain(t)
+	lock, err := repolock.Acquire(repo, "test")
+	if err != nil {
+		t.Fatalf("acquire lock: %v", err)
+	}
+	defer func() { _ = lock.Release() }()
+	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
+
+	err = Run([]string{"sources/raw.md", "--repo", repo, "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test"}, strings.NewReader("# Raw source\n"))
+	if err == nil {
+		t.Fatal("expected write to reject concurrent repo lock")
+	}
+	if !strings.Contains(err.Error(), "locked") {
+		t.Fatalf("expected lock error, got %v", err)
+	}
+	assertMissing(t, repo, "sources/raw.md")
+	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "1")
 }
 
 func TestWriteRequiresConfiguredUpstream(t *testing.T) {

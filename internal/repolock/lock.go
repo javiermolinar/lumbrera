@@ -1,0 +1,107 @@
+package repolock
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/javiermolinar/lumbrera/internal/git"
+)
+
+const (
+	lockGitPath = "lumbrera.lock"
+	ownerFile   = "OWNER"
+)
+
+type Lock struct {
+	path     string
+	token    string
+	released bool
+}
+
+func Acquire(repo, operation string) (*Lock, error) {
+	path, err := gitLockPath(repo)
+	if err != nil {
+		return nil, err
+	}
+	token, err := newToken()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(path, 0o700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, lockedError(path)
+		}
+		return nil, err
+	}
+
+	owner := ownerContent(operation, token)
+	if err := os.WriteFile(filepath.Join(path, ownerFile), []byte(owner), 0o600); err != nil {
+		_ = os.RemoveAll(path)
+		return nil, err
+	}
+	return &Lock{path: path, token: token}, nil
+}
+
+func (l *Lock) Release() error {
+	if l == nil || l.released {
+		return nil
+	}
+	content, err := os.ReadFile(filepath.Join(l.path, ownerFile))
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(content), "token: "+l.token+"\n") {
+		return fmt.Errorf("refusing to release repo lock %s: lock owner changed", l.path)
+	}
+	if err := os.RemoveAll(l.path); err != nil {
+		return err
+	}
+	l.released = true
+	return nil
+}
+
+func gitLockPath(repo string) (string, error) {
+	result, err := git.Run(repo, "rev-parse", "--git-path", lockGitPath)
+	if err != nil {
+		return "", err
+	}
+	path := strings.TrimSpace(result.Stdout)
+	if path == "" {
+		return "", fmt.Errorf("git rev-parse --git-path %s returned empty path", lockGitPath)
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(repo, path)
+	}
+	return filepath.Clean(path), nil
+}
+
+func lockedError(path string) error {
+	owner, err := os.ReadFile(filepath.Join(path, ownerFile))
+	if err != nil {
+		return fmt.Errorf("repository is locked by another Lumbrera operation at %s", path)
+	}
+	return fmt.Errorf("repository is locked by another Lumbrera operation at %s:\n%s", path, strings.TrimSpace(string(owner)))
+}
+
+func newToken() (string, error) {
+	var token [16]byte
+	if _, err := rand.Read(token[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(token[:]), nil
+}
+
+func ownerContent(operation, token string) string {
+	host, _ := os.Hostname()
+	operation = strings.TrimSpace(operation)
+	if operation == "" {
+		operation = "unknown"
+	}
+	return fmt.Sprintf("operation: %s\npid: %d\nhost: %s\ncreated: %s\ntoken: %s\n", operation, os.Getpid(), host, time.Now().UTC().Format(time.RFC3339Nano), token)
+}

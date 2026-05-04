@@ -10,6 +10,7 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/git"
+	"github.com/javiermolinar/lumbrera/internal/repolock"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
@@ -38,7 +39,7 @@ const (
 	opDelete operation = "delete"
 )
 
-func Run(args []string, stdin io.Reader) error {
+func Run(args []string, stdin io.Reader) (err error) {
 	opts, err := parseArgs(args)
 	if err != nil {
 		printHelp()
@@ -49,10 +50,22 @@ func Run(args []string, stdin io.Reader) error {
 		return nil
 	}
 
+	if err := git.EnsureAvailable(); err != nil {
+		return err
+	}
 	repo, err := resolveRepo(opts.Repo)
 	if err != nil {
 		return err
 	}
+	lock, err := repolock.Acquire(repo, "write")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if releaseErr := lock.Release(); err == nil && releaseErr != nil {
+			err = releaseErr
+		}
+	}()
 	if err := preflight(repo); err != nil {
 		return err
 	}
