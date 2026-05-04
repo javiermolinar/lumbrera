@@ -48,6 +48,7 @@ So Lumbrera can be framed as:
 - No large agent API with many note-specific commands.
 
 ## V2 ideas
+- Add explicit adoption/import for existing Markdown repositories, separate from `init`.
 - Add optional configuration for custom branches, directories, lint policy, and source immutability.
 - Build a derived database from the Markdown hierarchy, optional frontmatter, `## Sources` sections, and Markdown links.
 - Treat Markdown links as the canonical knowledge graph and derive backlinks, orphan pages, broken links, and graph traversal from them.
@@ -96,6 +97,7 @@ sources/              # preserved raw input, mostly immutable
 wiki/                 # distilled maintained knowledge; users choose the hierarchy inside it
 
 .brain/
+  VERSION             # marker identifying a supported Lumbrera brain format
   conflicts/          # temporary conflict context for failed sync/write attempts
   hooks/              # git hooks installed via core.hooksPath
 ```
@@ -110,14 +112,34 @@ wiki/    -> distilled, maintained knowledge
 ## Public CLI API
 
 ### `lumbrera init <repo>`
-Creates the minimal scaffold and installs repository hooks.
+Creates a new local Lumbrera brain scaffold and installs repository hooks. `init` is local-only in v1; it does not push.
 
 Responsibilities:
 - Create directory structure.
+- Create `.brain/VERSION` with the supported brain format marker, for example `lumbrera-brain-v1`.
 - Generate initial `INDEX.md`, `CHANGELOG.md`, and `BRAIN.sum`.
 - Generate `AGENTS.md`.
 - Install hooks via `git config core.hooksPath .brain/hooks`.
 - Initialize Git if needed.
+- Create an initial local commit with subject `[init] [lumbrera]: Initialize Lumbrera brain`.
+
+A Lumbrera brain repo is identified by `.brain/VERSION`, not by folder shape alone. `sync` and `write` must fail unless this marker exists and matches a supported version.
+
+Init safety rules:
+- Missing or empty directories may be initialized.
+- Existing empty Git repositories may be initialized.
+- Existing clean Git repositories that contain only common fresh-hosting boilerplate may be initialized; allowed root files are `README`, `README.md`, `LICENSE`, `LICENSE.md`, `LICENSE.txt`, `COPYING`, `COPYING.md`, and `.gitignore`.
+- Existing boilerplate files are preserved and are not treated as `sources/` or `wiki/` content.
+- Already initialized Lumbrera repositories should be detected and treated as already initialized.
+- Existing non-empty directories or Git repositories with non-boilerplate content and no `.brain/VERSION` must be rejected.
+- Repositories with `.brain/` but no valid `VERSION` marker must be rejected.
+- Dirty Git repositories must be rejected.
+
+V1 `init` does not convert existing Markdown repositories. Existing-repo adoption or import should be a future explicit command, not implicit `init` behavior.
+
+After `init`, users should configure a push remote before the first `write`. Successful `write` transactions require a configured push remote.
+
+Help must be agent-readable. Top-level `lumbrera --help` explains the product, commands, and safe agent rule. `lumbrera init --help` explains what init creates, accepted/rejected repo states, local-only behavior, and next steps.
 
 ### `lumbrera sync --repo <repo>`
 Makes the local repo current, clean, generated, linted, verified, and pushed.
@@ -635,7 +657,7 @@ Pi skill
 
 ## Open questions
 
-- Should source files be strictly immutable after creation, or allow metadata-only edits?
+- Should source files remain strictly immutable after creation, or should a future version allow metadata-only edits?
 - Should source references remain only in `## Sources`, or should future versions also support YAML frontmatter or inline citations?
 - Should `write` ever support batch operations, or should multi-file changes remain multiple one-commit transactions?
 - What exact format should `BRAIN.sum` use: line-oriented text, JSON, or TOML?
