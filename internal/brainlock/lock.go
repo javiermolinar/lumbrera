@@ -1,4 +1,4 @@
-package repolock
+package brainlock
 
 import (
 	"crypto/rand"
@@ -9,13 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/javiermolinar/lumbrera/internal/git"
 )
 
 const (
-	lockGitPath = "lumbrera.lock"
-	ownerFile   = "OWNER"
+	lockPath  = ".brain/lock"
+	ownerFile = "OWNER"
 )
 
 type Lock struct {
@@ -24,11 +22,8 @@ type Lock struct {
 	released bool
 }
 
-func Acquire(repo, operation string) (*Lock, error) {
-	path, err := gitLockPath(repo)
-	if err != nil {
-		return nil, err
-	}
+func Acquire(brain, operation string) (*Lock, error) {
+	path := filepath.Join(brain, filepath.FromSlash(lockPath))
 	token, err := newToken()
 	if err != nil {
 		return nil, err
@@ -57,7 +52,7 @@ func (l *Lock) Release() error {
 		return err
 	}
 	if !strings.Contains(string(content), "token: "+l.token+"\n") {
-		return fmt.Errorf("refusing to release repo lock %s: lock owner changed", l.path)
+		return fmt.Errorf("refusing to release brain lock %s: lock owner changed", l.path)
 	}
 	if err := os.RemoveAll(l.path); err != nil {
 		return err
@@ -66,27 +61,12 @@ func (l *Lock) Release() error {
 	return nil
 }
 
-func gitLockPath(repo string) (string, error) {
-	result, err := git.Run(repo, "rev-parse", "--git-path", lockGitPath)
-	if err != nil {
-		return "", err
-	}
-	path := strings.TrimSpace(result.Stdout)
-	if path == "" {
-		return "", fmt.Errorf("git rev-parse --git-path %s returned empty path", lockGitPath)
-	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(repo, path)
-	}
-	return filepath.Clean(path), nil
-}
-
 func lockedError(path string) error {
 	owner, err := os.ReadFile(filepath.Join(path, ownerFile))
 	if err != nil {
-		return fmt.Errorf("repository is locked by another Lumbrera operation at %s", path)
+		return fmt.Errorf("brain is locked by another Lumbrera operation at %s", path)
 	}
-	return fmt.Errorf("repository is locked by another Lumbrera operation at %s:\n%s", path, strings.TrimSpace(string(owner)))
+	return fmt.Errorf("brain is locked by another Lumbrera operation at %s:\n%s", path, strings.TrimSpace(string(owner)))
 }
 
 func newToken() (string, error) {

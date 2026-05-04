@@ -1,117 +1,108 @@
 package writecmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
-	"github.com/javiermolinar/lumbrera/internal/git"
+	"github.com/javiermolinar/lumbrera/internal/ops"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
-func resolveRepo(repo string) (string, error) {
-	if strings.TrimSpace(repo) == "" {
+func resolveBrain(brainDir string) (string, error) {
+	if strings.TrimSpace(brainDir) == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return "", err
 		}
-		root, err := git.WorkTreeRoot(cwd)
-		if err == nil {
-			repo = root
-		} else {
-			repo = cwd
-		}
+		brainDir = cwd
 	}
-	abs, err := filepath.Abs(repo)
+	abs, err := filepath.Abs(brainDir)
 	if err != nil {
 		return "", err
 	}
 	return filepath.Clean(abs), nil
 }
 
-func currentHead(repo string) (string, error) {
-	result, err := git.Run(repo, "rev-parse", "--verify", "HEAD")
-	if err != nil {
-		return "", err
+func preflight(brainDir string) error {
+	if err := brain.ValidateRepo(brainDir); err != nil {
+		return err
 	}
-	head := strings.TrimSpace(result.Stdout)
-	if head == "" {
-		return "", fmt.Errorf("git HEAD is empty")
-	}
-	return head, nil
+	return verify.Run(brainDir, verify.Options{})
 }
 
-func rollbackWrite(repo, base string) error {
-	if strings.TrimSpace(base) == "" {
-		return fmt.Errorf("cannot rollback write without a base commit")
-	}
-	if _, err := git.Run(repo, "reset", "--hard", base); err != nil {
-		return err
-	}
-	_, err := git.Run(repo, "clean", "-fd", "--", "sources", "wiki", brain.IndexPath, brain.ChangelogPath, brain.BrainSumPath)
-	return err
+type fileBackup struct {
+	path    string
+	exists  bool
+	content []byte
 }
 
-func preflight(repo string) error {
-	if err := git.EnsureAvailable(); err != nil {
-		return err
-	}
-	if !git.IsRepo(repo) {
-		return fmt.Errorf("%s is not a Git worktree root", repo)
-	}
-	if err := brain.ValidateRepo(repo); err != nil {
-		return err
-	}
-	clean, err := git.IsClean(repo)
-	if err != nil {
-		return err
-	}
-	if !clean {
-		return fmt.Errorf("working tree is not clean; run lumbrera sync or commit/revert unrelated changes before write")
-	}
-	if err := fetchAndRebaseBeforeWrite(repo); err != nil {
-		return err
-	}
-	return verify.Run(repo, verify.Options{})
+type writeBackup struct {
+	files []fileBackup
 }
 
-func fetchAndRebaseBeforeWrite(repo string) error {
-	upstream, err := git.Upstream(repo)
-	if err != nil {
-		return fmt.Errorf("write requires a configured upstream remote; after init run git remote add origin <url> and git push -u origin main: %w", err)
+func newWriteBackup(brainDir, target string) (*writeBackup, error) {
+	paths := []string{
+		target,
+		brain.IndexPath,
+		brain.ChangelogPath,
+		brain.BrainSumPath,
+		ops.LogPath,
 	}
-	if err := git.Fetch(repo); err != nil {
-		return fmt.Errorf("failed to fetch remote changes before write: %w", err)
+	seen := map[string]struct{}{}
+	backup := &writeBackup{}
+	for _, rel := range paths {
+		if rel == "" {
+			continue
+		}
+		if _, ok := seen[rel]; ok {
+			continue
+		}
+		seen[rel] = struct{}{}
+		abs := filepath.Join(brainDir, filepath.FromSlash(rel))
+		content, err := os.ReadFile(abs)
+		if err == nil {
+			backup.files = append(backup.files, fileBackup{path: abs, exists: true, content: content})
+			continue
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			backup.files = append(backup.files, fileBackup{path: abs})
+			continue
+		}
+		return nil, err
 	}
-	if err := git.Rebase(repo, upstream); err != nil {
-		_ = git.RebaseAbort(repo)
-		return fmt.Errorf("failed to rebase onto %s before write; run lumbrera sync or resolve conflicts before retrying: %w", upstream, err)
+	return backup, nil
+}
+
+func (b *writeBackup) Restore() error {
+	if b == nil {
+		return nil
 	}
-	clean, err := git.IsClean(repo)
-	if err != nil {
-		return err
-	}
-	if !clean {
-		return fmt.Errorf("working tree is not clean after remote rebase; resolve local state before write")
-	}
-	ahead, err := git.AheadCount(repo, upstream)
-	if err != nil {
-		return err
-	}
-	if ahead != 0 {
-		return fmt.Errorf("local branch has %d unpushed commit(s); run lumbrera sync before write", ahead)
+	for _, file := range b.files {
+		if file.exists {
+			if err := os.MkdirAll(filepath.Dir(file.path), 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(file.path, file.content, 0o644); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := os.Remove(file.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
 	}
 	return nil
 }
 
-func defaultActor(repo string) (string, error) {
-	result, err := git.Run(repo, "config", "user.name")
-	if err == nil {
-		name := strings.TrimSpace(result.Stdout)
-		if name != "" {
-			return sanitizeActor(name), nil
+func defaultActor(brainDir string) (string, error) {
+	_ = brainDir
+	for _, key := range []string{"LUMBRERA_ACTOR", "USER", "USERNAME"} {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return sanitizeActor(value), nil
 		}
 	}
 	return "human", nil

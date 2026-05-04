@@ -2,28 +2,22 @@ package writecmd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
+	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/initcmd"
-	"github.com/javiermolinar/lumbrera/internal/repolock"
 )
 
-func TestWriteSourceAndWikiCreateCommitGeneratedFiles(t *testing.T) {
+func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	repo := initBrain(t)
 
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/2026/05/04/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
 	runWrite(t, repo, "# Related\n\nCompanion page.\n", "wiki/related.md", "--title", "Related", "--source", "sources/2026/05/04/raw.md", "--reason", "Create related", "--actor", "test")
 	runWrite(t, repo, "# Topic\n\nSee [Related](./related.md).\n", "wiki/topic.md", "--title", "Topic", "--source", "sources/2026/05/04/raw.md", "--reason", "Create topic", "--actor", "test", "--tag", "design")
-
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "4")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
-	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[create] [test]: Create topic")
-	assertBareGitOutput(t, remotePath(t, repo), []string{"rev-list", "--count", "main"}, "4")
-	assertBareGitOutput(t, remotePath(t, repo), []string{"log", "--format=%s", "-1", "main"}, "[create] [test]: Create topic")
 
 	wiki := readFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
@@ -55,6 +49,7 @@ func TestWriteSourceAndWikiCreateCommitGeneratedFiles(t *testing.T) {
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/topic.md sha256:")
 	assertFileContains(t, repo, "CHANGELOG.md", "[source] [test]: Preserve raw source")
 	assertFileContains(t, repo, "CHANGELOG.md", "[create] [test]: Create topic")
+	assertFileContains(t, repo, ".brain/ops.log", `"operation":"create"`)
 }
 
 func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
@@ -64,16 +59,15 @@ func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 
 	runWrite(t, repo, "Appended note.\n", "wiki/topic.md", "--append", "Notes", "--source", "sources/raw.md", "--reason", "Append note", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Initial.\n\nAppended note.")
-	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[append] [test]: Append note")
+	assertFileContains(t, repo, "CHANGELOG.md", "[append] [test]: Append note")
 
 	runWrite(t, repo, "# Topic\n\nReplacement.\n", "wiki/topic.md", "--source", "sources/raw.md", "--reason", "Replace topic", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Replacement.")
-	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[update] [test]: Replace topic")
+	assertFileContains(t, repo, "CHANGELOG.md", "[update] [test]: Replace topic")
 
 	runWrite(t, repo, "", "wiki/topic.md", "--delete", "--reason", "Remove topic", "--actor", "test")
 	assertMissing(t, repo, "wiki/topic.md")
-	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[delete] [test]: Remove topic")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
+	assertFileContains(t, repo, "CHANGELOG.md", "[delete] [test]: Remove topic")
 }
 
 func TestWriteRejectsEmptyAppendFlag(t *testing.T) {
@@ -86,8 +80,6 @@ func TestWriteRejectsEmptyAppendFlag(t *testing.T) {
 	if strings.Contains(readFile(t, repo, "wiki/topic.md"), "Should append") {
 		t.Fatal("failed empty append wrote snippet into page")
 	}
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "3")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
 func TestWriteRejectsAppendToGeneratedSourcesSection(t *testing.T) {
@@ -99,8 +91,6 @@ func TestWriteRejectsAppendToGeneratedSourcesSection(t *testing.T) {
 	if strings.Contains(readFile(t, repo, "wiki/topic.md"), "This would be discarded") {
 		t.Fatal("append to generated Sources section wrote snippet into page")
 	}
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "3")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
 func TestWriteRejectsDeleteDirectoryTarget(t *testing.T) {
@@ -115,8 +105,6 @@ func TestWriteRejectsDeleteDirectoryTarget(t *testing.T) {
 	if err != nil || !info.IsDir() {
 		t.Fatalf("expected directory target to remain, info=%v err=%v", info, err)
 	}
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "1")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
 func TestWriteRejectsMissingInternalLinksAndRollsBack(t *testing.T) {
@@ -128,8 +116,9 @@ func TestWriteRejectsMissingInternalLinksAndRollsBack(t *testing.T) {
 	if strings.Contains(readFile(t, repo, "CHANGELOG.md"), "Create missing link") {
 		t.Fatal("failed write left pending changelog entry")
 	}
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
+	if strings.Contains(readFile(t, repo, ".brain/ops.log"), "Create missing link") {
+		t.Fatal("failed write left operation log entry")
+	}
 }
 
 func TestWriteRejectsMissingAnchorsAndRollsBack(t *testing.T) {
@@ -151,11 +140,9 @@ func TestWriteRejectsMissingAnchorsAndRollsBack(t *testing.T) {
 		assertWriteError(t, repo, tc.body, tc.target, "--title", tc.title, "--source", "sources/raw.md", "--reason", tc.reason, "--actor", "test")
 		assertMissing(t, repo, tc.target)
 		if strings.Contains(readFile(t, repo, "CHANGELOG.md"), tc.reason) {
-			t.Fatalf("failed write left pending changelog entry for %q", tc.reason)
+			t.Fatalf("failed write left changelog entry for %q", tc.reason)
 		}
 	}
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
 func TestWriteExtractsSourceCitationsIntoGeneratedSources(t *testing.T) {
@@ -214,47 +201,10 @@ func TestWritePreflightRejectsExistingBrokenAnchor(t *testing.T) {
 	if err := os.WriteFile(rawPath, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	runCommand(t, repo, "", "git", "add", "sources/raw.md")
-	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "commit", "-m", "test: break source anchor")
-	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "push")
+	regenerateChecksumsOnly(t, repo)
 
 	assertWriteError(t, repo, "# New source\n\nNotes.\n", "sources/new.md", "--title", "New source", "--reason", "Preserve new source", "--actor", "test")
 	assertMissing(t, repo, "sources/new.md")
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "4")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
-}
-
-func TestWritePreservesLocalCommitWhenPushFails(t *testing.T) {
-	repo := initBrain(t)
-	runCommand(t, repo, "", "git", "remote", "set-url", "--push", "origin", filepath.Join(t.TempDir(), "missing.git"))
-
-	err := Run([]string{"sources/raw.md", "--repo", repo, "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test"}, strings.NewReader("# Raw source\n\nRaw notes.\n"))
-	if err == nil {
-		t.Fatal("expected push failure")
-	}
-	if !strings.Contains(err.Error(), "local commit was preserved") {
-		t.Fatalf("expected preserved local commit error, got %v", err)
-	}
-	assertFileContains(t, repo, "sources/raw.md", "Raw notes.")
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
-	assertGitOutput(t, repo, []string{"log", "--format=%s", "-1"}, "[source] [test]: Preserve raw source")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
-}
-
-func TestWriteRollsBackWhenCommitFails(t *testing.T) {
-	repo := initBrain(t)
-	hook := filepath.Join(repo, ".brain", "hooks", "commit-msg")
-	if err := os.WriteFile(hook, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runCommand(t, repo, "", "git", "add", ".brain/hooks/commit-msg")
-	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "commit", "-m", "test: break commit hook")
-	runCommand(t, repo, "", "git", "-c", "core.hooksPath=/dev/null", "push")
-
-	assertWriteError(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
-	assertMissing(t, repo, "sources/raw.md")
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
 func TestValidateDocumentRejectsStaleGeneratedFrontmatter(t *testing.T) {
@@ -287,72 +237,38 @@ func TestWriteRejectsInvalidMutations(t *testing.T) {
 	assertWriteError(t, repo, "# Untitled\n", "wiki/untitled.md", "--source", "sources/raw.md", "--reason", "Create untitled", "--actor", "test")
 	assertWriteError(t, repo, "# Bad\n", "../bad.md", "--title", "Bad", "--reason", "Bad path", "--actor", "test")
 	assertWriteError(t, repo, "# Bad\n", "sources/../wiki/bad.md", "--title", "Bad", "--source", "sources/raw.md", "--reason", "Bad clean path", "--actor", "test")
-
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "2")
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 }
 
-func TestWriteRejectsConcurrentRepoLock(t *testing.T) {
+func TestWriteRejectsConcurrentBrainLock(t *testing.T) {
 	repo := initBrain(t)
-	lock, err := repolock.Acquire(repo, "test")
+	lock, err := brainlock.Acquire(repo, "test")
 	if err != nil {
 		t.Fatalf("acquire lock: %v", err)
 	}
 	defer func() { _ = lock.Release() }()
-	assertGitOutput(t, repo, []string{"status", "--porcelain"}, "")
 
-	err = Run([]string{"sources/raw.md", "--repo", repo, "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test"}, strings.NewReader("# Raw source\n"))
+	err = Run([]string{"sources/raw.md", "--brain", repo, "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test"}, strings.NewReader("# Raw source\n"))
 	if err == nil {
-		t.Fatal("expected write to reject concurrent repo lock")
+		t.Fatal("expected write to reject concurrent brain lock")
 	}
 	if !strings.Contains(err.Error(), "locked") {
 		t.Fatalf("expected lock error, got %v", err)
 	}
 	assertMissing(t, repo, "sources/raw.md")
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "1")
-}
-
-func TestWriteRequiresConfiguredUpstream(t *testing.T) {
-	setGitIdentityEnv(t)
-	repo := filepath.Join(t.TempDir(), "brain")
-	if err := initcmd.Run([]string{repo}); err != nil {
-		t.Fatalf("init failed: %v", err)
-	}
-
-	err := Run([]string{"sources/raw.md", "--repo", repo, "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test"}, strings.NewReader("# Raw source\n"))
-	if err == nil {
-		t.Fatal("expected write to require a configured upstream remote")
-	}
-	if !strings.Contains(err.Error(), "configured upstream remote") {
-		t.Fatalf("expected upstream remote error, got %v", err)
-	}
-	assertMissing(t, repo, "sources/raw.md")
-	assertGitOutput(t, repo, []string{"rev-list", "--count", "HEAD"}, "1")
 }
 
 func initBrain(t *testing.T) string {
 	t.Helper()
-	setGitIdentityEnv(t)
 	repo := filepath.Join(t.TempDir(), "brain")
 	if err := initcmd.Run([]string{repo}); err != nil {
 		t.Fatalf("init failed: %v", err)
 	}
-	configureRemote(t, repo)
 	return repo
-}
-
-func configureRemote(t *testing.T, repo string) string {
-	t.Helper()
-	remote := filepath.Join(t.TempDir(), "origin.git")
-	runCommand(t, filepath.Dir(remote), "", "git", "init", "--bare", remote)
-	runCommand(t, repo, "", "git", "remote", "add", "origin", remote)
-	runCommand(t, repo, "", "git", "push", "-u", "origin", "main")
-	return remote
 }
 
 func runWrite(t *testing.T, repo, stdin, target string, args ...string) {
 	t.Helper()
-	fullArgs := append([]string{target, "--repo", repo}, args...)
+	fullArgs := append([]string{target, "--brain", repo}, args...)
 	if err := Run(fullArgs, strings.NewReader(stdin)); err != nil {
 		t.Fatalf("write %v failed: %v", fullArgs, err)
 	}
@@ -360,56 +276,29 @@ func runWrite(t *testing.T, repo, stdin, target string, args ...string) {
 
 func assertWriteError(t *testing.T, repo, stdin, target string, args ...string) {
 	t.Helper()
-	fullArgs := append([]string{target, "--repo", repo}, args...)
+	fullArgs := append([]string{target, "--brain", repo}, args...)
 	if err := Run(fullArgs, strings.NewReader(stdin)); err == nil {
 		t.Fatalf("write %v unexpectedly succeeded", fullArgs)
 	}
 }
 
-func setGitIdentityEnv(t *testing.T) {
+func regenerateChecksumsOnly(t *testing.T, repo string) {
 	t.Helper()
-	t.Setenv("GIT_AUTHOR_NAME", "Test")
-	t.Setenv("GIT_AUTHOR_EMAIL", "test@example.invalid")
-	t.Setenv("GIT_COMMITTER_NAME", "Test")
-	t.Setenv("GIT_COMMITTER_EMAIL", "test@example.invalid")
-}
-
-func remotePath(t *testing.T, repo string) string {
-	t.Helper()
-	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
-	cmd.Dir = repo
-	out, err := cmd.CombinedOutput()
+	content := readFile(t, repo, "BRAIN.sum")
+	if !strings.Contains(content, "sha256:") {
+		t.Fatal("expected BRAIN.sum to have checksums")
+	}
+	// Let the next write preflight get past checksum drift so it can catch the
+	// broken anchor. This mimics a capable direct editor updating generated sums.
+	if err := os.WriteFile(filepath.Join(repo, "BRAIN.sum"), []byte(strings.Replace(content, "sha256:", "sha256:", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, err := generate.FilesForRepo(repo)
 	if err != nil {
-		t.Fatalf("git config remote.origin.url failed: %v\n%s", err, out)
+		t.Fatal(err)
 	}
-	return strings.TrimSpace(string(out))
-}
-
-func assertGitOutput(t *testing.T, repo string, args []string, want string) {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = repo
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v failed: %v\n%s", args, err, out)
-	}
-	got := strings.TrimSpace(string(out))
-	if got != want {
-		t.Fatalf("git %v got %q want %q", args, got, want)
-	}
-}
-
-func assertBareGitOutput(t *testing.T, gitDir string, args []string, want string) {
-	t.Helper()
-	fullArgs := append([]string{"--git-dir", gitDir}, args...)
-	cmd := exec.Command("git", fullArgs...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v failed: %v\n%s", fullArgs, err, out)
-	}
-	got := strings.TrimSpace(string(out))
-	if got != want {
-		t.Fatalf("git %v got %q want %q", fullArgs, got, want)
+	if err := generate.WriteFiles(repo, files); err != nil {
+		t.Fatal(err)
 	}
 }
 

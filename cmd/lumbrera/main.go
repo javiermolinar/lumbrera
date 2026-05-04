@@ -5,7 +5,6 @@ import (
 	"os"
 
 	initcmd "github.com/javiermolinar/lumbrera/internal/initcmd"
-	"github.com/javiermolinar/lumbrera/internal/synccmd"
 	"github.com/javiermolinar/lumbrera/internal/verifycmd"
 	"github.com/javiermolinar/lumbrera/internal/writecmd"
 )
@@ -27,8 +26,6 @@ func run(args []string) error {
 	switch command {
 	case "init":
 		return initcmd.Run(rest)
-	case "sync":
-		return synccmd.Run(rest)
 	case "verify":
 		return verifycmd.Run(rest)
 	case "write":
@@ -43,7 +40,7 @@ func run(args []string) error {
 }
 
 func printUsage() {
-	fmt.Println(`Lumbrera is a Git-backed Markdown knowledge base for humans and LLM agents.
+	fmt.Println(`Lumbrera is a Markdown knowledge base for humans and LLM agents.
 
 A Lumbrera brain repo stores:
   sources/   preserved raw source material
@@ -56,8 +53,7 @@ Usage:
 
 Commands:
   init <repo>              Initialize a Lumbrera brain repo
-  sync --repo <repo>       Converge a brain repo to a valid state
-  verify [--repo <repo>]   Check deterministic brain integrity
+  verify [--brain <path>]  Check deterministic brain integrity
   write <path> [options]   Perform one atomic knowledge mutation
 
 Run:
@@ -65,6 +61,5 @@ Run:
 
 Examples:
   lumbrera init ./brain
-  lumbrera sync --repo ./brain
   lumbrera write wiki/topic.md --title "Topic" --source sources/input.md --reason "Create topic page" < topic.md`)
 }

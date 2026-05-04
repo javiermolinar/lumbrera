@@ -24,10 +24,7 @@ var allowedRootFiles = map[string]struct{}{
 	".gitignore":        {},
 }
 
-type Options struct {
-	PendingChangelog []generate.PendingChangelogEntry
-	SkipChangelog    bool
-}
+type Options struct{}
 
 func Run(repo string, opts Options) error {
 	if err := brain.ValidateRepo(repo); err != nil {
@@ -39,7 +36,8 @@ func Run(repo string, opts Options) error {
 	if err := ValidateDocuments(repo); err != nil {
 		return err
 	}
-	return verifyGeneratedFiles(repo, opts.PendingChangelog, opts.SkipChangelog)
+	_ = opts
+	return VerifyGeneratedFiles(repo)
 }
 
 func ValidatePathPolicy(repo string) error {
@@ -217,21 +215,15 @@ func validateDocument(repo, absPath, relPath, wantKind string) error {
 	return nil
 }
 
-func VerifyGeneratedFiles(repo string, pending []generate.PendingChangelogEntry) error {
-	return verifyGeneratedFiles(repo, pending, false)
-}
-
-func verifyGeneratedFiles(repo string, pending []generate.PendingChangelogEntry, skipChangelog bool) error {
-	files, err := generate.FilesForRepoWithPending(repo, pending)
+func VerifyGeneratedFiles(repo string) error {
+	files, err := generate.FilesForRepo(repo)
 	if err != nil {
 		return err
 	}
 	checks := map[string]string{
-		brain.IndexPath:    files.Index,
-		brain.BrainSumPath: files.BrainSum,
-	}
-	if !skipChangelog {
-		checks[brain.ChangelogPath] = files.Changelog
+		brain.IndexPath:     files.Index,
+		brain.ChangelogPath: files.Changelog,
+		brain.BrainSumPath:  files.BrainSum,
 	}
 	for rel, want := range checks {
 		got, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
@@ -239,7 +231,7 @@ func verifyGeneratedFiles(repo string, pending []generate.PendingChangelogEntry,
 			return fmt.Errorf("generated file %s is missing: %w", rel, err)
 		}
 		if string(got) != want {
-			return fmt.Errorf("generated file %s is stale; run lumbrera sync first", rel)
+			return fmt.Errorf("generated file %s is stale; regenerate through lumbrera write or restore generated metadata", rel)
 		}
 	}
 	return nil

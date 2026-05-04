@@ -2,7 +2,6 @@ package verifycmd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,7 +13,7 @@ import (
 func TestVerifyPassesForInitializedBrain(t *testing.T) {
 	repo := initBrain(t)
 
-	if err := Run([]string{"--repo", repo}); err != nil {
+	if err := Run([]string{"--brain", repo}); err != nil {
 		t.Fatalf("verify failed: %v", err)
 	}
 }
@@ -29,7 +28,7 @@ func TestVerifyRejectsManifestDrift(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := Run([]string{"--repo", repo})
+	err := Run([]string{"--brain", repo})
 	if err == nil {
 		t.Fatal("expected verify to reject BRAIN.sum drift")
 	}
@@ -44,7 +43,7 @@ func TestVerifyRejectsUnexpectedRootMarkdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := Run([]string{"--repo", repo})
+	err := Run([]string{"--brain", repo})
 	if err == nil {
 		t.Fatal("expected verify to reject root Markdown")
 	}
@@ -53,64 +52,33 @@ func TestVerifyRejectsUnexpectedRootMarkdown(t *testing.T) {
 	}
 }
 
-func TestVerifySkipChangelogAllowsPendingChangelog(t *testing.T) {
+func TestVerifyRejectsChangelogDrift(t *testing.T) {
 	repo := initBrain(t)
 	changelog := readFile(t, repo, "CHANGELOG.md") + "2026-05-04 [source] [test]: Pending source\n"
 	if err := os.WriteFile(filepath.Join(repo, "CHANGELOG.md"), []byte(changelog), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := Run([]string{"--repo", repo}); err == nil {
-		t.Fatal("expected normal verify to reject pending changelog drift")
-	}
-	if err := Run([]string{"--repo", repo, "--skip-changelog"}); err != nil {
-		t.Fatalf("expected skip-changelog verify to pass, got %v", err)
+	if err := Run([]string{"--brain", repo}); err == nil {
+		t.Fatal("expected verify to reject changelog drift")
 	}
 }
 
 func initBrain(t *testing.T) string {
 	t.Helper()
-	setGitIdentityEnv(t)
 	repo := filepath.Join(t.TempDir(), "brain")
 	if err := initcmd.Run([]string{repo}); err != nil {
 		t.Fatalf("init failed: %v", err)
 	}
-	configureRemote(t, repo)
 	return repo
-}
-
-func configureRemote(t *testing.T, repo string) {
-	t.Helper()
-	remote := filepath.Join(t.TempDir(), "origin.git")
-	runCommand(t, filepath.Dir(remote), "git", "init", "--bare", remote)
-	runCommand(t, repo, "git", "remote", "add", "origin", remote)
-	runCommand(t, repo, "git", "push", "-u", "origin", "main")
-}
-
-func runCommand(t *testing.T, dir, name string, args ...string) {
-	t.Helper()
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("%s %v failed: %v\n%s", name, args, err, out)
-	}
 }
 
 func runWrite(t *testing.T, repo, stdin, target string, args ...string) {
 	t.Helper()
-	fullArgs := append([]string{target, "--repo", repo}, args...)
+	fullArgs := append([]string{target, "--brain", repo}, args...)
 	if err := writecmd.Run(fullArgs, strings.NewReader(stdin)); err != nil {
 		t.Fatalf("write %v failed: %v", fullArgs, err)
 	}
-}
-
-func setGitIdentityEnv(t *testing.T) {
-	t.Helper()
-	t.Setenv("GIT_AUTHOR_NAME", "Test")
-	t.Setenv("GIT_AUTHOR_EMAIL", "test@example.invalid")
-	t.Setenv("GIT_COMMITTER_NAME", "Test")
-	t.Setenv("GIT_COMMITTER_EMAIL", "test@example.invalid")
 }
 
 func readFile(t *testing.T, repo, rel string) string {

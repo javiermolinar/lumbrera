@@ -18,7 +18,7 @@ When changing product-facing agent behavior, update the scaffold templates and r
 
 ## Testing
 
-When testing `lumbrera init`, `lumbrera sync`, or `lumbrera write`, use a temporary fixture repo or test directory. Do not accidentally treat the implementation repo as the managed brain repo unless the test explicitly requires it.
+When testing `lumbrera init`, `lumbrera verify`, or `lumbrera write`, use a temporary fixture repo or test directory. Do not accidentally treat the implementation repo as the managed brain repo unless the test explicitly requires it.
 
 ## Generated brain files
 
@@ -30,10 +30,10 @@ The repo may contain checked-in skill templates for review or distribution, but 
 
 ## Commit messages
 
-The Lumbrera brain commit subject convention is:
+Lumbrera brain operation entries use this changelog shape:
 
 ```text
 [operation] [actor]: reason
 ```
 
-That convention is part of the product behavior for managed brain repos. It is optional in this implementation repo. Normal software commit messages such as `chore: scaffold cli` or `feat: implement init` are acceptable here.
+That convention is part of the product behavior inside generated `CHANGELOG.md`. It does not constrain commits in this implementation repo. Normal software commit messages such as `chore: scaffold cli` or `feat: implement init` are acceptable here.

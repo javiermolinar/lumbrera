@@ -10,7 +10,6 @@ import (
 
 const (
 	brainVersion        = "lumbrera-brain-v1"
-	initCommitSubject   = "[init] [lumbrera]: Initialize Lumbrera brain"
 	markerPath          = ".brain/VERSION"
 	agentsPath          = "AGENTS.md"
 	claudePath          = "CLAUDE.md"
@@ -23,23 +22,21 @@ const (
 var scaffoldDirs = []string{
 	"sources",
 	"wiki",
-	".brain/conflicts",
-	".brain/hooks",
+	".brain",
 	".agents/skills/lumbrera-ingest",
 	".agents/skills/lumbrera-query",
-	".agents/skills/lumbrera-sync",
 	".agents/skills/lumbrera-lint",
 }
 
 var scaffoldFiles = map[string]string{
-	markerPath:     brainVersion + "\n",
-	"INDEX.md":     indexContent,
-	"CHANGELOG.md": changelogContent,
-	"BRAIN.sum":    brainSumContent,
-	agentsPath:     agentsContent,
+	markerPath:       brainVersion + "\n",
+	"INDEX.md":       indexContent,
+	"CHANGELOG.md":   changelogContent,
+	"BRAIN.sum":      brainSumContent,
+	".brain/ops.log": "",
+	agentsPath:       agentsContent,
 	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
 	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,
-	".agents/skills/lumbrera-sync/SKILL.md":   syncSkillContent,
 	".agents/skills/lumbrera-lint/SKILL.md":   lintSkillContent,
 }
 
@@ -48,11 +45,8 @@ var partialDirs = map[string]struct{}{
 	".agents/skills":                 {},
 	".agents/skills/lumbrera-ingest": {},
 	".agents/skills/lumbrera-query":  {},
-	".agents/skills/lumbrera-sync":   {},
 	".agents/skills/lumbrera-lint":   {},
 	".brain":                         {},
-	".brain/conflicts":               {},
-	".brain/hooks":                   {},
 	"sources":                        {},
 	"wiki":                           {},
 }
@@ -61,11 +55,8 @@ var partialFiles = map[string]struct{}{
 	markerPath: {},
 	".agents/skills/lumbrera-ingest/SKILL.md": {},
 	".agents/skills/lumbrera-query/SKILL.md":  {},
-	".agents/skills/lumbrera-sync/SKILL.md":   {},
 	".agents/skills/lumbrera-lint/SKILL.md":   {},
-	".brain/hooks/commit-msg":                 {},
-	".brain/hooks/pre-commit":                 {},
-	".brain/hooks/pre-push":                   {},
+	".brain/ops.log":                          {},
 	agentsPath:                                {},
 	claudeDir:                                 {},
 	claudePath:                                {},
@@ -153,7 +144,7 @@ func validateFreshBoilerplate(repo string) error {
 	return nil
 }
 
-func validateEmptyNonGitDirectory(repo string) error {
+func validateEmptyDirectory(repo string) error {
 	entries, err := os.ReadDir(repo)
 	if err != nil {
 		return err
@@ -166,7 +157,7 @@ func validateEmptyNonGitDirectory(repo string) error {
 	if entry.IsDir() {
 		kind = "directory"
 	}
-	return fmt.Errorf("refusing to initialize %s: existing %s %q is not in an empty directory or clean Git boilerplate repo", repo, kind, entry.Name())
+	return fmt.Errorf("refusing to initialize %s: existing %s %q is not in an empty directory or common boilerplate directory", repo, kind, entry.Name())
 }
 
 func validatePartialScaffold(repo string) error {
@@ -304,7 +295,7 @@ No wiki pages yet.
 
 const changelogContent = `# Lumbrera Changelog
 
-Generated from Lumbrera commit history.
+Generated from the Lumbrera operation log.
 
 No Lumbrera writes yet.
 `
@@ -314,7 +305,7 @@ const brainSumContent = `lumbrera-sum-v1 sha256
 
 const agentsContent = `# Lumbrera Brain Agent Guide
 
-This repository is a Lumbrera brain: a backendless, Git-backed implementation of Andrej Karpathy's LLM Wiki pattern.
+This repository is a Lumbrera brain: a backendless, Markdown-native implementation of Andrej Karpathy's LLM Wiki pattern.
 
 The model:
 - sources/ contains immutable Markdown source material.
@@ -329,8 +320,15 @@ Use the matching bundled skill for the operation:
 
 - .agents/skills/lumbrera-ingest/SKILL.md for ingesting a raw source into distilled wiki knowledge.
 - .agents/skills/lumbrera-query/SKILL.md for answering questions from the maintained wiki and preserved sources.
-- .agents/skills/lumbrera-sync/SKILL.md for safely converging the local clone before reading or writing.
 - .agents/skills/lumbrera-lint/SKILL.md for semantic health checks: stale synthesis, contradictions, unsupported claims, duplicated concepts, and useful follow-up questions.
+
+## Command protocol
+
+Lumbrera is agent-driven. Prefer the bundled skills over inventing ad hoc shell workflows. The CLI commands are narrow protocol boundaries, not a broad human note-taking API:
+
+- lumbrera write is the only mutation boundary for sources/ and wiki/ content.
+- lumbrera verify is for deterministic diagnostics; it proves mechanical consistency, not semantic truth.
+- lumbrera init is a human/admin setup command.
 
 ## What Lumbrera handles
 
@@ -339,7 +337,7 @@ Lumbrera handles deterministic and protocol work:
 - frontmatter and protocol metadata,
 - required source references from write flags,
 - INDEX.md, CHANGELOG.md, and BRAIN.sum,
-- checksums, commits, pushes, hooks, and sync,
+- checksums and generated metadata,
 - deterministic consistency such as paths, generated files, source immutability, broken links, and broken heading anchors.
 
 ## What agents handle
@@ -354,11 +352,10 @@ Agents handle semantic work:
 
 ## Common workflow
 
-1. Sync first when local state may be stale: use the sync skill to run lumbrera sync and stop on conflicts or invalid state.
-2. Source arrives: the user adds or references a new Markdown source. Treat the raw source as immutable.
-3. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles frontmatter, source sections, index, changelog, checksums, commits, and sync metadata.
-4. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map, then read relevant wiki/ pages, then check sources/ when evidence is needed.
-5. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
+1. Source arrives: the user adds or references a new Markdown source. Treat the raw source as immutable.
+2. Ingest: use the ingest skill to read that source, distill durable knowledge into wiki/ content, and add it through lumbrera write. Lumbrera handles frontmatter, source sections, index, changelog, and checksums.
+3. Query: when the user asks questions, use the query skill. Start with INDEX.md as a map, then read relevant wiki/ pages, then check sources/ when evidence is needed.
+4. Lint periodically: use the lint skill from time to time to look for semantic drift only: stale synthesis, contradictions, unsupported claims, duplicated concepts, and missing source material.
 
 ## What to do
 
@@ -366,7 +363,7 @@ Agents handle semantic work:
 - Use Markdown body content only; let Lumbrera add protocol metadata and frontmatter.
 - For claim-level provenance, optionally add inline citations as [source: ../sources/path.md#heading-anchor]. Lumbrera validates the target file and heading anchor.
 - Use lumbrera write for every mutation, supplying title for new files, source path for wiki writes, and reason through CLI flags.
-- If local state may be stale, run lumbrera sync from the repository root.
+- Run lumbrera verify when deterministic consistency is in doubt.
 
 ## What not to do
 
@@ -374,10 +371,22 @@ Agents handle semantic work:
 - Do not modify existing source files under sources/.
 - Do not create or maintain frontmatter, INDEX.md, CHANGELOG.md, BRAIN.sum, checksums, or generated metadata manually.
 - Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
-- Do not run Git mutation commands for knowledge changes.
+- Do not rely on Git commands for Lumbrera knowledge bookkeeping.
 - Do not spend LLM linting effort on deterministic consistency; Lumbrera handles that.
 
-Remote setup is administrative. Humans usually configure the remote. Agents may do so only when explicitly instructed.
+Git, cloud sync, backup, and sharing are external to Lumbrera. Use them only when explicitly instructed.
+
+## Optional external guardrails
+
+Humans may configure external tools such as Git hooks, GitHub Actions, CI jobs, backup checks, or sync services to run:
+
+~~~sh
+lumbrera verify --brain .
+~~~
+
+Those guardrails are defense-in-depth only. They do not replace lumbrera write, and they do not make direct edits safe. Agents must not create, edit, disable, or bypass external guardrails unless the user explicitly asks.
+
+If generated files drift because someone edited files directly, stop and report the verification error. The usual recovery is to restore the generated files or the whole brain from the user's external versioning/backup system, then retry through lumbrera write.
 `
 
 const ingestSkillContent = `---
@@ -416,37 +425,6 @@ Use when the user asks a question about knowledge in the brain.
 - Answer with citations to the wiki pages or source documents used.
 - If the answer is durable knowledge worth keeping, ask whether to save it.
 - Save only through lumbrera write. Do not create frontmatter or generated metadata.
-`
-
-const syncSkillContent = `---
-name: lumbrera-sync
-description: Safely converge a Lumbrera brain clone before reading or writing by running lumbrera sync and reporting blocking conflicts, drift, or invalid state.
----
-
-# Lumbrera Sync
-
-Use when starting work in a Lumbrera brain, when the user asks to update or synchronize the brain, when lumbrera write says to run sync first, or when local generated metadata may be stale.
-
-## Workflow
-
-- Run lumbrera sync from the repository root or pass --repo with the target brain path.
-- If sync succeeds, continue with the user's read, query, ingest, or lint task.
-- If sync reports generated-file repairs, mention that Lumbrera committed and pushed a sync repair.
-- If sync fails because of invalid knowledge state, broken links, missing sources, or source immutability violations, stop and report the exact blocking paths and error.
-- If sync fails because of Git conflicts or remote divergence, stop and report the conflict. Do not edit files directly to resolve it.
-- After a failed sync, mutations must still go through lumbrera write. Do not repair INDEX.md, CHANGELOG.md, BRAIN.sum, sources/, or wiki/ manually.
-
-## Commands
-
-~~~sh
-lumbrera sync --repo <repo>
-~~~
-
-If already inside the brain repository:
-
-~~~sh
-lumbrera sync
-~~~
 `
 
 const lintSkillContent = `---

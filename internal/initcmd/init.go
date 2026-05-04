@@ -3,9 +3,6 @@ package initcmd
 import (
 	"errors"
 	"path/filepath"
-
-	"github.com/javiermolinar/lumbrera/internal/git"
-	"github.com/javiermolinar/lumbrera/internal/hooks"
 )
 
 func Run(args []string) error {
@@ -16,9 +13,6 @@ func Run(args []string) error {
 	if len(args) != 1 {
 		printHelp()
 		return errors.New("init requires exactly one <repo> argument")
-	}
-	if err := git.EnsureAvailable(); err != nil {
-		return err
 	}
 
 	repo, err := filepath.Abs(args[0])
@@ -46,25 +40,10 @@ func Run(args []string) error {
 }
 
 func completeInit(repo string) error {
-	if err := ensureGitRepo(repo); err != nil {
-		return err
-	}
 	if err := ensureScaffold(repo); err != nil {
 		return err
 	}
-	if err := hooks.Install(repo); err != nil {
-		return err
-	}
-	if err := git.AddAll(repo); err != nil {
-		return err
-	}
-	if err := git.Commit(repo, initCommitSubject); err != nil {
-		return err
-	}
-
-	branch, _ := git.CurrentBranch(repo)
-	remotes, _ := git.Remotes(repo)
-	printSuccess(repo, branch, remotes)
+	printSuccess(repo)
 	return nil
 }
 

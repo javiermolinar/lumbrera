@@ -7,16 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 func validateDocuments(repo string) error {
 	return verify.ValidateDocuments(repo)
-}
-
-func verifyGeneratedFiles(repo string, pending []generate.PendingChangelogEntry) error {
-	return verify.VerifyGeneratedFiles(repo, pending)
 }
 
 func validateOptionsForOperation(repo, target, kind string, exists bool, op operation, opts options) error {

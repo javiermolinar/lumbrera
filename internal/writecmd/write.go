@@ -7,15 +7,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
+	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
-	"github.com/javiermolinar/lumbrera/internal/git"
-	"github.com/javiermolinar/lumbrera/internal/repolock"
+	"github.com/javiermolinar/lumbrera/internal/ops"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 type options struct {
-	Repo      string
+	Brain     string
 	Target    string
 	Reason    string
 	Actor     string
@@ -50,14 +51,14 @@ func Run(args []string, stdin io.Reader) (err error) {
 		return nil
 	}
 
-	if err := git.EnsureAvailable(); err != nil {
-		return err
-	}
-	repo, err := resolveRepo(opts.Repo)
+	brainDir, err := resolveBrain(opts.Brain)
 	if err != nil {
 		return err
 	}
-	lock, err := repolock.Acquire(repo, "write")
+	if err := brain.ValidateRepo(brainDir); err != nil {
+		return err
+	}
+	lock, err := brainlock.Acquire(brainDir, "write")
 	if err != nil {
 		return err
 	}
@@ -66,11 +67,11 @@ func Run(args []string, stdin io.Reader) (err error) {
 			err = releaseErr
 		}
 	}()
-	if err := preflight(repo); err != nil {
+	if err := preflight(brainDir); err != nil {
 		return err
 	}
 	if strings.TrimSpace(opts.Actor) == "" {
-		opts.Actor, err = defaultActor(repo)
+		opts.Actor, err = defaultActor(brainDir)
 		if err != nil {
 			return err
 		}
@@ -83,11 +84,11 @@ func Run(args []string, stdin io.Reader) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := ensureSafeFilesystemTarget(repo, target); err != nil {
+	if err := ensureSafeFilesystemTarget(brainDir, target); err != nil {
 		return err
 	}
 
-	absTarget := filepath.Join(repo, filepath.FromSlash(target))
+	absTarget := filepath.Join(brainDir, filepath.FromSlash(target))
 	exists, err := fileExists(absTarget)
 	if err != nil {
 		return err
@@ -97,7 +98,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := validateOptionsForOperation(repo, target, kind, exists, op, opts); err != nil {
+	if err := validateOptionsForOperation(brainDir, target, kind, exists, op, opts); err != nil {
 		return err
 	}
 
@@ -118,21 +119,19 @@ func Run(args []string, stdin io.Reader) (err error) {
 		}
 	}
 
-	base, err := currentHead(repo)
+	backup, err := newWriteBackup(brainDir, target)
 	if err != nil {
 		return err
 	}
-	commitTime := time.Now()
-	commitSubject := fmt.Sprintf("[%s] [%s]: %s", op, opts.Actor, opts.Reason)
+	operationEntry := ops.NewEntry(string(op), opts.Actor, opts.Reason, time.Now())
 
 	mutated := false
-	committed := false
 	fail := func(err error) error {
 		if err == nil {
 			return nil
 		}
-		if mutated && !committed {
-			if rollbackErr := rollbackWrite(repo, base); rollbackErr != nil {
+		if mutated {
+			if rollbackErr := backup.Restore(); rollbackErr != nil {
 				return fmt.Errorf("%w; rollback failed: %v", err, rollbackErr)
 			}
 		}
@@ -140,37 +139,23 @@ func Run(args []string, stdin io.Reader) (err error) {
 	}
 
 	mutated = true
-	if err := applyMutation(repo, target, kind, op, opts, input); err != nil {
+	if err := applyMutation(brainDir, target, kind, op, opts, input); err != nil {
 		return fail(err)
 	}
-	files, err := generate.FilesForRepoWithPending(repo, []generate.PendingChangelogEntry{{Date: commitTime, Subject: commitSubject}})
+	if err := ops.Append(brainDir, operationEntry); err != nil {
+		return fail(err)
+	}
+	files, err := generate.FilesForRepo(brainDir)
 	if err != nil {
 		return fail(err)
 	}
-	if err := generate.WriteFiles(repo, files); err != nil {
+	if err := generate.WriteFiles(brainDir, files); err != nil {
 		return fail(err)
 	}
-	if err := verify.Run(repo, verify.Options{PendingChangelog: []generate.PendingChangelogEntry{{Date: commitTime, Subject: commitSubject}}}); err != nil {
+	if err := verify.Run(brainDir, verify.Options{}); err != nil {
 		return fail(err)
 	}
 
-	if err := git.AddAll(repo); err != nil {
-		return fail(err)
-	}
-	if err := git.Commit(repo, commitSubject); err != nil {
-		return fail(err)
-	}
-	committed = true
-	clean, err := git.IsClean(repo)
-	if err != nil {
-		return fail(err)
-	}
-	if !clean {
-		return fail(fmt.Errorf("write committed but working tree is not clean"))
-	}
-	if err := git.Push(repo); err != nil {
-		return fmt.Errorf("write committed locally as %q but push failed; local commit was preserved; run lumbrera sync or inspect the remote before retrying: %w", commitSubject, err)
-	}
-	fmt.Printf("Committed and pushed Lumbrera write: %s\n", commitSubject)
+	fmt.Printf("Applied Lumbrera write: [%s] [%s]: %s\n", op, opts.Actor, opts.Reason)
 	return nil
 }

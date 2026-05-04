@@ -5,16 +5,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
-	"github.com/javiermolinar/lumbrera/internal/git"
 	"github.com/javiermolinar/lumbrera/internal/manifest"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
+	"github.com/javiermolinar/lumbrera/internal/ops"
 )
 
 type Files struct {
@@ -23,21 +21,12 @@ type Files struct {
 	BrainSum  string
 }
 
-type PendingChangelogEntry struct {
-	Date    time.Time
-	Subject string
-}
-
 func FilesForRepo(repo string) (Files, error) {
-	return FilesForRepoWithPending(repo, nil)
-}
-
-func FilesForRepoWithPending(repo string, pending []PendingChangelogEntry) (Files, error) {
 	index, err := IndexForRepo(repo)
 	if err != nil {
 		return Files{}, err
 	}
-	changelog, err := ChangelogForRepo(repo, pending)
+	changelog, err := ChangelogForRepo(repo)
 	if err != nil {
 		return Files{}, err
 	}
@@ -215,56 +204,22 @@ func titleForFile(absPath, relPath string) (string, error) {
 	return strings.TrimSuffix(base, filepath.Ext(base)), nil
 }
 
-var changelogSubject = regexp.MustCompile(`^\[(source|create|append|update|delete|sync)\] \[[^]]+\]: .+$`)
-
-func ChangelogForRepo(repo string, pending []PendingChangelogEntry) (string, error) {
-	entries, err := changelogEntries(repo)
+func ChangelogForRepo(repo string) (string, error) {
+	entries, err := ops.Read(repo)
 	if err != nil {
 		return "", err
-	}
-	for _, entry := range pending {
-		if strings.TrimSpace(entry.Subject) == "" {
-			continue
-		}
-		date := entry.Date
-		if date.IsZero() {
-			date = time.Now()
-		}
-		entries = append(entries, date.Format("2006-01-02")+" "+entry.Subject)
 	}
 
 	var b strings.Builder
 	b.WriteString("# Lumbrera Changelog\n\n")
-	b.WriteString("Generated from Lumbrera commit history.\n\n")
+	b.WriteString("Generated from the Lumbrera operation log.\n\n")
 	if len(entries) == 0 {
 		b.WriteString("No Lumbrera writes yet.\n")
 		return b.String(), nil
 	}
 	for _, entry := range entries {
-		b.WriteString(entry)
+		b.WriteString(ops.ChangelogLine(entry))
 		b.WriteByte('\n')
 	}
 	return b.String(), nil
-}
-
-func changelogEntries(repo string) ([]string, error) {
-	if !git.HasCommits(repo) {
-		return nil, nil
-	}
-	result, err := git.Run(repo, "log", "--reverse", "--date=short", "--format=%ad%x09%s")
-	if err != nil {
-		return nil, err
-	}
-	var entries []string
-	for _, line := range strings.Split(strings.TrimSpace(result.Stdout), "\n") {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, "\t", 2)
-		if len(parts) != 2 || !changelogSubject.MatchString(parts[1]) {
-			continue
-		}
-		entries = append(entries, parts[0]+" "+parts[1])
-	}
-	return entries, nil
 }

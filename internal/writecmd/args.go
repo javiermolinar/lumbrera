@@ -32,12 +32,12 @@ func parseArgs(args []string) (options, error) {
 			return args[i], nil
 		}
 		switch name {
-		case "--repo":
+		case "--brain", "--repo":
 			v, err := nextValue()
 			if err != nil {
 				return options{}, err
 			}
-			opts.Repo = v
+			opts.Brain = v
 		case "--reason":
 			v, err := nextValue()
 			if err != nil {
@@ -106,15 +106,16 @@ func printHelp() {
 	fmt.Println(`Usage:
   lumbrera write <path> [options] < content.md
 
-Performs one Lumbrera write transaction, commits all content and generated metadata changes, and pushes the transaction commit.
+Performs one Lumbrera write transaction and regenerates local metadata.
 
 Required:
   <path>              repo-relative Markdown path under sources/ or wiki/
-  --reason <reason>   single-line commit/changelog reason
+  --reason <reason>   single-line changelog reason
 
 Options:
-  --repo <path>       target brain repo, default current Git worktree root
-  --actor <actor>     actor label for commit subject, default Git user name or human
+  --brain <path>      target brain directory, default current directory
+  --repo <path>       deprecated alias for --brain
+  --actor <actor>     actor label for changelog, default LUMBRERA_ACTOR, USER, USERNAME, or human
   --title <title>     required when creating a new file
   --summary <text>    optional generated frontmatter summary
   --tag <tag>         optional generated frontmatter tag, repeatable
@@ -128,6 +129,6 @@ Rules:
   - wiki writes require at least one --source
   - local Markdown links and heading anchors must resolve
   - optional inline claim citations use [source: ../sources/path.md#heading-anchor]
-  - successful writes create exactly one Git commit and push it
-  - write requires a configured upstream remote; init is local-only`)
+  - successful writes update INDEX.md, CHANGELOG.md, and BRAIN.sum
+  - Git, cloud sync, backup, and sharing are external to Lumbrera`)
 }

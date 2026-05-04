@@ -7,14 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/javiermolinar/lumbrera/internal/git"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 type options struct {
-	Repo          string
-	SkipChangelog bool
-	Help          bool
+	Brain string
+	Help  bool
 }
 
 func Run(args []string) error {
@@ -27,17 +25,14 @@ func Run(args []string) error {
 		printHelp()
 		return nil
 	}
-	if err := git.EnsureAvailable(); err != nil {
-		return err
-	}
-	repo, err := resolveRepo(opts.Repo)
+	brainDir, err := resolveBrain(opts.Brain)
 	if err != nil {
 		return err
 	}
-	if err := verify.Run(repo, verify.Options{SkipChangelog: opts.SkipChangelog}); err != nil {
+	if err := verify.Run(brainDir, verify.Options{}); err != nil {
 		return err
 	}
-	fmt.Printf("Lumbrera verify passed: %s\n", repo)
+	fmt.Printf("Lumbrera verify passed: %s\n", brainDir)
 	return nil
 }
 
@@ -50,8 +45,8 @@ func parseArgs(args []string) (options, error) {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	fs.SetOutput(new(strings.Builder))
 	var opts options
-	fs.StringVar(&opts.Repo, "repo", "", "target Lumbrera brain repo")
-	fs.BoolVar(&opts.SkipChangelog, "skip-changelog", false, "skip CHANGELOG.md drift checks; intended for pre-commit hooks before the commit subject exists")
+	fs.StringVar(&opts.Brain, "brain", "", "target Lumbrera brain directory")
+	fs.StringVar(&opts.Brain, "repo", "", "deprecated alias for --brain")
 	if err := fs.Parse(args); err != nil {
 		return options{}, err
 	}
@@ -61,19 +56,15 @@ func parseArgs(args []string) (options, error) {
 	return opts, nil
 }
 
-func resolveRepo(repo string) (string, error) {
-	if strings.TrimSpace(repo) == "" {
+func resolveBrain(brainDir string) (string, error) {
+	if strings.TrimSpace(brainDir) == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return "", err
 		}
-		if root, err := git.WorkTreeRoot(cwd); err == nil {
-			repo = root
-		} else {
-			repo = cwd
-		}
+		brainDir = cwd
 	}
-	abs, err := filepath.Abs(repo)
+	abs, err := filepath.Abs(brainDir)
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +79,7 @@ func printHelp() {
 	fmt.Println(`Verify a Lumbrera brain repo for deterministic consistency.
 
 Usage:
-  lumbrera verify [--repo <repo>] [--skip-changelog]
+  lumbrera verify [--brain <path>]
 
 Checks:
   - .brain/VERSION matches the supported brain format
@@ -99,8 +90,8 @@ Checks:
   - INDEX.md, CHANGELOG.md, and BRAIN.sum match regenerated output
 
 Options:
-  --repo <repo>       target brain repo, defaults to the current Git worktree root
-  --skip-changelog    skip CHANGELOG.md drift checks for pre-commit hooks
+  --brain <path>      target brain directory, defaults to the current directory
+  --repo <path>       deprecated alias for --brain
 
-This command is primarily for hooks and diagnostics. Knowledge mutations should still use lumbrera write.`)
+This command is for deterministic diagnostics. Knowledge mutations should still use lumbrera write.`)
 }
