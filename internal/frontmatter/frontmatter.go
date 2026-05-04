@@ -2,10 +2,15 @@ package frontmatter
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -15,7 +20,10 @@ const (
 	MaxTags = 5
 )
 
-var tagPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+var (
+	idPattern  = regexp.MustCompile(`^doc_[a-f0-9]{32}$`)
+	tagPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+)
 
 type Document struct {
 	Title    string       `yaml:"title"`
@@ -25,24 +33,56 @@ type Document struct {
 }
 
 type LumbreraMeta struct {
+	ID      string   `yaml:"id"`
 	Schema  string   `yaml:"schema"`
 	Kind    string   `yaml:"kind"`
 	Sources []string `yaml:"sources"`
 	Links   []string `yaml:"links"`
 }
 
+type SplitOptions struct {
+	AllowMissingID bool
+}
+
+type ValidateOptions struct {
+	AllowMissingID bool
+}
+
 func New(kind, title, summary string, tags, sources, links []string) Document {
+	return NewWithID(newIDBestEffort(), kind, title, summary, tags, sources, links)
+}
+
+func NewWithID(id, kind, title, summary string, tags, sources, links []string) Document {
 	return Document{
 		Title:   strings.TrimSpace(title),
 		Summary: strings.TrimSpace(summary),
 		Tags:    sortedUnique(tags),
 		Lumbrera: LumbreraMeta{
+			ID:      strings.TrimSpace(id),
 			Schema:  Schema,
 			Kind:    kind,
 			Sources: sortedUnique(sources),
 			Links:   sortedUnique(links),
 		},
 	}
+}
+
+func NewID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return "doc_" + hex.EncodeToString(b[:]), nil
+}
+
+func newIDBestEffort() string {
+	id, err := NewID()
+	if err == nil {
+		return id
+	}
+	seed := fmt.Sprintf("%d:%d", time.Now().UnixNano(), os.Getpid())
+	sum := sha256.Sum256([]byte(seed))
+	return "doc_" + hex.EncodeToString(sum[:16])
 }
 
 func Render(doc Document) (string, error) {
@@ -69,6 +109,10 @@ func Attach(doc Document, markdownBody string) (string, error) {
 }
 
 func Split(content []byte) (Document, string, bool, error) {
+	return SplitWithOptions(content, SplitOptions{})
+}
+
+func SplitWithOptions(content []byte, opts SplitOptions) (Document, string, bool, error) {
 	if !StartsWithFrontmatter(content) {
 		return Document{}, string(content), false, nil
 	}
@@ -93,7 +137,7 @@ func Split(content []byte) (Document, string, bool, error) {
 	if err := yaml.Unmarshal(frontmatterBytes, &doc); err != nil {
 		return Document{}, "", true, fmt.Errorf("malformed frontmatter: %w", err)
 	}
-	if err := Validate(doc); err != nil {
+	if err := ValidateWithOptions(doc, ValidateOptions{AllowMissingID: opts.AllowMissingID}); err != nil {
 		return Document{}, "", true, err
 	}
 
@@ -113,8 +157,19 @@ func StartsWithFrontmatter(content []byte) bool {
 }
 
 func Validate(doc Document) error {
+	return ValidateWithOptions(doc, ValidateOptions{})
+}
+
+func ValidateWithOptions(doc Document, opts ValidateOptions) error {
 	if strings.TrimSpace(doc.Title) == "" {
 		return fmt.Errorf("frontmatter title is required")
+	}
+	id := strings.TrimSpace(doc.Lumbrera.ID)
+	if id == "" && !opts.AllowMissingID {
+		return fmt.Errorf("frontmatter lumbrera.id is required")
+	}
+	if id != "" && !idPattern.MatchString(id) {
+		return fmt.Errorf("frontmatter lumbrera.id %q must match doc_<32 lowercase hex chars>", id)
 	}
 	if doc.Lumbrera.Schema != Schema {
 		return fmt.Errorf("frontmatter lumbrera.schema must be %q", Schema)

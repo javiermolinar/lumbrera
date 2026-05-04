@@ -28,6 +28,9 @@ func TestRenderAndSplitGeneratedFrontmatter(t *testing.T) {
 	if got.Title != "Write command" || got.Lumbrera.Kind != "wiki" {
 		t.Fatalf("unexpected document: %+v", got)
 	}
+	if !idPattern.MatchString(got.Lumbrera.ID) {
+		t.Fatalf("unexpected document id %q", got.Lumbrera.ID)
+	}
 	if len(got.Tags) != 2 || got.Tags[0] != "brain" || got.Tags[1] != "cli" {
 		t.Fatalf("tags not sorted/unique: %#v", got.Tags)
 	}
@@ -58,6 +61,24 @@ func TestRenderRejectsInvalidWikiTags(t *testing.T) {
 	}
 	if _, err := Render(New("wiki", "Tagged", "Tagged summary.", []string{"Bad Tag"}, []string{"sources/raw.md"}, nil)); err == nil {
 		t.Fatal("expected invalid tag slug to be rejected")
+	}
+}
+
+func TestSplitRejectsMissingIDUnlessAllowed(t *testing.T) {
+	content := []byte("---\ntitle: Old\nsummary: Old summary.\ntags:\n  - old\nlumbrera:\n  schema: document-v1\n  kind: wiki\n  sources:\n    - sources/raw.md\n  links: []\n---\n\n# Old\n")
+	_, _, has, err := Split(content)
+	if !has {
+		t.Fatal("expected frontmatter")
+	}
+	if err == nil {
+		t.Fatal("expected missing id to be rejected")
+	}
+	got, _, has, err := SplitWithOptions(content, SplitOptions{AllowMissingID: true})
+	if err != nil {
+		t.Fatalf("expected missing id to be allowed: %v", err)
+	}
+	if !has || got.Lumbrera.ID != "" {
+		t.Fatalf("unexpected lenient split result: has=%v doc=%+v", has, got)
 	}
 }
 

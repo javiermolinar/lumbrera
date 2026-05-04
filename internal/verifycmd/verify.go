@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
@@ -29,6 +30,11 @@ func Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	lock, err := brainlock.Acquire(brainDir, "verify")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = lock.Release() }()
 	if err := verify.Run(brainDir, verify.Options{}); err != nil {
 		return err
 	}
@@ -81,6 +87,10 @@ func printHelp() {
 Usage:
   lumbrera verify [--brain <path>]
 
+Behavior:
+  - repairs missing wiki frontmatter document IDs for backward compatibility
+  - then checks deterministic consistency
+
 Checks:
   - .brain/VERSION matches the supported brain format
   - content paths obey Lumbrera policy
@@ -93,5 +103,5 @@ Options:
   --brain <path>      target brain directory, defaults to the current directory
   --repo <path>       deprecated alias for --brain
 
-This command is for deterministic diagnostics. Knowledge mutations should still use lumbrera write.`)
+This command may repair missing generated document IDs. Knowledge mutations should still use lumbrera write.`)
 }

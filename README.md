@@ -54,7 +54,7 @@ Time to time run the linter to fix semantic drifts:
 - Preserve source material as raw Markdown before distilling it into wiki pages.
 - Generate `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, and read-only `tags.md` from the managed wiki state.
 - Require source references for distilled knowledge so claims can be traced back to preserved material.
-- Require single-line wiki summaries and 1-5 lowercase slug tags, then validate local Markdown links, heading anchors, and optional inline source citations such as `[source: ../sources/input.md#section]` during writes.
+- Generate stable Lumbrera document IDs in wiki frontmatter, require single-line wiki summaries and 1-5 lowercase slug tags, then validate local Markdown links, heading anchors, and optional inline source citations such as `[source: ../sources/input.md#section]` during writes.
 - Support bring-your-own-agent workflows, including Pi, Claude Code, Cursor, Slack bots, scripts, and humans.
 - Avoid a database, custom backend, CRDT layer, hosted service, or mandatory Git workflow in the first version.
 
@@ -65,7 +65,7 @@ Lumbrera is not trying to be a new chat UI or a full knowledge-management app. I
 Agents use the generated `AGENTS.md` and bundled skills. The core protocol is intentionally small:
 
 - `lumbrera write ...` is the only supported mutation boundary for `sources/`, `wiki/`, and generated metadata such as `tags.md`.
-- `lumbrera verify --brain <path>` checks deterministic integrity for managed wiki content: provenance, links, generated files, and checksums. Raw files under `sources/` are not required to have Lumbrera frontmatter.
+- `lumbrera verify --brain <path>` repairs missing wiki document IDs for backward compatibility, then checks deterministic integrity for managed wiki content: provenance, links, generated files, and checksums. Raw files under `sources/` are not required to have Lumbrera frontmatter.
 - `lumbrera init <path>` creates a brain scaffold. It does not initialize Git, install hooks, commit, or push.
 
 ## Guardrails

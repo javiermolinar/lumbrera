@@ -33,6 +33,9 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	if meta.Title != "Topic" || meta.Lumbrera.Kind != "wiki" {
 		t.Fatalf("unexpected wiki metadata: %+v", meta)
 	}
+	if meta.Lumbrera.ID == "" {
+		t.Fatal("expected generated document id")
+	}
 	if len(meta.Tags) != 1 || meta.Tags[0] != "design" {
 		t.Fatalf("unexpected tags: %#v", meta.Tags)
 	}
@@ -66,8 +69,19 @@ func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 	assertFileContains(t, repo, "wiki/topic.md", "Initial.\n\nAppended note.")
 	assertFileContains(t, repo, "CHANGELOG.md", "[append] [test]: Append note")
 
+	beforeUpdateMeta, _, _, err := frontmatter.Split([]byte(readFile(t, repo, "wiki/topic.md")))
+	if err != nil {
+		t.Fatal(err)
+	}
 	runWrite(t, repo, "# Topic\n\nReplacement.\n", "wiki/topic.md", "--source", "sources/raw.md", "--reason", "Replace topic", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Replacement.")
+	afterUpdateMeta, _, _, err := frontmatter.Split([]byte(readFile(t, repo, "wiki/topic.md")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if beforeUpdateMeta.Lumbrera.ID == "" || afterUpdateMeta.Lumbrera.ID != beforeUpdateMeta.Lumbrera.ID {
+		t.Fatalf("expected update to preserve document id: before=%q after=%q", beforeUpdateMeta.Lumbrera.ID, afterUpdateMeta.Lumbrera.ID)
+	}
 	assertFileContains(t, repo, "CHANGELOG.md", "[update] [test]: Replace topic")
 
 	runWrite(t, repo, "", "wiki/topic.md", "--delete", "--reason", "Remove topic", "--actor", "test")

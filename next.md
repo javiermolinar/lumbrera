@@ -2,7 +2,7 @@
 
 ## Context
 
-The old `2026-05-02-lumbrera-plan.md` has been renamed to this `next.md`. The current implementation has the local v1 shape mostly in place: `init`, `write`, and `verify`; generated `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, and read-only `tags.md`; immutable raw sources; mandatory single-line wiki summary and 1-5 tags; generated wiki frontmatter and source sections; link, heading-anchor, and inline source-citation validation; rollback on failed writes; and bundled ingest/query/lint skills.
+The old `2026-05-02-lumbrera-plan.md` has been renamed to this `next.md`. The current implementation has the local v1 shape mostly in place: `init`, `write`, and `verify`; generated `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, and read-only `tags.md`; immutable raw sources; stable generated wiki document IDs; mandatory single-line wiki summary and 1-5 tags; generated wiki frontmatter and source sections; link, heading-anchor, and inline source-citation validation; rollback on failed writes; and bundled ingest/query/lint skills.
 
 The next milestone is v2: make Lumbrera easier for LLM agents to query by adding a derived SQLite search index and a new `lumbrera search` command.
 
@@ -10,11 +10,12 @@ The next milestone is v2: make Lumbrera easier for LLM agents to query by adding
 
 Build a nice local indexing and search tool backed by SQLite so agents can quickly find relevant wiki pages, source evidence, headings, links, citations, and related documents before deciding what to read in full.
 
-The index is a derived cache, not source of truth. Markdown files, generated metadata, `tags.md`, and `.brain/ops.log` remain canonical. The SQLite database must be safe to delete and rebuild. `tags.md` is itself generated from wiki frontmatter and read-only for agents.
+The index is a derived cache, not source of truth. Markdown files, generated Lumbrera document IDs, generated metadata, `tags.md`, and `.brain/ops.log` remain canonical. The SQLite database must be safe to delete and rebuild. `tags.md` is itself generated from wiki frontmatter and read-only for agents.
 
 ## What is missing for v2
 
 - SQLite-backed derived index stored under `.brain/`, likely `.brain/search.sqlite`.
+- Incremental updates keyed by stable generated Lumbrera document IDs in wiki frontmatter; `verify` repairs missing IDs in older wiki pages.
 - Index schema versioning and rebuild/staleness detection.
 - Markdown section extraction for both `wiki/` and `sources/`.
 - Full-text search over titles, summaries, tags, headings, body text, paths, and source citations.
@@ -55,7 +56,7 @@ Core tables:
 ```sql
 meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)
 documents(
-  id INTEGER PRIMARY KEY,
+  id TEXT PRIMARY KEY,         -- generated Lumbrera document id from frontmatter
   path TEXT UNIQUE NOT NULL,
   kind TEXT NOT NULL,          -- wiki or source
   title TEXT NOT NULL,
@@ -87,7 +88,7 @@ sections_fts USING fts5(title, path, heading, body, tags, content='sections', co
 
 Index inputs:
 
-- `wiki/`: strip generated Lumbrera frontmatter, require title/summary/1-5 tags, preserve title/summary/tags/sources/links from frontmatter, split body by headings.
+- `wiki/`: strip generated Lumbrera frontmatter, require generated id/title/summary/1-5 tags, preserve id/title/summary/tags/sources/links from frontmatter, split body by headings.
 - `sources/`: preserve raw Markdown, split by headings, ignore unresolved links inside sources just like current verification does.
 - `.brain/ops.log`: optional later source for operation history search; not needed for first cut.
 

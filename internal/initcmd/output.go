@@ -10,7 +10,8 @@ Initializes <repo> as a Lumbrera brain directory.
 
 A brain is a Markdown knowledge base. It preserves raw sources under sources/
 and distilled knowledge under wiki/. After initialization, agents should not
-edit brain files directly; they should use lumbrera write.
+edit brain files directly; they should use lumbrera write. Verify can repair
+missing generated wiki document IDs for older brains.
 
 Creates:
   INDEX.md          generated navigation map

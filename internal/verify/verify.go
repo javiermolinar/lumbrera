@@ -34,11 +34,77 @@ func Run(repo string, opts Options) error {
 	if err := ValidatePathPolicy(repo); err != nil {
 		return err
 	}
+	repaired, err := RepairMissingIDs(repo)
+	if err != nil {
+		return err
+	}
+	if repaired {
+		files, err := generate.FilesForRepo(repo)
+		if err != nil {
+			return err
+		}
+		if err := generate.WriteFiles(repo, files); err != nil {
+			return err
+		}
+	}
 	if err := ValidateDocuments(repo); err != nil {
 		return err
 	}
 	_ = opts
 	return VerifyGeneratedFiles(repo)
+}
+
+func RepairMissingIDs(repo string) (bool, error) {
+	root := filepath.Join(repo, "wiki")
+	if _, err := os.Stat(root); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	repaired := false
+	err := filepath.WalkDir(root, func(absPath string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
+			return nil
+		}
+		content, err := os.ReadFile(absPath)
+		if err != nil {
+			return err
+		}
+		meta, body, has, err := frontmatter.SplitWithOptions(content, frontmatter.SplitOptions{AllowMissingID: true})
+		if err != nil {
+			rel, relErr := filepath.Rel(repo, absPath)
+			if relErr != nil {
+				return relErr
+			}
+			return fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", filepath.ToSlash(rel), err)
+		}
+		if !has || meta.Lumbrera.Kind != "wiki" || strings.TrimSpace(meta.Lumbrera.ID) != "" {
+			return nil
+		}
+		id, err := frontmatter.NewID()
+		if err != nil {
+			return err
+		}
+		meta.Lumbrera.ID = id
+		updated, err := frontmatter.Attach(meta, body)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(absPath, []byte(updated), 0o644); err != nil {
+			return err
+		}
+		repaired = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return repaired, nil
 }
 
 func ValidatePathPolicy(repo string) error {
@@ -127,6 +193,7 @@ func ValidateDocuments(repo string) error {
 		}
 		return err
 	}
+	seenIDs := map[string]string{}
 	return filepath.WalkDir(root, func(absPath string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -152,57 +219,65 @@ func ValidateDocuments(repo string) error {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		return validateWikiDocument(repo, absPath, rel)
+		id, err := validateWikiDocument(repo, absPath, rel)
+		if err != nil {
+			return err
+		}
+		if existing, ok := seenIDs[id]; ok {
+			return fmt.Errorf("%s duplicates Lumbrera document id %s from %s", rel, id, existing)
+		}
+		seenIDs[id] = rel
+		return nil
 	})
 }
 
-func validateWikiDocument(repo, absPath, relPath string) error {
+func validateWikiDocument(repo, absPath, relPath string) (string, error) {
 	content, err := os.ReadFile(absPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	meta, body, has, err := frontmatter.Split(content)
 	if err != nil {
-		return fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
+		return "", fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
 	}
 	if !has {
-		return fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
+		return "", fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
 	}
 	if meta.Lumbrera.Kind != "wiki" {
-		return fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, "wiki")
+		return "", fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, "wiki")
 	}
 	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: true})
 	if err != nil {
-		return fmt.Errorf("%s has invalid Markdown links: %w", relPath, err)
+		return "", fmt.Errorf("%s has invalid Markdown links: %w", relPath, err)
 	}
 	if analysis.FirstH1 != "" && analysis.FirstH1 != meta.Title {
-		return fmt.Errorf("%s first H1 %q does not match generated title %q", relPath, analysis.FirstH1, meta.Title)
+		return "", fmt.Errorf("%s first H1 %q does not match generated title %q", relPath, analysis.FirstH1, meta.Title)
 	}
 	if err := validateInternalReferencesExist(repo, relPath, analysis.LinkReferences); err != nil {
-		return err
+		return "", err
 	}
 	if err := validateSourceCitations(repo, relPath, analysis.SourceCitations); err != nil {
-		return err
+		return "", err
 	}
 	if !sameStrings(meta.Lumbrera.Links, filterWikiLinks(analysis.Links)) {
-		return fmt.Errorf("%s frontmatter links are stale; regenerate through lumbrera write", relPath)
+		return "", fmt.Errorf("%s frontmatter links are stale; regenerate through lumbrera write", relPath)
 	}
 	if len(analysis.Sources) == 0 {
-		return fmt.Errorf("%s is missing a ## Sources section with source links", relPath)
+		return "", fmt.Errorf("%s is missing a ## Sources section with source links", relPath)
 	}
 	for _, source := range analysis.Sources {
 		if !strings.HasPrefix(source, "sources/") {
-			return fmt.Errorf("%s Sources section must link only to sources/, got %s", relPath, source)
+			return "", fmt.Errorf("%s Sources section must link only to sources/, got %s", relPath, source)
 		}
 	}
 	if err := validateInternalReferencesExist(repo, relPath, analysis.SourceReferences); err != nil {
-		return err
+		return "", err
 	}
 	expectedSources := mergePaths(analysis.Sources, referencePaths(analysis.SourceCitations))
 	if !sameStrings(meta.Lumbrera.Sources, expectedSources) {
-		return fmt.Errorf("%s frontmatter sources are stale; regenerate through lumbrera write", relPath)
+		return "", fmt.Errorf("%s frontmatter sources are stale; regenerate through lumbrera write", relPath)
 	}
-	return nil
+	return meta.Lumbrera.ID, nil
 }
 
 func VerifyGeneratedFiles(repo string) error {

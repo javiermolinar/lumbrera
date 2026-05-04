@@ -38,6 +38,45 @@ func TestVerifyRejectsManifestDrift(t *testing.T) {
 	}
 }
 
+func TestVerifyRepairsMissingWikiDocumentID(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+
+	withoutID := removeIDLine(readFile(t, repo, "wiki/topic.md"))
+	if err := os.WriteFile(filepath.Join(repo, "wiki", "topic.md"), []byte(withoutID), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Run([]string{"--brain", repo}); err != nil {
+		t.Fatalf("verify should repair missing id: %v", err)
+	}
+	if !strings.Contains(readFile(t, repo, "wiki/topic.md"), "id: doc_") {
+		t.Fatal("expected verify to add generated document id")
+	}
+}
+
+func TestVerifyRejectsDuplicateWikiDocumentIDs(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# First\n\nBody.\n", "wiki/first.md", "--title", "First", "--summary", "First summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create first", "--actor", "test")
+	runWrite(t, repo, "# Second\n\nBody.\n", "wiki/second.md", "--title", "Second", "--summary", "Second summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create second", "--actor", "test")
+
+	firstID := idLine(readFile(t, repo, "wiki/first.md"))
+	second := replaceIDLine(readFile(t, repo, "wiki/second.md"), firstID)
+	if err := os.WriteFile(filepath.Join(repo, "wiki", "second.md"), []byte(second), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Run([]string{"--brain", repo})
+	if err == nil {
+		t.Fatal("expected duplicate document id to be rejected")
+	}
+	if !strings.Contains(err.Error(), "duplicates Lumbrera document id") {
+		t.Fatalf("expected duplicate id error, got %v", err)
+	}
+}
+
 func TestVerifyAllowsRawSourceWithoutGeneratedFrontmatter(t *testing.T) {
 	repo := initBrain(t)
 	path := filepath.Join(repo, "sources", "raw.md")
@@ -117,4 +156,36 @@ func readFile(t *testing.T, repo, rel string) string {
 		t.Fatalf("read %s: %v", rel, err)
 	}
 	return string(content)
+}
+
+func idLine(content string) string {
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "id: doc_") {
+			return line
+		}
+	}
+	return ""
+}
+
+func removeIDLine(content string) string {
+	var lines []string
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "id: doc_") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func replaceIDLine(content, replacement string) string {
+	var lines []string
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "id: doc_") {
+			lines = append(lines, replacement)
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }

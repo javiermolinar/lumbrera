@@ -46,7 +46,7 @@ func applyMutation(repo, target, kind string, op operation, opts options, input 
 			return err
 		}
 		body = md.AppendSourcesSection(body, target, sources)
-		return writeDocument(absTarget, target, kind, opts.Title, opts.Summary, opts.Tags, sources, body)
+		return writeDocument(absTarget, target, kind, "", opts.Title, opts.Summary, opts.Tags, sources, body)
 	case opUpdate:
 		existingMeta, _, err := readExistingDocument(absTarget)
 		if err != nil {
@@ -70,7 +70,7 @@ func applyMutation(repo, target, kind string, op operation, opts options, input 
 			return err
 		}
 		body = md.AppendSourcesSection(body, target, sources)
-		return writeDocument(absTarget, target, kind, title, summary, tags, sources, body)
+		return writeDocument(absTarget, target, kind, existingMeta.Lumbrera.ID, title, summary, tags, sources, body)
 	case opAppend:
 		existingMeta, existingBody, err := readExistingDocument(absTarget)
 		if err != nil {
@@ -83,7 +83,7 @@ func applyMutation(repo, target, kind string, op operation, opts options, input 
 			return err
 		}
 		body = md.AppendSourcesSection(body, target, sources)
-		return writeDocument(absTarget, target, kind, existingMeta.Title, existingMeta.Summary, existingMeta.Tags, sources, body)
+		return writeDocument(absTarget, target, kind, existingMeta.Lumbrera.ID, existingMeta.Title, existingMeta.Summary, existingMeta.Tags, sources, body)
 	default:
 		return fmt.Errorf("unsupported operation %q", op)
 	}
@@ -96,7 +96,7 @@ func writeRawFile(absTarget string, content []byte) error {
 	return os.WriteFile(absTarget, content, 0o644)
 }
 
-func writeDocument(absTarget, target, kind, title, summary string, tags, sources []string, body string) error {
+func writeDocument(absTarget, target, kind, id, title, summary string, tags, sources []string, body string) error {
 	analysis, err := md.AnalyzeWithOptions(target, body, md.AnalyzeOptions{SourceCitations: kind == "wiki"})
 	if err != nil {
 		return err
@@ -109,6 +109,9 @@ func writeDocument(absTarget, target, kind, title, summary string, tags, sources
 		sources = nil
 	}
 	meta := frontmatter.New(kind, title, summary, tags, sources, links)
+	if strings.TrimSpace(id) != "" {
+		meta = frontmatter.NewWithID(id, kind, title, summary, tags, sources, links)
+	}
 	content, err := frontmatter.Attach(meta, body)
 	if err != nil {
 		return err
