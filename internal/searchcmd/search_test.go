@@ -29,6 +29,9 @@ func TestSearchAutoRebuildsMissingIndexAndOutputsJSON(t *testing.T) {
 	if len(payload.Results) == 0 {
 		t.Fatalf("search returned no results: %s", out.String())
 	}
+	if len(payload.RecommendedReadOrder) == 0 || payload.StopRule == "" {
+		t.Fatalf("missing recommended read order/stop rule: %#v", payload)
+	}
 	if _, err := os.Stat(searchindex.SearchIndexPath(repo)); err != nil {
 		t.Fatalf("search should auto-create index: %v", err)
 	}

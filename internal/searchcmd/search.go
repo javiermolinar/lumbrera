@@ -26,9 +26,11 @@ type options struct {
 }
 
 type jsonOutput struct {
-	Query     string       `json:"query"`
-	QueryMode string       `json:"query_mode"`
-	Results   []jsonResult `json:"results"`
+	Query                string       `json:"query"`
+	QueryMode            string       `json:"query_mode"`
+	Results              []jsonResult `json:"results"`
+	RecommendedReadOrder []string     `json:"recommended_read_order"`
+	StopRule             string       `json:"stop_rule"`
 }
 
 type jsonResult struct {
@@ -246,9 +248,11 @@ func resolveBrain(brainDir string) (string, error) {
 
 func writeJSON(out io.Writer, response searchindex.SearchResponse) error {
 	payload := jsonOutput{
-		Query:     response.Query,
-		QueryMode: response.QueryMode,
-		Results:   make([]jsonResult, 0, len(response.Results)),
+		Query:                response.Query,
+		QueryMode:            response.QueryMode,
+		Results:              make([]jsonResult, 0, len(response.Results)),
+		RecommendedReadOrder: nonNilStrings(response.RecommendedReadOrder),
+		StopRule:             response.StopRule,
 	}
 	for _, result := range response.Results {
 		payload.Results = append(payload.Results, jsonResult{

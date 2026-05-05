@@ -31,6 +31,10 @@ func TestSearchANDQueryAndWikiBoost(t *testing.T) {
 	}
 	assertStringSlicesEqual(t, response.Results[0].Tags, []string{"tempo"}, "tags")
 	assertStringSlicesEqual(t, response.Results[0].Sources, []string{"sources/tempo.md"}, "sources")
+	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{"wiki/tempo-downscale.md", "wiki/tempo-related.md"}, "recommended read order")
+	if response.StopRule != "Read the top 3 wiki pages first. Do not scan the repo unless those are insufficient." {
+		t.Fatalf("stop rule = %q", response.StopRule)
+	}
 }
 
 func TestSearchORFallback(t *testing.T) {
@@ -46,8 +50,8 @@ func TestSearchORFallback(t *testing.T) {
 	if len(response.Results) == 0 {
 		t.Fatal("OR fallback returned no results")
 	}
-	if response.Results[0].Path != "wiki/tempo-downscale.md" {
-		t.Fatalf("top fallback result path = %q, want wiki/tempo-downscale.md", response.Results[0].Path)
+	if response.Results[0].Kind != KindWiki || !strings.HasPrefix(response.Results[0].Path, "wiki/tempo") {
+		t.Fatalf("top fallback result = %#v, want tempo wiki result", response.Results[0])
 	}
 }
 
@@ -128,6 +132,68 @@ func TestSearchFiltersAndLimit(t *testing.T) {
 	}
 }
 
+func TestSearchPenalizesGeneratedNavigationSections(t *testing.T) {
+	db := openTestDB(t)
+	docs := []Document{{
+		ID:          "doc_generated_sections",
+		Path:        "wiki/generated-sections.md",
+		Kind:        KindWiki,
+		Title:       "Generated sections",
+		Summary:     "generatedunique summary",
+		TagsJSON:    `["generated"]`,
+		SourcesJSON: `[]`,
+		LinksJSON:   `[]`,
+		TagsText:    "generated",
+		Hash:        "hash-generated",
+		SizeBytes:   100,
+	}}
+	sections := []Section{
+		{DocumentID: "doc_generated_sections", Ordinal: 1, Heading: "Generated sections", Anchor: "generated-sections", Level: 1, Body: "body"},
+		{DocumentID: "doc_generated_sections", Ordinal: 2, Heading: "Sources", Anchor: "sources", Level: 2, Body: "body"},
+		{DocumentID: "doc_generated_sections", Ordinal: 3, Heading: "Related pages", Anchor: "related-pages", Level: 2, Body: "body"},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "fixture"}); err != nil {
+		t.Fatalf("rebuild generated sections fixture: %v", err)
+	}
+
+	response, err := Search(context.Background(), db, "generatedunique", SearchOptions{Limit: 3})
+	if err != nil {
+		t.Fatalf("search generated sections fixture: %v", err)
+	}
+	if len(response.Results) != 3 {
+		t.Fatalf("result count = %d, want 3: %#v", len(response.Results), response.Results)
+	}
+	if response.Results[0].Heading == "Sources" || response.Results[0].Heading == "Related pages" {
+		t.Fatalf("generated navigation section ranked first: %#v", response.Results)
+	}
+}
+
+func TestSearchRecommendedReadOrderForSourceOnlyResults(t *testing.T) {
+	db := searchFixtureDB(t)
+
+	response, err := Search(context.Background(), db, "tempo downscale", SearchOptions{Kind: KindSource, Limit: 10})
+	if err != nil {
+		t.Fatalf("source search: %v", err)
+	}
+	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{"sources/tempo.md"}, "source recommended read order")
+	if response.StopRule != "Read these source results directly. Do not scan the repo unless they are insufficient." {
+		t.Fatalf("source stop rule = %q", response.StopRule)
+	}
+}
+
+func TestSearchRecommendedReadOrderForNoResults(t *testing.T) {
+	db := searchFixtureDB(t)
+
+	response, err := Search(context.Background(), db, "absentterm", SearchOptions{})
+	if err != nil {
+		t.Fatalf("no-result search: %v", err)
+	}
+	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{}, "empty recommended read order")
+	if response.StopRule != "No search results. Run one refined search with different terms before broader exploration." {
+		t.Fatalf("empty stop rule = %q", response.StopRule)
+	}
+}
+
 func TestSearchRejectsInvalidOptions(t *testing.T) {
 	db := searchFixtureDB(t)
 
@@ -189,6 +255,19 @@ func searchFixtureDB(t *testing.T) *sql.DB {
 			SizeBytes:   100,
 		},
 		{
+			ID:          "doc_tempo_related",
+			Path:        "wiki/tempo-related.md",
+			Kind:        KindWiki,
+			Title:       "Tempo related",
+			Summary:     "Related tempo downscale notes.",
+			TagsJSON:    `["tempo"]`,
+			SourcesJSON: `[]`,
+			LinksJSON:   `[]`,
+			TagsText:    "tempo",
+			Hash:        "hash-wiki-tempo-related",
+			SizeBytes:   100,
+		},
+		{
 			ID:          "doc_mimir_limits",
 			Path:        "wiki/mimir-limits.md",
 			Kind:        KindWiki,
@@ -206,6 +285,7 @@ func searchFixtureDB(t *testing.T) *sql.DB {
 		{DocumentID: "doc_tempo_downscale", Ordinal: 1, Heading: "Tempo downscale", Anchor: "tempo-downscale", Level: 1, Body: "Tempo downscale procedure for ingesters."},
 		{DocumentID: "doc_tempo_downscale", Ordinal: 2, Heading: "Rollback", Anchor: "rollback", Level: 2, Body: "Rollback after downscale."},
 		{DocumentID: "doc_source_tempo", Ordinal: 1, Heading: "Tempo source", Anchor: "tempo-source", Level: 1, Body: "Tempo downscale raw evidence."},
+		{DocumentID: "doc_tempo_related", Ordinal: 1, Heading: "Tempo related", Anchor: "tempo-related", Level: 1, Body: "Tempo downscale related notes."},
 		{DocumentID: "doc_mimir_limits", Ordinal: 1, Heading: "Tenant limits", Anchor: "tenant-limits", Level: 1, Body: "Mimir tenant limits are configured per tenant."},
 	}
 	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "fixture"}); err != nil {

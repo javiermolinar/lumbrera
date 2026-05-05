@@ -28,9 +28,11 @@ type SearchOptions struct {
 }
 
 type SearchResponse struct {
-	Query     string
-	QueryMode string
-	Results   []SearchResult
+	Query                string
+	QueryMode            string
+	Results              []SearchResult
+	RecommendedReadOrder []string
+	StopRule             string
 }
 
 type SearchResult struct {
@@ -81,7 +83,14 @@ func Search(ctx context.Context, db *sql.DB, query string, opts SearchOptions) (
 		mode = QueryModeORFallback
 	}
 
-	return SearchResponse{Query: query, QueryMode: mode, Results: results}, nil
+	recommendedReadOrder, stopRule := recommendedReadOrder(results, opts)
+	return SearchResponse{
+		Query:                query,
+		QueryMode:            mode,
+		Results:              results,
+		RecommendedReadOrder: recommendedReadOrder,
+		StopRule:             stopRule,
+	}, nil
 }
 
 func runSearch(ctx context.Context, db *sql.DB, match string, opts SearchOptions) ([]SearchResult, error) {
@@ -112,7 +121,12 @@ func runSearch(ctx context.Context, db *sql.DB, match string, opts SearchOptions
 		s.links_json,
 		s.ordinal,
 		snippet(sections_fts, -1, '<<', '>>', '...', 16) AS snippet,
-		bm25(sections_fts, 5.0, 3.0, 4.0, 2.0, 2.0, 1.5, 3.0, 1.0) AS lexical_score
+		bm25(sections_fts, 5.0, 3.0, 4.0, 2.0, 2.0, 1.5, 3.0, 1.0) AS lexical_score,
+		CASE lower(COALESCE(s.heading, ''))
+			WHEN 'sources' THEN 2.0
+			WHEN 'related pages' THEN 1.5
+			ELSE 0
+		END AS heading_penalty
 	FROM sections_fts
 	JOIN sections s ON s.rowid = sections_fts.rowid
 	WHERE %s
@@ -130,7 +144,7 @@ SELECT
 	sources_json,
 	links_json,
 	snippet,
-	lexical_score - CASE kind WHEN 'wiki' THEN abs(lexical_score) * %.2f ELSE 0 END AS score,
+	lexical_score - CASE kind WHEN 'wiki' THEN abs(lexical_score) * %.2f ELSE 0 END + heading_penalty AS score,
 	lexical_score
 FROM matches
 ORDER BY
@@ -357,6 +371,41 @@ func decodeStringArray(value string) ([]string, error) {
 		return []string{}, nil
 	}
 	return out, nil
+}
+
+func recommendedReadOrder(results []SearchResult, opts SearchOptions) ([]string, string) {
+	if len(results) == 0 {
+		return []string{}, "No search results. Run one refined search with different terms before broader exploration."
+	}
+	if opts.Kind == KindSource || !hasKind(results, KindWiki) {
+		return dedupeBestPaths(results, KindSource), "Read these source results directly. Do not scan the repo unless they are insufficient."
+	}
+	return dedupeBestPaths(results, KindWiki), "Read the top 3 wiki pages first. Do not scan the repo unless those are insufficient."
+}
+
+func hasKind(results []SearchResult, kind string) bool {
+	for _, result := range results {
+		if result.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func dedupeBestPaths(results []SearchResult, kind string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(results))
+	for _, result := range results {
+		if result.Kind != kind {
+			continue
+		}
+		if _, ok := seen[result.Path]; ok {
+			continue
+		}
+		seen[result.Path] = struct{}{}
+		out = append(out, result.Path)
+	}
+	return out
 }
 
 var searchStopwords = map[string]bool{
