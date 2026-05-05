@@ -6,6 +6,7 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/indexcmd"
 	initcmd "github.com/javiermolinar/lumbrera/internal/initcmd"
+	"github.com/javiermolinar/lumbrera/internal/searchcmd"
 	"github.com/javiermolinar/lumbrera/internal/verifycmd"
 	"github.com/javiermolinar/lumbrera/internal/writecmd"
 )
@@ -29,6 +30,8 @@ func run(args []string) error {
 		return initcmd.Run(rest)
 	case "index":
 		return indexcmd.Run(rest)
+	case "search":
+		return searchcmd.Run(rest)
 	case "verify":
 		return verifycmd.Run(rest)
 	case "write":
@@ -57,6 +60,7 @@ Usage:
 Commands:
   init <repo>              Initialize a Lumbrera brain repo
   index [options]          Manage the local SQLite search index
+  search <query> [options] Search the local SQLite index with JSON output
   verify [--brain <path>]  Check deterministic brain integrity
   write <path> [options]   Perform one atomic knowledge mutation
 
@@ -67,5 +71,6 @@ Examples:
   lumbrera init ./brain
   lumbrera index --status --brain ./brain
   lumbrera index --rebuild --brain ./brain
+  lumbrera search "tempo downscale" --brain ./brain --json
   lumbrera write wiki/topic.md --title "Topic" --summary "Durable summary" --tag topic --source sources/input.md --reason "Create topic page" < topic.md`)
 }
