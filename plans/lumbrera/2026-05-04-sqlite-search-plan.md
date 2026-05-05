@@ -279,29 +279,48 @@ Do not rely on implicit triggers in the first cut. Tests must include a fixture 
 The common search query should only join `sections_fts` to the denormalized `sections` content table. `documents` supports staleness checks, document grouping, and recommended read order; it is not needed for the normal top-N result projection.
 
 ```sql
+WITH matches AS (
+  SELECT
+    s.path,
+    s.id AS section_id,
+    s.anchor,
+    s.kind,
+    s.title,
+    s.heading,
+    s.tags_json,
+    s.sources_json,
+    s.links_json,
+    s.ordinal,
+    snippet(sections_fts, -1, '<<', '>>', '...', 16) AS snippet,
+    bm25(sections_fts, 5.0, 3.0, 4.0, 2.0, 2.0, 1.5, 3.0, 1.0) AS lexical_score
+  FROM sections_fts
+  JOIN sections s ON s.rowid = sections_fts.rowid
+  WHERE sections_fts MATCH ?
+)
 SELECT
-  s.path,
-  s.id AS section_id,
-  s.anchor,
-  s.kind,
-  s.title,
-  s.heading,
-  s.tags_json,
-  s.sources_json,
-  s.links_json,
-  snippet(sections_fts, -1, '<<', '>>', '...', 16) AS snippet,
-  bm25(sections_fts, 5.0, 3.0, 4.0, 2.0, 2.0, 1.5, 3.0, 1.0) AS score
-FROM sections_fts
-JOIN sections s ON s.rowid = sections_fts.rowid
-WHERE sections_fts MATCH ?
+  path,
+  section_id,
+  anchor,
+  kind,
+  title,
+  heading,
+  tags_json,
+  sources_json,
+  links_json,
+  snippet,
+  lexical_score - CASE kind WHEN 'wiki' THEN abs(lexical_score) * 0.15 ELSE 0 END AS score
+FROM matches
 ORDER BY
   score ASC,
-  CASE s.kind WHEN 'wiki' THEN 0 ELSE 1 END,
-  s.path ASC,
-  s.ordinal ASC,
-  s.id ASC
+  lexical_score ASC,
+  CASE kind WHEN 'wiki' THEN 0 ELSE 1 END,
+  path ASC,
+  ordinal ASC,
+  section_id ASC
 LIMIT ?;
 ```
+
+`score` is the final lower-is-better rank score after the wiki-kind boost. `lexical_score` is internal debug/ranking state and is not required in the public JSON contract.
 
 The BM25 weights correspond to:
 
@@ -323,22 +342,26 @@ Default `lumbrera search` should accept natural language input, not raw SQLite F
 First-cut query handling:
 
 - Normalize and tokenize unquoted text into safe FTS terms.
-- Preserve quoted substrings as exact phrases after escaping internal quotes.
+- Drop a small fixed list of common low-signal English stopwords from unquoted text before building the FTS query.
+- Preserve quoted substrings as exact phrases after escaping internal quotes; do not remove stopwords inside quoted phrases.
+- Join remaining terms and phrases with `AND` for the default query mode so results are precision-first and easier for agents to trust.
+- If the default `AND` query returns zero results, retry once with the same sanitized terms joined by `OR` for recall. Expose this as `query_mode: "or_fallback"` in JSON output.
 - Treat boolean operators (`AND`, `OR`, `NOT`), `NEAR`, parentheses, column filters, and `*` as user text unless a later explicit raw/prefix mode is added.
 - Return a clear error if sanitization leaves no searchable terms.
 - Do not pass the user query directly to `MATCH` without sanitization.
 
-This prevents accidental FTS syntax errors and keeps agent-generated queries predictable. Raw FTS syntax or prefix search can be added later behind an explicit flag if needed.
+This prevents accidental FTS syntax errors, avoids overly broad first-pass natural-language searches, and still recovers when strict lexical matching is over-constrained. Raw FTS syntax or prefix search can be added later behind an explicit flag if needed.
 
 ## Ranking
 
-Start with FTS5 BM25 plus deterministic boosts:
+Start with FTS5 BM25 column weights plus a deterministic wiki-kind boost:
 
 - path/title/tag hits > summary hits > heading hits > body hits
 - source path and link path hits are searchable text, not separate structured lookups
-- wiki results get a small boost over sources
-- source results still appear when the query clearly matches raw evidence
-- ties break by path, section ordinal, and section ID as the final fallback
+- Apply a real wiki boost after lexical BM25, not only a tie-breaker: `final_score = lexical_score - abs(lexical_score) * 0.15` for wiki results, and `final_score = lexical_score` for source results.
+- The initial `0.15` boost should make wiki pages win among comparable lexical matches because sources are secondary evidence files, while still allowing a much stronger source match to outrank a weak wiki match.
+- Lower score is better. Sort by final score, then lexical score, then deterministic tie-breakers.
+- Ties break by path, section ordinal, and section ID as the final fallback
 - default limit is 5, maximum is 20
 
 Ranking is lexical. It only matches tokens and phrases accepted by the sanitized FTS query builder. It does not infer semantic similarity between unrelated terms.
@@ -361,6 +384,7 @@ Do not include line ranges in default output. They are not stable enough for Lum
 ```json
 {
   "query": "atomic write protocol",
+  "query_mode": "and",
   "results": [
     {
       "id": "doc_...",
@@ -471,7 +495,7 @@ Generated query skill should say:
     - Add FTS external-content population tests that fail if the explicit rebuild command is omitted.
     - Add source-only recommended read order tests.
     - Add scaffold `.gitignore` tests for `.brain/search.sqlite*`.
-    - Add ranking fixture tests after the end-to-end path works.
+    - Add ranking fixture tests after the end-to-end path works, including a comparable wiki-vs-source match where the wiki boost changes order and a clearly stronger source match that still wins.
 
 ## SQLite driver decision
 
