@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 const (
@@ -276,11 +277,18 @@ func normalizeJSONArray(value string) (string, error) {
 }
 
 func uniqueSortedStrings(input []string) []string {
-	if len(input) == 0 {
+	items := make([]string, 0, len(input))
+	for _, item := range input {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
 		return []string{}
 	}
 
-	items := append([]string(nil), input...)
 	sort.Strings(items)
 	out := items[:0]
 	var previous string
