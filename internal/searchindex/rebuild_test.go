@@ -147,6 +147,19 @@ func TestRebuildNormalizesJSONArrays(t *testing.T) {
 	}
 }
 
+func TestRebuildInvalidInputDoesNotCreateSchema(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t)
+
+	err := RebuildRecords(ctx, db, []Document{{Path: "wiki/missing-id.md", Kind: KindWiki, Title: "Missing ID", Hash: "hash"}}, nil, nil)
+	if err == nil {
+		t.Fatal("RebuildRecords succeeded with invalid input, want error")
+	}
+	if _, exists, err := ReadSchemaVersion(ctx, db); err != nil || exists {
+		t.Fatalf("schema version after invalid input: exists=%v err=%v, want missing without error", exists, err)
+	}
+}
+
 func TestRebuildRejectsInvalidInput(t *testing.T) {
 	ctx := context.Background()
 	db := openTestDB(t)

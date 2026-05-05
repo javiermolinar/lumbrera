@@ -65,6 +65,7 @@ var partialFiles = map[string]struct{}{
 	"tags.md":                                 {},
 	"CHANGELOG.md":                            {},
 	"INDEX.md":                                {},
+	".gitignore":                              {},
 }
 
 func ensureScaffold(repo string) error {
@@ -78,10 +79,58 @@ func ensureScaffold(repo string) error {
 			return err
 		}
 	}
+	if err := ensureGitignore(filepath.Join(repo, ".gitignore")); err != nil {
+		return err
+	}
 	if err := ensureSymlink(filepath.Join(repo, claudePath), claudeSymlinkTarget); err != nil {
 		return err
 	}
 	return ensureSymlink(filepath.Join(repo, claudeDir), claudeDirTarget)
+}
+
+func ensureGitignore(path string) error {
+	const searchIndexIgnore = ".brain/search.sqlite*"
+	info, statErr := os.Lstat(path)
+	if statErr == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to update symlinked .gitignore %s", path)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("refusing to update non-regular .gitignore %s", path)
+		}
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return writeExpectedFile(path, "# Lumbrera derived cache\n"+searchIndexIgnore+"\n")
+	}
+	if hasGitignoreLine(string(content), searchIndexIgnore) {
+		return nil
+	}
+
+	updated := string(content)
+	if updated != "" && !strings.HasSuffix(updated, "\n") {
+		updated += "\n"
+	}
+	if updated != "" {
+		updated += "\n"
+	}
+	updated += "# Lumbrera derived cache\n" + searchIndexIgnore + "\n"
+	return os.WriteFile(path, []byte(updated), 0o644)
+}
+
+func hasGitignoreLine(content, want string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func writeExpectedFile(path, content string) error {

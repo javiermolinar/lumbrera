@@ -52,12 +52,6 @@ func RebuildRecords(ctx context.Context, db *sql.DB, documents []Document, secti
 	if db == nil {
 		return errors.New("rebuild search index records: nil database")
 	}
-	if err := CreateSchema(ctx, db); err != nil {
-		return err
-	}
-	if _, err := db.ExecContext(ctx, `PRAGMA foreign_keys = ON`); err != nil {
-		return fmt.Errorf("enable sqlite foreign keys: %w", err)
-	}
 
 	docs, byID, err := normalizeDocuments(documents)
 	if err != nil {
@@ -68,6 +62,13 @@ func RebuildRecords(ctx context.Context, db *sql.DB, documents []Document, secti
 		return err
 	}
 	metaKeys := sortedKeys(metadata)
+
+	if err := CreateSchema(ctx, db); err != nil {
+		return err
+	}
+	if _, err := db.ExecContext(ctx, `PRAGMA foreign_keys = ON`); err != nil {
+		return fmt.Errorf("enable sqlite foreign keys: %w", err)
+	}
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

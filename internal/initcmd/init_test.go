@@ -22,6 +22,7 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertExists(t, repo, "BRAIN.sum")
 	assertExists(t, repo, "tags.md")
 	assertExists(t, repo, ".brain/ops.log")
+	assertFileContains(t, repo, ".gitignore", ".brain/search.sqlite*")
 	assertExists(t, repo, "AGENTS.md")
 	assertFileContains(t, repo, "AGENTS.md", "## Read")
 	assertFileContains(t, repo, "AGENTS.md", "## Write")
@@ -60,12 +61,17 @@ func TestInitAllowsBoilerplate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# Brain\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("dist/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := Run([]string{repo}); err != nil {
 		t.Fatalf("init with boilerplate failed: %v", err)
 	}
 
 	assertFile(t, repo, "README.md", "# Brain")
+	assertFileContains(t, repo, ".gitignore", "dist/")
+	assertFileContains(t, repo, ".gitignore", ".brain/search.sqlite*")
 	assertExists(t, repo, ".brain/VERSION")
 }
 
