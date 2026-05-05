@@ -29,8 +29,17 @@ func TestSearchAutoRebuildsMissingIndexAndOutputsJSON(t *testing.T) {
 	if len(payload.Results) == 0 {
 		t.Fatalf("search returned no results: %s", out.String())
 	}
-	if len(payload.RecommendedReadOrder) == 0 || payload.StopRule == "" {
-		t.Fatalf("missing recommended read order/stop rule: %#v", payload)
+	if len(payload.RecommendedReadOrder) == 0 || len(payload.RecommendedSections) == 0 || payload.StopRule == "" {
+		t.Fatalf("missing recommended read order/sections/stop rule: %#v", payload)
+	}
+	if payload.RecommendedSections[0].Reason == "" {
+		t.Fatalf("recommended section missing reason: %#v", payload.RecommendedSections[0])
+	}
+	if payload.AgentInstructions.ReadFirst != "recommended_sections" || len(payload.AgentInstructions.DoNot) == 0 || payload.AgentInstructions.Fallback == "" {
+		t.Fatalf("missing agent instructions: %#v", payload.AgentInstructions)
+	}
+	if _, ok := payload.Coverage["missing"]; !ok {
+		t.Fatalf("coverage missing 'missing' field: %#v", payload.Coverage)
 	}
 	if _, err := os.Stat(searchindex.SearchIndexPath(repo)); err != nil {
 		t.Fatalf("search should auto-create index: %v", err)

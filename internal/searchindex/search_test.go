@@ -31,8 +31,9 @@ func TestSearchANDQueryAndWikiBoost(t *testing.T) {
 	}
 	assertStringSlicesEqual(t, response.Results[0].Tags, []string{"tempo"}, "tags")
 	assertStringSlicesEqual(t, response.Results[0].Sources, []string{"sources/tempo.md"}, "sources")
-	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{"wiki/tempo-downscale.md", "wiki/tempo-related.md"}, "recommended read order")
-	if response.StopRule != "Read the top 3 wiki pages first. Do not scan the repo unless those are insufficient." {
+	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{"wiki/tempo-downscale.md"}, "recommended read order")
+	assertRecommendedSectionTargets(t, response.RecommendedSections, []string{"wiki/tempo-downscale.md#tempo-downscale"})
+	if response.StopRule != "Read recommended_sections from the top wiki pages first. Do not scan the repo unless those are insufficient." {
 		t.Fatalf("stop rule = %q", response.StopRule)
 	}
 }
@@ -52,6 +53,82 @@ func TestSearchORFallback(t *testing.T) {
 	}
 	if response.Results[0].Kind != KindWiki || !strings.HasPrefix(response.Results[0].Path, "wiki/tempo") {
 		t.Fatalf("top fallback result = %#v, want tempo wiki result", response.Results[0])
+	}
+}
+
+func TestSearchNaturalQuestionIgnoresIntentWords(t *testing.T) {
+	db := searchFixtureDB(t)
+
+	response, err := Search(context.Background(), db, "What should I read to understand Mimir tenant limits?", SearchOptions{Limit: 5})
+	if err != nil {
+		t.Fatalf("natural question search: %v", err)
+	}
+	if len(response.Results) == 0 || response.Results[0].Path != "wiki/mimir-limits.md" {
+		t.Fatalf("top result = %#v, want Mimir limits", response.Results)
+	}
+	assertRecommendedSectionTargetPrefix(t, response.RecommendedSections, []string{"wiki/mimir-limits.md#tenant-limits"})
+}
+
+func TestSearchRecommendsMultipleProductsForComparison(t *testing.T) {
+	db := searchFixtureDB(t)
+
+	response, err := Search(context.Background(), db, "difference tenant overrides tempo mimir", SearchOptions{Limit: 5})
+	if err != nil {
+		t.Fatalf("comparison search: %v", err)
+	}
+	if response.QueryMode != QueryModeORFallback {
+		t.Fatalf("query mode = %q, want OR fallback from source-only AND matches", response.QueryMode)
+	}
+	assertStringSlicePrefix(t, response.RecommendedReadOrder, []string{"wiki/tempo-overrides.md", "wiki/mimir-limits.md"}, "comparison recommended read order")
+	assertRecommendedSectionTargetPrefix(t, response.RecommendedSections, []string{"wiki/tempo-overrides.md#runtime-overrides", "wiki/mimir-limits.md#tenant-limits"})
+	if response.AgentInstructions.ReadFirst != "recommended_sections" {
+		t.Fatalf("agent read_first = %q", response.AgentInstructions.ReadFirst)
+	}
+	if !response.Coverage.Entities["tempo"] || !response.Coverage.Entities["mimir"] || len(response.Coverage.Missing) != 0 {
+		t.Fatalf("coverage = %#v, want tempo+mimir covered", response.Coverage)
+	}
+	if response.Results[0].Path != "wiki/tempo-overrides.md" || response.Results[1].Path != "wiki/mimir-limits.md" {
+		t.Fatalf("results should start with recommended entity coverage, got %#v", response.Results[:2])
+	}
+	if strings.Contains(response.Results[0].Path, "loki") || strings.Contains(response.Results[1].Path, "loki") {
+		t.Fatalf("unrequested Loki result ranked ahead of requested entities: %#v", response.Results[:2])
+	}
+}
+
+func TestSearchBalancesTopicRecommendations(t *testing.T) {
+	db := searchFixtureDB(t)
+
+	response, err := Search(context.Background(), db, "relationship between Mimir downscale and tenant limits", SearchOptions{Limit: 5})
+	if err != nil {
+		t.Fatalf("relationship search: %v", err)
+	}
+	assertStringSlicePrefix(t, response.RecommendedReadOrder, []string{"wiki/mimir-scaling.md", "wiki/mimir-limits.md"}, "relationship recommended read order")
+	for _, section := range response.RecommendedSections {
+		if section.Anchor == "related-pages" {
+			t.Fatalf("related-pages section was recommended: %#v", response.RecommendedSections)
+		}
+	}
+}
+
+func TestSearchCapsResultSectionsPerDocument(t *testing.T) {
+	db := openTestDB(t)
+	docs := []Document{newTestDocument("doc_many_sections", "wiki/many-sections.md", KindWiki, "Many sections", "Many sections mention floodunique.", `["many"]`, "many")}
+	sections := []Section{
+		{DocumentID: "doc_many_sections", Ordinal: 1, Heading: "One", Anchor: "one", Level: 1, Body: "floodunique one"},
+		{DocumentID: "doc_many_sections", Ordinal: 2, Heading: "Two", Anchor: "two", Level: 2, Body: "floodunique two"},
+		{DocumentID: "doc_many_sections", Ordinal: 3, Heading: "Three", Anchor: "three", Level: 2, Body: "floodunique three"},
+		{DocumentID: "doc_many_sections", Ordinal: 4, Heading: "Four", Anchor: "four", Level: 2, Body: "floodunique four"},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "fixture"}); err != nil {
+		t.Fatalf("rebuild many-sections fixture: %v", err)
+	}
+
+	response, err := Search(context.Background(), db, "floodunique", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("many-sections search: %v", err)
+	}
+	if len(response.Results) != maxSectionsPerDocument {
+		t.Fatalf("result count = %d, want capped at %d: %#v", len(response.Results), maxSectionsPerDocument, response.Results)
 	}
 }
 
@@ -176,7 +253,8 @@ func TestSearchRecommendedReadOrderForSourceOnlyResults(t *testing.T) {
 		t.Fatalf("source search: %v", err)
 	}
 	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{"sources/tempo.md"}, "source recommended read order")
-	if response.StopRule != "Read these source results directly. Do not scan the repo unless they are insufficient." {
+	assertRecommendedSectionTargets(t, response.RecommendedSections, []string{"sources/tempo.md#tempo-source"})
+	if response.StopRule != "Read these source sections/files directly. Do not scan the repo unless they are insufficient." {
 		t.Fatalf("source stop rule = %q", response.StopRule)
 	}
 }
@@ -189,7 +267,8 @@ func TestSearchRecommendedReadOrderForNoResults(t *testing.T) {
 		t.Fatalf("no-result search: %v", err)
 	}
 	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{}, "empty recommended read order")
-	if response.StopRule != "No search results. Run one refined search with different terms before broader exploration." {
+	assertRecommendedSectionTargets(t, response.RecommendedSections, []string{})
+	if response.StopRule != "No indexed content matched. Ask for clearer terms or use INDEX.md/tags.md only if fallback navigation is required; do not scan the repo." {
 		t.Fatalf("empty stop rule = %q", response.StopRule)
 	}
 }
@@ -268,15 +347,78 @@ func searchFixtureDB(t *testing.T) *sql.DB {
 			SizeBytes:   100,
 		},
 		{
+			ID:          "doc_source_mixed",
+			Path:        "sources/mixed.md",
+			Kind:        KindSource,
+			Title:       "Mixed source",
+			Summary:     "",
+			TagsJSON:    `[]`,
+			SourcesJSON: `[]`,
+			LinksJSON:   `[]`,
+			Hash:        "hash-source-mixed",
+			SizeBytes:   100,
+		},
+		{
+			ID:          "doc_source_loki",
+			Path:        "sources/loki.md",
+			Kind:        KindSource,
+			Title:       "Loki source",
+			Summary:     "",
+			TagsJSON:    `[]`,
+			SourcesJSON: `[]`,
+			LinksJSON:   `[]`,
+			Hash:        "hash-source-loki",
+			SizeBytes:   100,
+		},
+		{
+			ID:          "doc_tempo_overrides",
+			Path:        "wiki/tempo-overrides.md",
+			Kind:        KindWiki,
+			Title:       "Tempo tenant overrides",
+			Summary:     "Tempo runtime overrides and per-tenant override configuration.",
+			TagsJSON:    `["tempo","overrides"]`,
+			SourcesJSON: `[]`,
+			LinksJSON:   `[]`,
+			TagsText:    "overrides tempo",
+			Hash:        "hash-wiki-tempo-overrides",
+			SizeBytes:   100,
+		},
+		{
+			ID:          "doc_mimir_scaling",
+			Path:        "wiki/mimir-scaling.md",
+			Kind:        KindWiki,
+			Title:       "Mimir scaling and downscale",
+			Summary:     "Mimir downscale and ingester capacity guidance.",
+			TagsJSON:    `["mimir","autoscaling"]`,
+			SourcesJSON: `[]`,
+			LinksJSON:   `[]`,
+			TagsText:    "autoscaling mimir",
+			Hash:        "hash-wiki-mimir-scaling",
+			SizeBytes:   100,
+		},
+		{
+			ID:          "doc_mimir_runbooks",
+			Path:        "wiki/mimir-runbooks.md",
+			Kind:        KindWiki,
+			Title:       "Mimir runbooks and alerts",
+			Summary:     "Mimir runbook triage for capacity, tenant alerts, limits, and scaling symptoms.",
+			TagsJSON:    `["mimir","runbook","alerts"]`,
+			SourcesJSON: `[]`,
+			LinksJSON:   `[]`,
+			TagsText:    "alerts mimir runbook",
+			Hash:        "hash-wiki-mimir-runbooks",
+			SizeBytes:   100,
+		},
+		{
 			ID:          "doc_mimir_limits",
 			Path:        "wiki/mimir-limits.md",
 			Kind:        KindWiki,
 			Title:       "Mimir tenant limits",
-			Summary:     "Tenant limits for Mimir.",
-			TagsJSON:    `["mimir","limits"]`,
+			Summary:     "Tenant limits and overrides for Mimir.",
+			TagsJSON:    `["mimir","limits","overrides"]`,
 			SourcesJSON: `[]`,
 			LinksJSON:   `[]`,
-			TagsText:    "limits mimir",
+			TagsText:    "limits mimir overrides",
 			Hash:        "hash-wiki-mimir",
 			SizeBytes:   100,
 		},
@@ -286,12 +428,65 @@ func searchFixtureDB(t *testing.T) *sql.DB {
 		{DocumentID: "doc_tempo_downscale", Ordinal: 2, Heading: "Rollback", Anchor: "rollback", Level: 2, Body: "Rollback after downscale."},
 		{DocumentID: "doc_source_tempo", Ordinal: 1, Heading: "Tempo source", Anchor: "tempo-source", Level: 1, Body: "Tempo downscale raw evidence."},
 		{DocumentID: "doc_tempo_related", Ordinal: 1, Heading: "Tempo related", Anchor: "tempo-related", Level: 1, Body: "Tempo downscale related notes."},
-		{DocumentID: "doc_mimir_limits", Ordinal: 1, Heading: "Tenant limits", Anchor: "tenant-limits", Level: 1, Body: "Mimir tenant limits are configured per tenant."},
+		{DocumentID: "doc_source_mixed", Ordinal: 1, Heading: "Mixed source", Anchor: "mixed-source", Level: 1, Body: "Tempo and Mimir tenant overrides appear together only in this raw source."},
+		{DocumentID: "doc_source_loki", Ordinal: 1, Heading: "Loki source", Anchor: "loki-source", Level: 1, Body: "Loki source mentions tempo mimir tenant overrides difference repeatedly: tempo mimir tenant overrides difference."},
+		{DocumentID: "doc_tempo_overrides", Ordinal: 1, Heading: "Runtime overrides", Anchor: "runtime-overrides", Level: 1, Body: "Tempo tenant overrides use runtime overrides and per tenant override configuration."},
+		{DocumentID: "doc_mimir_scaling", Ordinal: 1, Heading: "Mimir scaling and safe downscale", Anchor: "mimir-scaling", Level: 1, Body: "Mimir downscale changes ingester capacity and safe scaling margins."},
+		{DocumentID: "doc_mimir_runbooks", Ordinal: 1, Heading: "Capacity, alerts, and tenant limits", Anchor: "capacity-limits-and-tenant-alerts", Level: 1, Body: "Mimir capacity alerts, tenant symptoms, and limits relationship triage."},
+		{DocumentID: "doc_mimir_limits", Ordinal: 1, Heading: "Tenant limits", Anchor: "tenant-limits", Level: 1, Body: "Mimir tenant limits and overrides are configured per tenant."},
 	}
 	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "fixture"}); err != nil {
 		t.Fatalf("rebuild search fixture: %v", err)
 	}
 	return db
+}
+
+func newTestDocument(id, pathValue, kind, title, summary, tagsJSON, tagsText string) Document {
+	return Document{
+		ID:          id,
+		Path:        pathValue,
+		Kind:        kind,
+		Title:       title,
+		Summary:     summary,
+		TagsJSON:    tagsJSON,
+		SourcesJSON: `[]`,
+		LinksJSON:   `[]`,
+		TagsText:    tagsText,
+		Hash:        "hash-" + id,
+		SizeBytes:   100,
+	}
+}
+
+func assertRecommendedSectionTargets(t *testing.T, got []RecommendedSection, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("recommended sections length = %d, want %d: %#v", len(got), len(want), got)
+	}
+	assertRecommendedSectionTargetPrefix(t, got, want)
+}
+
+func assertRecommendedSectionTargetPrefix(t *testing.T, got []RecommendedSection, want []string) {
+	t.Helper()
+	if len(got) < len(want) {
+		t.Fatalf("recommended sections length = %d, want at least %d: %#v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i].Target != want[i] {
+			t.Fatalf("recommended section target[%d] = %q, want %q; all=%#v", i, got[i].Target, want[i], got)
+		}
+	}
+}
+
+func assertStringSlicePrefix(t *testing.T, got, want []string, name string) {
+	t.Helper()
+	if len(got) < len(want) {
+		t.Fatalf("%s length = %d, want at least %d: %#v", name, len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("%s[%d] = %q, want %q; all=%#v", name, i, got[i], want[i], got)
+		}
+	}
 }
 
 func assertStringSlicesEqual(t *testing.T, got, want []string, name string) {

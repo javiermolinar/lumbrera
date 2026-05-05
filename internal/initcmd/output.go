@@ -18,6 +18,7 @@ Creates:
   CHANGELOG.md      generated semantic history from .brain/ops.log
   BRAIN.sum         generated wiki checksum manifest
   tags.md           generated read-only tag registry from wiki frontmatter
+  .gitignore        ignores disposable Lumbrera search cache files
   AGENTS.md         standing instructions for agents
   CLAUDE.md         symlink to AGENTS.md for Claude
   .agents/skills/   bundled Lumbrera ingest, query, and lint skills
@@ -26,6 +27,7 @@ Creates:
   wiki/             distilled knowledge
   .brain/VERSION    Lumbrera brain format marker
   .brain/ops.log    Lumbrera operation log
+  .brain/search.sqlite is created later by lumbrera index/search and ignored by Git
 
 Behavior:
   - creates <repo> if it does not exist
@@ -57,6 +59,7 @@ Created:
   CHANGELOG.md
   BRAIN.sum
   tags.md
+  .gitignore
   AGENTS.md
   CLAUDE.md -> AGENTS.md
   .agents/skills/lumbrera-ingest/SKILL.md
@@ -66,6 +69,6 @@ Created:
   .brain/VERSION
   .brain/ops.log
 
-Agents should follow AGENTS.md, CLAUDE.md, or the bundled Lumbrera ingest/query/lint skills and use lumbrera write for all future mutations.
+Agents should follow AGENTS.md, CLAUDE.md, or the bundled Lumbrera ingest/query/lint skills. Use lumbrera search before broad file exploration and lumbrera write for all future mutations.
 `, repo)
 }
