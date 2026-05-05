@@ -12,21 +12,6 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
-func resolveBrain(brainDir string) (string, error) {
-	if strings.TrimSpace(brainDir) == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
-		brainDir = cwd
-	}
-	abs, err := filepath.Abs(brainDir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Clean(abs), nil
-}
-
 func preflight(brainDir string) error {
 	if err := brain.ValidateRepo(brainDir); err != nil {
 		return err

@@ -3,11 +3,10 @@ package verifycmd
 import (
 	"flag"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brainlock"
+	"github.com/javiermolinar/lumbrera/internal/cliutil"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
@@ -26,7 +25,7 @@ func Run(args []string) error {
 		printHelp()
 		return nil
 	}
-	brainDir, err := resolveBrain(opts.Brain)
+	brainDir, err := cliutil.ResolveBrain(opts.Brain)
 	if err != nil {
 		return err
 	}
@@ -60,21 +59,6 @@ func parseArgs(args []string) (options, error) {
 		return options{}, fmt.Errorf("verify does not accept positional arguments")
 	}
 	return opts, nil
-}
-
-func resolveBrain(brainDir string) (string, error) {
-	if strings.TrimSpace(brainDir) == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
-		brainDir = cwd
-	}
-	abs, err := filepath.Abs(brainDir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Clean(abs), nil
 }
 
 func isHelp(arg string) bool {

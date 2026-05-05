@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brainlock"
+	"github.com/javiermolinar/lumbrera/internal/cliutil"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
@@ -84,7 +84,7 @@ func RunWithOutput(args []string, out io.Writer) error {
 		return nil
 	}
 
-	brainDir, err := resolveBrain(opts.Brain)
+	brainDir, err := cliutil.ResolveBrain(opts.Brain)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func autoRebuild(ctx context.Context, brainDir string, state searchindex.StatusS
 		return fmt.Errorf("search index has unknown status %q; run lumbrera index --status --brain %s", status.State, brainDir)
 	}
 
-	if err := verify.Run(brainDir, verify.Options{}); err != nil {
+	if err := verify.Check(brainDir, verify.Options{}); err != nil {
 		return fmt.Errorf("cannot automatically rebuild search index because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
 	}
 	if err := searchindex.RebuildBrain(ctx, brainDir); err != nil {
@@ -249,21 +249,6 @@ func optionValue(args []string, index int, flag, inlineValue string, hasInlineVa
 		return "", index, fmt.Errorf("%s requires a non-empty value", flag)
 	}
 	return value, index + 1, nil
-}
-
-func resolveBrain(brainDir string) (string, error) {
-	if strings.TrimSpace(brainDir) == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
-		brainDir = cwd
-	}
-	abs, err := filepath.Abs(brainDir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Clean(abs), nil
 }
 
 func writeJSON(out io.Writer, response searchindex.SearchResponse) error {

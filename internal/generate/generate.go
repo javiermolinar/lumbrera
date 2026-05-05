@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/manifest"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 	"github.com/javiermolinar/lumbrera/internal/ops"
+	"github.com/javiermolinar/lumbrera/internal/textutil"
 )
 
 type Files struct {
@@ -321,28 +321,7 @@ func titleForFile(absPath, relPath string) (string, error) {
 }
 
 func titleForPath(relPath string) string {
-	base := filepath.Base(relPath)
-	base = strings.TrimSuffix(base, filepath.Ext(base))
-	base = strings.ReplaceAll(base, "-", " ")
-	base = strings.ReplaceAll(base, "_", " ")
-	base = strings.TrimSpace(base)
-	if base == "" {
-		return relPath
-	}
-	return titleWords(base)
-}
-
-func titleWords(value string) string {
-	parts := strings.Fields(value)
-	for i, part := range parts {
-		runes := []rune(part)
-		if len(runes) == 0 {
-			continue
-		}
-		runes[0] = unicode.ToUpper(runes[0])
-		parts[i] = string(runes)
-	}
-	return strings.Join(parts, " ")
+	return textutil.TitleForPath(relPath)
 }
 
 func ChangelogForRepo(repo string) (string, error) {

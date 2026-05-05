@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 )
 
 const Header = "lumbrera-sum-v1 sha256"
@@ -23,7 +25,7 @@ func Generate(entries []Entry) (string, error) {
 		if entries[i].Path == "" {
 			return "", fmt.Errorf("manifest entry has empty path")
 		}
-		if strings.HasPrefix(entries[i].Path, "./") || hasParentSegment(entries[i].Path) || strings.Contains(entries[i].Path, "\\") {
+		if strings.HasPrefix(entries[i].Path, "./") || pathpolicy.HasParentSegment(entries[i].Path) || strings.Contains(entries[i].Path, "\\") {
 			return "", fmt.Errorf("manifest entry has unsafe path %q", entries[i].Path)
 		}
 		if entries[i].Hash == "" {
@@ -100,13 +102,4 @@ func HashContent(content []byte) string {
 	normalized := strings.ReplaceAll(string(content), "\r\n", "\n")
 	sum := sha256.Sum256([]byte(normalized))
 	return hex.EncodeToString(sum[:])
-}
-
-func hasParentSegment(p string) bool {
-	for _, part := range strings.Split(p, "/") {
-		if part == ".." {
-			return true
-		}
-	}
-	return false
 }

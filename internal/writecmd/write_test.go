@@ -10,6 +10,7 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/initcmd"
+	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
@@ -260,7 +261,7 @@ func TestValidateDocumentRejectsStaleGeneratedFrontmatter(t *testing.T) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := validateDocuments(repo); err == nil {
+	if err := verify.ValidateDocuments(repo); err == nil {
 		t.Fatal("expected stale frontmatter to be rejected")
 	}
 }

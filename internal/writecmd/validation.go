@@ -8,12 +8,7 @@ import (
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
-	"github.com/javiermolinar/lumbrera/internal/verify"
 )
-
-func validateDocuments(repo string) error {
-	return verify.ValidateDocuments(repo)
-}
 
 func validateOptionsForOperation(repo, target, kind string, exists bool, op operation, opts options) error {
 	if err := validateCommitSubject(opts.Actor, opts.Reason); err != nil {

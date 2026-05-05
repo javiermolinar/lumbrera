@@ -5,13 +5,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
+	"github.com/javiermolinar/lumbrera/internal/textutil"
 )
 
 // ExtractMarkdownRecords converts one canonical Markdown file into normalized
@@ -146,26 +145,5 @@ func textList(values []string) string {
 }
 
 func titleForPath(relPath string) string {
-	base := filepath.Base(relPath)
-	base = strings.TrimSuffix(base, filepath.Ext(base))
-	base = strings.ReplaceAll(base, "-", " ")
-	base = strings.ReplaceAll(base, "_", " ")
-	base = strings.TrimSpace(base)
-	if base == "" {
-		return relPath
-	}
-	return titleWords(base)
-}
-
-func titleWords(value string) string {
-	parts := strings.Fields(value)
-	for i, part := range parts {
-		runes := []rune(part)
-		if len(runes) == 0 {
-			continue
-		}
-		runes[0] = unicode.ToUpper(runes[0])
-		parts[i] = string(runes)
-	}
-	return strings.Join(parts, " ")
+	return textutil.TitleForPath(relPath)
 }

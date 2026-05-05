@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
+	"github.com/javiermolinar/lumbrera/internal/textutil"
 	"gopkg.in/yaml.v3"
 )
 
@@ -209,22 +209,5 @@ func ValidateTags(tags []string) error {
 }
 
 func sortedUnique(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	sort.Strings(out)
-	if out == nil {
-		return []string{}
-	}
-	return out
+	return textutil.UniqueSorted(values)
 }

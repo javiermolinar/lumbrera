@@ -1,11 +1,11 @@
 package writecmd
 
 import (
-	"sort"
 	"strings"
 
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
+	"github.com/javiermolinar/lumbrera/internal/textutil"
 )
 
 func normalizeTargetPath(raw string) (string, string, error) {
@@ -20,32 +20,8 @@ func fileExists(path string) (bool, error) {
 	return pathpolicy.FileExists(path)
 }
 
-func pathInside(root, candidate string) bool {
-	return pathpolicy.PathInside(root, candidate)
-}
-
-func hasParentSegment(p string) bool {
-	return pathpolicy.HasParentSegment(p)
-}
-
 func mergePaths(groups ...[]string) []string {
-	seen := map[string]struct{}{}
-	var out []string
-	for _, group := range groups {
-		for _, value := range group {
-			value = strings.TrimSpace(value)
-			if value == "" {
-				continue
-			}
-			if _, ok := seen[value]; ok {
-				continue
-			}
-			seen[value] = struct{}{}
-			out = append(out, value)
-		}
-	}
-	sort.Strings(out)
-	return out
+	return textutil.MergeStrings(groups...)
 }
 
 func referencePaths(refs []md.Reference) []string {
@@ -67,15 +43,5 @@ func filterWikiLinks(links []string) []string {
 }
 
 func sameStrings(a, b []string) bool {
-	a = mergePaths(a)
-	b = mergePaths(b)
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+	return textutil.SameStringSet(a, b)
 }

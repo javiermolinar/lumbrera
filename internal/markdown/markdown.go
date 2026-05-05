@@ -13,6 +13,9 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
+
+	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
+	"github.com/javiermolinar/lumbrera/internal/textutil"
 )
 
 type Reference struct {
@@ -222,7 +225,7 @@ func normalizeLinkPath(fromPath, destination string) (string, error) {
 	if normalized == "." || normalized == "" {
 		return "", nil
 	}
-	if hasParentSegment(normalized) {
+	if pathpolicy.HasParentSegment(normalized) {
 		return "", fmt.Errorf("Markdown link %q resolves outside the repo", destination)
 	}
 	if !strings.HasPrefix(normalized, "sources/") && !strings.HasPrefix(normalized, "wiki/") {
@@ -480,31 +483,8 @@ func isExternal(destination string) bool {
 	return strings.Contains(lower, "://") || strings.HasPrefix(lower, "mailto:") || strings.HasPrefix(lower, "tel:") || strings.HasPrefix(lower, "urn:")
 }
 
-func hasParentSegment(p string) bool {
-	for _, part := range strings.Split(p, "/") {
-		if part == ".." {
-			return true
-		}
-	}
-	return false
-}
-
 func sortedUnique(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	sort.Strings(out)
-	return out
+	return textutil.UniqueSorted(values)
 }
 
 func sortedUniqueReferences(values []Reference) []Reference {
@@ -545,14 +525,5 @@ func linkLabel(repoPath string) string {
 }
 
 func titleWords(value string) string {
-	parts := strings.Fields(value)
-	for i, part := range parts {
-		runes := []rune(part)
-		if len(runes) == 0 {
-			continue
-		}
-		runes[0] = unicode.ToUpper(runes[0])
-		parts[i] = string(runes)
-	}
-	return strings.Join(parts, " ")
+	return textutil.TitleWords(value)
 }

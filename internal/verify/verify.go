@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
@@ -13,6 +12,7 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/generate"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
+	"github.com/javiermolinar/lumbrera/internal/textutil"
 )
 
 var allowedRootFiles = map[string]struct{}{
@@ -27,6 +27,8 @@ var allowedRootFiles = map[string]struct{}{
 
 type Options struct{}
 
+// Run performs the user-facing verify command behavior, including the legacy
+// repair step for wiki documents that predate generated IDs.
 func Run(repo string, opts Options) error {
 	if err := brain.ValidateRepo(repo); err != nil {
 		return err
@@ -46,6 +48,19 @@ func Run(repo string, opts Options) error {
 		if err := generate.WriteFiles(repo, files); err != nil {
 			return err
 		}
+	}
+	return Check(repo, opts)
+}
+
+// Check validates deterministic brain integrity without mutating canonical
+// files. Commands that only need a precondition should call Check instead of
+// Run.
+func Check(repo string, opts Options) error {
+	if err := brain.ValidateRepo(repo); err != nil {
+		return err
+	}
+	if err := ValidatePathPolicy(repo); err != nil {
+		return err
 	}
 	if err := ValidateDocuments(repo); err != nil {
 		return err
@@ -385,23 +400,7 @@ func documentAnchors(repo, relPath string) (map[string]struct{}, error) {
 }
 
 func mergePaths(groups ...[]string) []string {
-	seen := map[string]struct{}{}
-	var out []string
-	for _, group := range groups {
-		for _, value := range group {
-			value = strings.TrimSpace(value)
-			if value == "" {
-				continue
-			}
-			if _, ok := seen[value]; ok {
-				continue
-			}
-			seen[value] = struct{}{}
-			out = append(out, value)
-		}
-	}
-	sort.Strings(out)
-	return out
+	return textutil.MergeStrings(groups...)
 }
 
 func referencePaths(refs []md.Reference) []string {
@@ -423,15 +422,5 @@ func filterWikiLinks(links []string) []string {
 }
 
 func sameStrings(a, b []string) bool {
-	a = mergePaths(a)
-	b = mergePaths(b)
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+	return textutil.SameStringSet(a, b)
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/brainlock"
+	"github.com/javiermolinar/lumbrera/internal/cliutil"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/ops"
@@ -51,7 +52,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 		return nil
 	}
 
-	brainDir, err := resolveBrain(opts.Brain)
+	brainDir, err := cliutil.ResolveBrain(opts.Brain)
 	if err != nil {
 		return err
 	}

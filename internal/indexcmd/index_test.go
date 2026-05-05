@@ -64,6 +64,29 @@ func TestIndexRebuildRunsVerify(t *testing.T) {
 	}
 }
 
+func TestIndexRebuildDoesNotRepairMissingWikiDocumentID(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+
+	path := filepath.Join(repo, "wiki", "topic.md")
+	withoutID := removeIDLine(readFile(t, repo, "wiki/topic.md"))
+	if err := os.WriteFile(path, []byte(withoutID), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Run([]string{"--brain", repo, "--rebuild"})
+	if err == nil {
+		t.Fatal("index rebuild repaired or accepted missing ID, want verify error")
+	}
+	if strings.Contains(readFile(t, repo, "wiki/topic.md"), "id: doc_") {
+		t.Fatal("index rebuild mutated wiki file by repairing missing ID")
+	}
+	if _, statErr := os.Stat(searchindex.SearchIndexPath(repo)); !os.IsNotExist(statErr) {
+		t.Fatalf("failed rebuild should not create index, stat err=%v", statErr)
+	}
+}
+
 func TestIndexRejectsInvalidFlagCombination(t *testing.T) {
 	if err := Run(nil); err == nil {
 		t.Fatal("index without mode succeeded, want error")
@@ -106,6 +129,17 @@ func readFile(t *testing.T, repo, rel string) string {
 		t.Fatalf("read %s: %v", rel, err)
 	}
 	return string(content)
+}
+
+func removeIDLine(content string) string {
+	var lines []string
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "id: doc_") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func assertIndexMatches(t *testing.T, repo, term string, want int) {
