@@ -425,9 +425,10 @@ Generated query skill should say:
 
 ## Implementation order
 
-1. Add SQLite dependency and FTS5 probe.
+1. Add SQLite dependency and driver smoke test.
    - Add `modernc.org/sqlite`.
-   - Add a small FTS5 availability test.
+   - Add a small SQLite open/execute test.
+   - Do not keep a dedicated FTS5 probe; creating the `sections_fts` schema in normal index tests is the FTS5 validation path.
 
 2. Create `internal/searchindex` schema.
    - Add `meta`, `documents`, `sections`, `sections_fts`, and the minimal B-tree indexes.
@@ -520,15 +521,7 @@ import (
 db, err := sql.Open("sqlite", ".brain/search.sqlite")
 ```
 
-Add a startup/test probe so failures are explicit:
-
-```go
-_, err := db.Exec(`CREATE VIRTUAL TABLE fts_probe USING fts5(body)`)
-if err != nil {
-    return fmt.Errorf("sqlite FTS5 unavailable: %w", err)
-}
-_, _ = db.Exec(`DROP TABLE fts_probe`)
-```
+Do not keep a dedicated runtime FTS5 probe in the first cut. Creating the real `sections_fts` table during schema initialization and schema tests should be the explicit failure point if FTS5 support is unavailable.
 
 Caveat: `modernc.org/sqlite` documents a fragile `modernc.org/libc` dependency. Keep module versions pinned through `go.mod`/`go.sum` and test release builds on supported target platforms.
 
@@ -556,4 +549,4 @@ Caveat: `modernc.org/sqlite` documents a fragile `modernc.org/libc` dependency. 
 - Section IDs are rebuild-stable cache locators, not edit-stable citations.
 - Search queries are sanitized natural language by default, not raw SQLite FTS5 syntax.
 - `lumbrera index --status` should avoid mutation and report cache freshness/incompatibility. If deeper integrity problems block indexing, point to `lumbrera verify`.
-- Use `modernc.org/sqlite`; release builds should include an FTS5 probe on supported target platforms.
+- Use `modernc.org/sqlite`; no separate runtime FTS5 probe is required because schema creation exercises FTS5 directly.
