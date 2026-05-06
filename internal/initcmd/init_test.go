@@ -15,6 +15,14 @@ func TestInitMissingDirectory(t *testing.T) {
 	}
 
 	assertFile(t, repo, ".brain/VERSION", brainVersion)
+	assertFileExact(t, repo, "INDEX.md", indexContent)
+	assertFileExact(t, repo, "CHANGELOG.md", changelogContent)
+	assertFileExact(t, repo, "BRAIN.sum", brainSumContent)
+	assertFileExact(t, repo, "tags.md", tagsContent)
+	assertFileExact(t, repo, "AGENTS.md", agentsContent)
+	assertFileExact(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", ingestSkillContent)
+	assertFileExact(t, repo, ".agents/skills/lumbrera-query/SKILL.md", querySkillContent)
+	assertFileExact(t, repo, ".agents/skills/lumbrera-lint/SKILL.md", lintSkillContent)
 	assertExists(t, repo, "sources")
 	assertExists(t, repo, "wiki")
 	assertExists(t, repo, "INDEX.md")
@@ -134,6 +142,17 @@ func assertFile(t *testing.T, repo, rel, want string) {
 	got := strings.TrimSpace(string(content))
 	if got != want {
 		t.Fatalf("unexpected %s content: got %q want %q", rel, got, want)
+	}
+}
+
+func assertFileExact(t *testing.T, repo, rel, want string) {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatalf("expected to read %s: %v", rel, err)
+	}
+	if string(content) != want {
+		t.Fatalf("unexpected %s content:\ngot:\n%s\nwant:\n%s", rel, string(content), want)
 	}
 }
 
