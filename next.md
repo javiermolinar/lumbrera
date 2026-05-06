@@ -22,6 +22,7 @@ This file is now the active tracker for consolidated v2+ backlog ideas. The olde
 
 ### Retrieval intelligence
 
+- Search-powered health/curation workflow: generated lint/health workflow uses ranked related documents as LLM review context for duplicates, contradictions, stale claims, missing cross-links, orphan pages, missing concept pages, and source gaps before any `lumbrera write` mutation.
 - Optional semantic/vector search and embeddings.
 - Hybrid lexical plus semantic retrieval.
 - Semantic lint suggestions for stale claims, duplicates, contradictions, weakly connected pages, and missing sources.

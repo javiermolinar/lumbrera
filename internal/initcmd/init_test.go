@@ -50,6 +50,8 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "pass --title")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "1-5 --tag")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "hard maximum of 400 Markdown body lines")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "Search for overlap before writing")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "Make an explicit overlap decision")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "name: lumbrera-query")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "lumbrera search \"<question>\" --json")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "recommended_read_order")
