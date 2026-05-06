@@ -20,6 +20,8 @@ type options struct {
 	Limit      int
 	Kind       string
 	PathPrefix string
+	Tags       []string
+	Sources    []string
 	JSON       bool
 	Help       bool
 }
@@ -103,6 +105,8 @@ func RunWithOutput(args []string, out io.Writer) error {
 		Limit:      opts.Limit,
 		Kind:       opts.Kind,
 		PathPrefix: opts.PathPrefix,
+		Tags:       opts.Tags,
+		Sources:    opts.Sources,
 	})
 	if err != nil {
 		return err
@@ -150,6 +154,20 @@ func parseArgs(args []string) (options, error) {
 				return options{}, err
 			}
 			opts.PathPrefix = value
+			i = next
+		case "--tag":
+			value, next, err := cmdutil.OptionValue(args, i, name, inlineValue, hasInlineValue)
+			if err != nil {
+				return options{}, err
+			}
+			opts.Tags = append(opts.Tags, value)
+			i = next
+		case "--source":
+			value, next, err := cmdutil.OptionValue(args, i, name, inlineValue, hasInlineValue)
+			if err != nil {
+				return options{}, err
+			}
+			opts.Sources = append(opts.Sources, value)
 			i = next
 		case "--json":
 			if hasInlineValue {
@@ -231,7 +249,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, `Search a Lumbrera brain with the local SQLite lexical index.
 
 Usage:
-  lumbrera search <query> [--brain <path>] [--limit <n>] [--kind all|wiki|source] [--path <prefix>] [--json]
+  lumbrera search <query> [--brain <path>] [--limit <n>] [--kind all|wiki|source] [--path <prefix>] [--tag <tag>] [--source <path>] [--json]
 
 Behavior:
   - output is JSON only in this version
@@ -246,5 +264,7 @@ Options:
   --limit <n>         max results, default 5, maximum 20
   --kind <value>      restrict to all, wiki, or source; default all
   --path <prefix>     restrict to a repo path prefix
+  --tag <tag>         restrict to wiki pages with an exact tag; repeatable
+  --source <path>     restrict to wiki pages citing an exact source path; repeatable
   --json              accepted for compatibility; output is always JSON`)
 }

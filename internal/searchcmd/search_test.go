@@ -88,7 +88,7 @@ func TestSearchFiltersAndFlagsAfterQuery(t *testing.T) {
 	braintest.RunWrite(t, repo, "# Topic\n\nBody mentions filterunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	var out bytes.Buffer
-	if err := RunWithOutput([]string{"filterunique", "--brain=" + repo, "--kind=wiki", "--path=wiki/", "--limit=1"}, &out); err != nil {
+	if err := RunWithOutput([]string{"filterunique", "--brain=" + repo, "--kind=wiki", "--path=wiki/", "--tag=topic", "--source", "sources/raw.md", "--limit=1"}, &out); err != nil {
 		t.Fatalf("filtered search failed: %v", err)
 	}
 	payload := decodeOutput(t, out.Bytes())

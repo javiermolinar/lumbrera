@@ -43,19 +43,22 @@ Preserve raw source material and distill it into small, source-grounded wiki pag
    ~~~sh
    lumbrera search "<candidate title summary key entities>" --json
    lumbrera search "<candidate tags and key claim terms>" --json
+   lumbrera search "<candidate key terms>" --tag <candidate-tag> --json
+   lumbrera search "<candidate key terms>" --source sources/<source>.md --json
    ~~~
 
-4. Read `recommended_sections` first, then the top wiki pages from `recommended_read_order` only if needed. Use `INDEX.md` and `tags.md` as fallback navigation and tag reference, not as a substitute for search.
-5. Make an explicit overlap decision for each candidate:
+4. Use exact `--tag` and `--source` filters only when they narrow the review set; broad searches still come first so differently tagged or uncited overlap is not missed.
+5. Read `recommended_sections` first, then the top wiki pages from `recommended_read_order` only if needed. Use `INDEX.md` and `tags.md` as fallback navigation and tag reference, not as a substitute for search.
+6. Make an explicit overlap decision for each candidate:
    - update an existing page only when it is clearly the same canonical topic and the source adds durable value;
    - create a new page when the topic is distinct;
    - create a new linked page when the topic is related but should stay separate;
    - skip when the existing wiki already covers the source with enough fidelity.
-6. Draft small pages and keep every wiki page under the hard maximum of 400 Markdown body lines.
-7. Choose a clear title, single-line summary, and 1-5 `--tag` values, reusing `tags.md` when possible.
-8. Add real wiki links and precise source citations where needed.
-9. Write with `lumbrera write`, then run `lumbrera verify`.
-10. Report the overlap decision, pages changed, source coverage, skipped material, uncertainties, and follow-up work.
+7. Draft small pages and keep every wiki page under the hard maximum of 400 Markdown body lines.
+8. Choose a clear title, single-line summary, and 1-5 `--tag` values, reusing `tags.md` when possible.
+9. Add real wiki links and precise source citations where needed.
+10. Write with `lumbrera write`, then run `lumbrera verify`.
+11. Report the overlap decision, pages changed, source coverage, skipped material, uncertainties, and follow-up work.
 
 ## Links
 

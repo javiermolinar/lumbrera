@@ -31,7 +31,6 @@ This file is the active tracker for consolidated v2+ backlog ideas. Completed im
 
 ### Search and index evolution
 
-- Exact `--tag` and `--source` filters if lexical search plus returned context is not enough.
 - Optional raw FTS or prefix-search mode behind an explicit flag.
 - Graph traversal command if agents need structured neighborhood exploration.
 - `.brain/ops.log` operation-history search.

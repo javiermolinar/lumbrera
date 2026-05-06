@@ -20,17 +20,24 @@ Lumbrera handles deterministic consistency for managed wiki content: wiki docume
 1. Run `lumbrera health --json` before broad repository exploration.
 2. Review the top candidate first. Do not scan the repo unless candidates are insufficient.
 3. Use the candidate's `suggested_queries` with `lumbrera search "<query>" --json` when evidence is insufficient.
-4. Read the candidate pages and cited sources before deciding.
-5. Classify the result as one of:
+4. When a candidate reason names a tag or source, optionally inspect that local neighborhood with exact filters:
+
+   ~~~sh
+   lumbrera search "<query>" --tag <tag> --json
+   lumbrera search "<query>" --source sources/<source>.md --json
+   ~~~
+
+5. Read the candidate pages and cited sources before deciding.
+6. Classify the result as one of:
    - duplicate or consolidation opportunity;
    - overlapping but distinct pages;
    - missing cross-link;
    - stale-risk requiring source review;
    - missing concept or source coverage gap;
    - no action.
-6. Report affected paths, deterministic reasons, evidence read, classification, and suggested next action.
-7. If a mutation is needed, ask for explicit user approval first.
-8. After approval, mutate only with `lumbrera write`, then run `lumbrera verify --brain .`.
+7. Report affected paths, deterministic reasons, evidence read, classification, and suggested next action.
+8. If a mutation is needed, ask for explicit user approval first.
+9. After approval, mutate only with `lumbrera write`, then run `lumbrera verify --brain .`.
 
 ## What to look for
 

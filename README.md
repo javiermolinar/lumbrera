@@ -73,7 +73,7 @@ Lumbrera is not trying to be a new chat UI or a full knowledge-management app. I
 
 Agents use the generated `AGENTS.md` and bundled skills. The core protocol is intentionally small:
 
-- `lumbrera search "<query>" --brain <path> --json` searches wiki synthesis and preserved Markdown sources with a deterministic local SQLite/FTS5 index. Output treats `recommended_sections` as the primary agent read plan, with section reasons, `agent_instructions`, entity `coverage`, ranked raw hits, snippets, tags, sources, links, `recommended_read_order`, and a stop rule.
+- `lumbrera search "<query>" --brain <path> --json` searches wiki synthesis and preserved Markdown sources with a deterministic local SQLite/FTS5 index. Optional exact `--tag <tag>` and `--source <sources/path.md>` filters narrow wiki results by generated tags or cited provenance. Output treats `recommended_sections` as the primary agent read plan, with section reasons, `agent_instructions`, entity `coverage`, ranked raw hits, snippets, tags, sources, links, `recommended_read_order`, and a stop rule.
 - `lumbrera health --brain <path> --json` returns deterministic health/consolidation review candidates for LLM review. Candidates are not conclusions; they identify pages or sources worth reading for possible links, consolidation, stale-risk, orphan pages, or source coverage gaps.
 - `lumbrera index --status --brain <path>` reports whether `.brain/search.sqlite` is missing, fresh, stale, or incompatible without mutating files.
 - `lumbrera index --rebuild --brain <path>` verifies the brain and rebuilds `.brain/search.sqlite` as a disposable cache.

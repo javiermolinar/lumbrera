@@ -17,16 +17,24 @@ Use when the user asks a question about knowledge in the brain.
 
 2. Treat recommended_sections as the primary product contract and read those path#anchor targets first.
 3. Check coverage on comparison/entity questions; if a named entity is missing, say so or refine the search before answering.
-4. If recommended_sections are insufficient, read only the top 3 wiki pages from recommended_read_order.
-5. Stop once those sections/pages support the answer.
-6. If the top results are insufficient, run one refined search using better terms from the first results.
-7. Only after search is insufficient, use INDEX.md and tags.md as fallback navigation and state why search was insufficient.
+4. Use exact filters when the user names a known tag or provenance source:
+
+   ~~~sh
+   lumbrera search "<question>" --tag <tag> --json
+   lumbrera search "<question>" --source sources/<source>.md --json
+   ~~~
+
+5. If recommended_sections are insufficient, read only the top 3 wiki pages from recommended_read_order.
+6. Stop once those sections/pages support the answer.
+7. If the top results are insufficient, run one refined search using better terms from the first results.
+8. Only after search is insufficient, use INDEX.md and tags.md as fallback navigation and state why search was insufficient.
 
 ## Guardrails
 
 - Do not start by scanning the repo, running broad find/rg, or reading every INDEX.md entry.
 - If a user term is ambiguous, state the likely interpretations and either ask for clarification or answer with the assumed scope.
 - Read cited sources only for numeric limits, operational/destructive actions, surprising claims, conflicts, uncertainty, or requested evidence.
+- Use repeatable `--tag` and `--source` filters to narrow search when exact topic/provenance constraints matter; do not substitute filters for reading the returned evidence.
 - For --kind source searches or source-only recommended_read_order, read those recommended source sections/files directly instead of scanning the repo.
 - Do not infer frequency, priority, popularity, or prevalence unless the wiki/source explicitly supports it.
 - When using internal/private operational sources, label the answer as internal-sourced and avoid presenting it as public documentation.

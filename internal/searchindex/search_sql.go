@@ -18,6 +18,14 @@ func runSearch(ctx context.Context, db *sql.DB, match string, opts SearchOptions
 		where = append(where, `s.path LIKE ? ESCAPE '\'`)
 		args = append(args, escapeLikePrefix(opts.PathPrefix)+"%")
 	}
+	for _, tag := range opts.Tags {
+		where = append(where, `EXISTS (SELECT 1 FROM document_tags dt WHERE dt.document_id = s.document_id AND dt.tag = ?)`)
+		args = append(args, tag)
+	}
+	for _, source := range opts.Sources {
+		where = append(where, `EXISTS (SELECT 1 FROM document_citations dc WHERE dc.document_id = s.document_id AND dc.source_path = ?)`)
+		args = append(args, source)
+	}
 	args = append(args, searchCandidateLimit(opts.Limit))
 
 	query := fmt.Sprintf(`WITH matches AS (

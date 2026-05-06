@@ -25,6 +25,8 @@ type SearchOptions struct {
 	Limit      int
 	Kind       string
 	PathPrefix string
+	Tags       []string
+	Sources    []string
 }
 
 type SearchResponse struct {

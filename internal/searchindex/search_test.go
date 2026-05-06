@@ -200,6 +200,32 @@ func TestSearchFiltersAndLimit(t *testing.T) {
 		}
 	}
 
+	response, err = Search(context.Background(), db, "tempo downscale", SearchOptions{Tags: []string{"tempo"}, Limit: 10})
+	if err != nil {
+		t.Fatalf("tag-filtered search: %v", err)
+	}
+	if len(response.Results) == 0 {
+		t.Fatal("tag-filtered search returned no results")
+	}
+	for _, result := range response.Results {
+		if !stringSliceContainsExact(result.Tags, "tempo") {
+			t.Fatalf("tag-filtered result missing tempo tag: %#v", result)
+		}
+	}
+
+	response, err = Search(context.Background(), db, "tempo downscale", SearchOptions{Sources: []string{"sources/tempo.md"}, Limit: 10})
+	if err != nil {
+		t.Fatalf("source-filtered search: %v", err)
+	}
+	if len(response.Results) == 0 {
+		t.Fatal("source-filtered search returned no results")
+	}
+	for _, result := range response.Results {
+		if !stringSliceContainsExact(result.Sources, "sources/tempo.md") {
+			t.Fatalf("source-filtered result missing source: %#v", result)
+		}
+	}
+
 	response, err = Search(context.Background(), db, "tempo", SearchOptions{Limit: 100})
 	if err != nil {
 		t.Fatalf("capped limit search: %v", err)
@@ -285,6 +311,15 @@ func TestSearchRejectsInvalidOptions(t *testing.T) {
 	}
 	if _, err := Search(context.Background(), db, "tempo", SearchOptions{PathPrefix: "wiki/../sources"}); err == nil {
 		t.Fatal("path prefix with parent segment succeeded, want error")
+	}
+	if _, err := Search(context.Background(), db, "tempo", SearchOptions{Tags: []string{"Bad Tag"}}); err == nil {
+		t.Fatal("invalid tag filter succeeded, want error")
+	}
+	if _, err := Search(context.Background(), db, "tempo", SearchOptions{Sources: []string{"wiki/topic.md"}}); err == nil {
+		t.Fatal("non-source source filter succeeded, want error")
+	}
+	if _, err := Search(context.Background(), db, "tempo", SearchOptions{Sources: []string{"../sources/raw.md"}}); err == nil {
+		t.Fatal("unsafe source filter succeeded, want error")
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 )
 
@@ -135,8 +136,43 @@ func normalizeSearchOptions(opts SearchOptions) (SearchOptions, error) {
 	if err != nil {
 		return SearchOptions{}, err
 	}
+	tags, err := normalizeSearchTags(opts.Tags)
+	if err != nil {
+		return SearchOptions{}, err
+	}
+	sources, err := normalizeSearchSources(opts.Sources)
+	if err != nil {
+		return SearchOptions{}, err
+	}
 	opts.PathPrefix = prefix
+	opts.Tags = tags
+	opts.Sources = sources
 	return opts, nil
+}
+
+func normalizeSearchTags(tags []string) ([]string, error) {
+	out := uniqueSortedStrings(tags)
+	for _, tag := range out {
+		if err := frontmatter.ValidateTags([]string{tag}); err != nil {
+			return nil, fmt.Errorf("invalid search tag %q: %w", tag, err)
+		}
+	}
+	return out, nil
+}
+
+func normalizeSearchSources(sources []string) ([]string, error) {
+	out := make([]string, 0, len(sources))
+	for _, source := range sources {
+		normalized, kind, err := pathpolicy.NormalizeTargetPath(source)
+		if err != nil {
+			return nil, fmt.Errorf("invalid search source %q: %w", source, err)
+		}
+		if kind != KindSource {
+			return nil, fmt.Errorf("search source %q must be under sources/", source)
+		}
+		out = append(out, normalized)
+	}
+	return uniqueSortedStrings(out), nil
 }
 
 func normalizePathPrefix(prefix string) (string, error) {
