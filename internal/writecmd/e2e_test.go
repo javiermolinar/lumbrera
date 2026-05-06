@@ -30,7 +30,7 @@ func TestE2EInitSourceWriteWikiWriteInTmp(t *testing.T) {
 
 	assertFileContains(t, repo, "wiki/e2e-write-page.md", "schema: document-v1")
 	assertFileContains(t, repo, "wiki/e2e-write-page.md", "## Sources")
-	assertFileContains(t, repo, "INDEX.md", "- 2026/\n  - 05/\n    - 04/\n      - [E2e Source](sources/2026/05/04/e2e-source.md)")
+	assertFileContains(t, repo, "INDEX.md", "- 2026/\n  - 05/\n    - 04/\n      - [E2E source](sources/2026/05/04/e2e-source.md)")
 	assertFileContains(t, repo, "INDEX.md", "[E2E write page](wiki/e2e-write-page.md)")
 	assertFileNotContains(t, repo, "BRAIN.sum", "sources/2026/05/04/e2e-source.md sha256:")
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/e2e-write-page.md sha256:")

@@ -54,7 +54,7 @@ func TestSearchAutoRebuildsStaleIndex(t *testing.T) {
 		// The query intentionally has no match. It is only used to trigger initial rebuild.
 		t.Fatalf("initial search failed: %v", err)
 	}
-	braintest.WriteFile(t, repo, "sources/unreferenced.md", "# Unreferenced\n\nThis unreferenced source mentions freshunique.\n")
+	braintest.RunWrite(t, repo, "# Unreferenced\n\nThis unreferenced source mentions freshunique.\n", "sources/unreferenced.md", "--reason", "Preserve unreferenced source", "--actor", "test")
 
 	var out bytes.Buffer
 	if err := RunWithOutput([]string{"freshunique", "--brain", repo}, &out); err != nil {

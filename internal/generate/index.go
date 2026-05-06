@@ -20,7 +20,7 @@ type indexDoc struct {
 }
 
 func IndexForRepo(repo string) (string, error) {
-	sources, err := sourceIndexDocsFromWiki(repo)
+	sources, err := indexDocs(repo, "sources")
 	if err != nil {
 		return "", err
 	}
@@ -161,7 +161,7 @@ func titleForFile(absPath, relPath string) (string, error) {
 	if err != nil && hasFrontmatter {
 		return "", fmt.Errorf("%s has invalid frontmatter: %w", relPath, err)
 	}
-	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{})
+	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{IgnoreLinks: true})
 	if err != nil {
 		return "", err
 	}

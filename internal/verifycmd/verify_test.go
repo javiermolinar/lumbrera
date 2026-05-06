@@ -97,13 +97,13 @@ func TestVerifyRejectsOversizedWikiPage(t *testing.T) {
 
 func TestVerifyAllowsRawSourceWithoutGeneratedFrontmatter(t *testing.T) {
 	repo := braintest.InitBrain(t)
-	path := filepath.Join(repo, "sources", "raw.md")
-	if err := os.WriteFile(path, []byte("# Raw source\n\nRaw notes.\n"), 0o644); err != nil {
-		t.Fatal(err)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	if strings.HasPrefix(braintest.ReadFile(t, repo, "sources/raw.md"), "---") {
+		t.Fatal("source write should preserve raw source without generated frontmatter")
 	}
 
 	if err := Run([]string{"--brain", repo}); err != nil {
-		t.Fatalf("verify should ignore raw source frontmatter: %v", err)
+		t.Fatalf("verify should allow raw source without frontmatter: %v", err)
 	}
 }
 

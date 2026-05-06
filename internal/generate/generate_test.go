@@ -9,9 +9,10 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 )
 
-func TestIndexForRepoUsesWikiMetadataAndReferencedSourcePaths(t *testing.T) {
+func TestIndexForRepoListsAllSourcesAndWikiPages(t *testing.T) {
 	repo := t.TempDir()
 	writeRaw(t, repo, "sources/2026/05/04/raw.md", "# Raw source\n")
+	writeRaw(t, repo, "sources/unreferenced.md", "# Unreferenced source\n")
 	writeDoc(t, repo, "wiki/architecture/topic.md", frontmatter.New("wiki", "Topic title", "Topic summary.", []string{"design"}, []string{"sources/2026/05/04/raw.md"}, nil), "# Ignored wiki H1\n")
 
 	index, err := IndexForRepo(repo)
@@ -19,7 +20,8 @@ func TestIndexForRepoUsesWikiMetadataAndReferencedSourcePaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"- 2026/\n  - 05/\n    - 04/\n      - [Raw](sources/2026/05/04/raw.md)",
+		"- 2026/\n  - 05/\n    - 04/\n      - [Raw source](sources/2026/05/04/raw.md)",
+		"- [Unreferenced source](sources/unreferenced.md)",
 		"- architecture/\n  - [Topic title](wiki/architecture/topic.md)",
 	} {
 		if !strings.Contains(index, want) {
