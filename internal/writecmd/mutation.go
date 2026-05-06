@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
@@ -111,6 +112,9 @@ func writeDocument(absTarget, target, kind, id, title, summary string, tags, sou
 	meta := frontmatter.New(kind, title, summary, tags, sources, links)
 	if strings.TrimSpace(id) != "" {
 		meta = frontmatter.NewWithID(id, kind, title, summary, tags, sources, links)
+	}
+	if kind == "wiki" {
+		meta.Lumbrera.ModifiedDate = time.Now().Format("2006-01-02")
 	}
 	content, err := frontmatter.Attach(meta, body)
 	if err != nil {

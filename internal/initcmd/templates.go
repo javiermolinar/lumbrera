@@ -23,5 +23,5 @@ var ingestSkillContent string
 //go:embed templates/skills/lumbrera-query/SKILL.md
 var querySkillContent string
 
-//go:embed templates/skills/lumbrera-lint/SKILL.md
-var lintSkillContent string
+//go:embed templates/skills/lumbrera-health/SKILL.md
+var healthSkillContent string

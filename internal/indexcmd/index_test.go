@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/javiermolinar/lumbrera/internal/frontmatter"
+	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/initcmd"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
 	"github.com/javiermolinar/lumbrera/internal/writecmd"
@@ -40,6 +42,37 @@ func TestIndexRebuildCreatesFreshIndex(t *testing.T) {
 	}
 	assertIndexMatches(t, repo, "topicunique", 1)
 	assertIndexMatches(t, repo, "indexunique", 1)
+}
+
+func TestIndexRebuildRepairsMissingModifiedDate(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw notes mention dateunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nBody mentions dateunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+
+	path := filepath.Join(repo, "wiki", "topic.md")
+	withoutModifiedDate := removeModifiedDateLine(readFile(t, repo, "wiki/topic.md"))
+	if err := os.WriteFile(path, []byte(withoutModifiedDate), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, err := generate.FilesForRepo(repo)
+	if err != nil {
+		t.Fatalf("generate files for legacy fixture: %v", err)
+	}
+	if err := generate.WriteFiles(repo, files); err != nil {
+		t.Fatalf("write generated files for legacy fixture: %v", err)
+	}
+
+	if err := Run([]string{"--brain", repo, "--rebuild"}); err != nil {
+		t.Fatalf("index rebuild should repair missing modified date: %v", err)
+	}
+	meta, _, _, err := frontmatter.Split([]byte(readFile(t, repo, "wiki/topic.md")))
+	if err != nil {
+		t.Fatalf("read repaired wiki frontmatter: %v", err)
+	}
+	if meta.Lumbrera.ModifiedDate == "" {
+		t.Fatal("index rebuild did not repair modified date")
+	}
+	assertIndexMatches(t, repo, "dateunique", 2)
 }
 
 func TestIndexRebuildRunsVerify(t *testing.T) {
@@ -135,6 +168,17 @@ func removeIDLine(content string) string {
 	var lines []string
 	for _, line := range strings.Split(content, "\n") {
 		if strings.Contains(line, "id: doc_") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func removeModifiedDateLine(content string) string {
+	var lines []string
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "modified_date:") {
 			continue
 		}
 		lines = append(lines, line)

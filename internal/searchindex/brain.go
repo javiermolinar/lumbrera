@@ -39,19 +39,19 @@ func RebuildBrain(ctx context.Context, repo string) error {
 		return err
 	}
 
-	documents, sections, metadata, err := RecordsForRepo(repo)
+	documents, sections, links, citations, tags, metadata, err := RecordsForRepoWithFacts(repo)
 	if err != nil {
 		return err
 	}
 
-	return rebuildBrainAtomically(ctx, repo, documents, sections, metadata)
+	return rebuildBrainAtomically(ctx, repo, documents, sections, links, citations, tags, metadata)
 }
 
 func SearchIndexPath(repo string) string {
 	return filepath.Join(repo, filepath.FromSlash(SearchIndexRelPath))
 }
 
-func rebuildBrainAtomically(ctx context.Context, repo string, documents []Document, sections []Section, metadata map[string]string) error {
+func rebuildBrainAtomically(ctx context.Context, repo string, documents []Document, sections []Section, links []DocumentLink, citations []DocumentCitation, tags []DocumentTag, metadata map[string]string) error {
 	brainDir := filepath.Join(repo, ".brain")
 	tmpFile, err := os.CreateTemp(brainDir, "search.sqlite-*.tmp")
 	if err != nil {
@@ -68,7 +68,7 @@ func rebuildBrainAtomically(ctx context.Context, repo string, documents []Docume
 	if err != nil {
 		return err
 	}
-	rebuildErr := RebuildRecords(ctx, db, documents, sections, metadata)
+	rebuildErr := RebuildRecordsWithFacts(ctx, db, documents, sections, links, citations, tags, metadata)
 	closeErr := db.Close()
 	if rebuildErr != nil {
 		return rebuildErr
@@ -88,29 +88,43 @@ func rebuildBrainAtomically(ctx context.Context, repo string, documents []Docume
 // RecordsForRepo extracts deterministic search records and manifest metadata
 // from all indexed Markdown files in a Lumbrera brain repository.
 func RecordsForRepo(repo string) ([]Document, []Section, map[string]string, error) {
+	documents, sections, _, _, _, metadata, err := RecordsForRepoWithFacts(repo)
+	return documents, sections, metadata, err
+}
+
+// RecordsForRepoWithFacts extracts deterministic search records, relationship
+// facts, and manifest metadata from all indexed Markdown files in a Lumbrera
+// brain repository.
+func RecordsForRepoWithFacts(repo string) ([]Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, map[string]string, error) {
 	paths, err := indexedMarkdownPaths(repo)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 
 	documents := make([]Document, 0, len(paths))
 	var sections []Section
+	var links []DocumentLink
+	var citations []DocumentCitation
+	var tags []DocumentTag
 	files := make([]indexedFile, 0, len(paths))
 	for _, relPath := range paths {
 		content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(relPath)))
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("read indexed Markdown file %s: %w", relPath, err)
+			return nil, nil, nil, nil, nil, nil, fmt.Errorf("read indexed Markdown file %s: %w", relPath, err)
 		}
-		doc, docSections, err := ExtractMarkdownRecords(relPath, content)
+		doc, docSections, docLinks, docCitations, docTags, err := ExtractMarkdownRecordsWithFacts(relPath, content)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, nil, nil, err
 		}
 		documents = append(documents, doc)
 		sections = append(sections, docSections...)
+		links = append(links, docLinks...)
+		citations = append(citations, docCitations...)
+		tags = append(tags, docTags...)
 		files = append(files, indexedFile{Path: relPath, Hash: contentHash(content), Size: len(content)})
 	}
 	metadata := manifestMetadata(files)
-	return documents, sections, metadata, nil
+	return documents, sections, links, citations, tags, metadata, nil
 }
 
 func indexedMarkdownPaths(repo string) ([]string, error) {

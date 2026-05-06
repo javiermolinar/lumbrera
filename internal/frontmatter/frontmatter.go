@@ -33,11 +33,12 @@ type Document struct {
 }
 
 type LumbreraMeta struct {
-	ID      string   `yaml:"id"`
-	Schema  string   `yaml:"schema"`
-	Kind    string   `yaml:"kind"`
-	Sources []string `yaml:"sources"`
-	Links   []string `yaml:"links"`
+	ID           string   `yaml:"id"`
+	Schema       string   `yaml:"schema"`
+	Kind         string   `yaml:"kind"`
+	ModifiedDate string   `yaml:"modified_date,omitempty"`
+	Sources      []string `yaml:"sources"`
+	Links        []string `yaml:"links"`
 }
 
 type SplitOptions struct {
@@ -173,6 +174,12 @@ func ValidateWithOptions(doc Document, opts ValidateOptions) error {
 	}
 	if doc.Lumbrera.Schema != Schema {
 		return fmt.Errorf("frontmatter lumbrera.schema must be %q", Schema)
+	}
+	modifiedDate := strings.TrimSpace(doc.Lumbrera.ModifiedDate)
+	if modifiedDate != "" {
+		if _, err := time.Parse("2006-01-02", modifiedDate); err != nil {
+			return fmt.Errorf("frontmatter lumbrera.modified_date %q must use YYYY-MM-DD", modifiedDate)
+		}
 	}
 	if doc.Lumbrera.Kind != "source" && doc.Lumbrera.Kind != "wiki" {
 		return fmt.Errorf("frontmatter lumbrera.kind must be source or wiki")

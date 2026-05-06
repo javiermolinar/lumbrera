@@ -18,6 +18,7 @@ func TestExtractMarkdownRecordsWiki(t *testing.T) {
 		[]string{"sources/raw-b.md", "sources/raw-a.md"},
 		[]string{"wiki/related.md"},
 	)
+	meta.Lumbrera.ModifiedDate = "2026-05-06"
 	content, err := frontmatter.Attach(meta, "# Tempo limits\n\nIntro mentions tempo.\n\n## Ingestion\n\nIngestion body.\n")
 	if err != nil {
 		t.Fatalf("attach frontmatter: %v", err)
@@ -43,6 +44,9 @@ func TestExtractMarkdownRecordsWiki(t *testing.T) {
 	if doc.LinksJSON != `["wiki/related.md"]` || doc.LinksText != "wiki/related.md" {
 		t.Fatalf("unexpected links fields: json=%q text=%q", doc.LinksJSON, doc.LinksText)
 	}
+	if doc.ModifiedDate != "2026-05-06" {
+		t.Fatalf("modified date = %q, want 2026-05-06", doc.ModifiedDate)
+	}
 	if doc.Hash != contentHash([]byte(content)) || doc.SizeBytes != int64(len(content)) {
 		t.Fatalf("unexpected hash/size: %#v", doc)
 	}
@@ -52,6 +56,54 @@ func TestExtractMarkdownRecordsWiki(t *testing.T) {
 		{DocumentID: id, Ordinal: 2, Heading: "Ingestion", Anchor: "ingestion", Level: 2, Body: "Ingestion body."},
 	}
 	assertSections(t, sections, wantSections)
+}
+
+func TestExtractMarkdownRecordsWithFactsWikiRelationships(t *testing.T) {
+	id := "doc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	meta := frontmatter.NewWithID(
+		id,
+		KindWiki,
+		"Related tempo",
+		"Related tempo summary.",
+		[]string{"tempo", "related"},
+		[]string{"sources/raw.md"},
+		[]string{"wiki/other.md"},
+	)
+	meta.Lumbrera.ModifiedDate = "2026-05-06"
+	content, err := frontmatter.Attach(meta, "# Related tempo\n\nSee [Other](./other.md). Inline evidence [source: ../sources/raw.md#evidence].\n")
+	if err != nil {
+		t.Fatalf("attach frontmatter: %v", err)
+	}
+
+	_, _, links, citations, tags, err := ExtractMarkdownRecordsWithFacts("wiki/related-tempo.md", []byte(content))
+	if err != nil {
+		t.Fatalf("extract wiki records with facts: %v", err)
+	}
+
+	if len(links) != 1 || links[0].FromDocumentID != id || links[0].FromPath != "wiki/related-tempo.md" || links[0].ToPath != "wiki/other.md" || links[0].Kind != KindWiki {
+		t.Fatalf("unexpected links: %#v", links)
+	}
+	wantCitations := []DocumentCitation{
+		{DocumentID: id, WikiPath: "wiki/related-tempo.md", SourcePath: "sources/raw.md", CitationText: "sources/raw.md", CitationKind: "frontmatter_source"},
+		{DocumentID: id, WikiPath: "wiki/related-tempo.md", SourcePath: "sources/raw.md", SourceAnchor: "evidence", CitationText: "sources/raw.md#evidence", CitationKind: "inline_source"},
+	}
+	if len(citations) != len(wantCitations) {
+		t.Fatalf("citation count = %d, want %d: %#v", len(citations), len(wantCitations), citations)
+	}
+	for i := range wantCitations {
+		if citations[i] != wantCitations[i] {
+			t.Fatalf("citation[%d] = %#v, want %#v; all=%#v", i, citations[i], wantCitations[i], citations)
+		}
+	}
+	wantTags := []DocumentTag{{DocumentID: id, Path: "wiki/related-tempo.md", Tag: "related"}, {DocumentID: id, Path: "wiki/related-tempo.md", Tag: "tempo"}}
+	if len(tags) != len(wantTags) {
+		t.Fatalf("tag count = %d, want %d: %#v", len(tags), len(wantTags), tags)
+	}
+	for i := range wantTags {
+		if tags[i] != wantTags[i] {
+			t.Fatalf("tag[%d] = %#v, want %#v; all=%#v", i, tags[i], wantTags[i], tags)
+		}
+	}
 }
 
 func TestExtractMarkdownRecordsSource(t *testing.T) {

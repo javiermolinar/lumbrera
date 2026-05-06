@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
+	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
@@ -57,6 +59,20 @@ func Run(args []string) error {
 
 	if err := verify.Check(brainDir, verify.Options{}); err != nil {
 		return fmt.Errorf("cannot rebuild search index because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
+	}
+	if repaired, err := searchindex.RepairMissingModifiedDates(brainDir, time.Now().Format("2006-01-02")); err != nil {
+		return err
+	} else if repaired {
+		files, err := generate.FilesForRepo(brainDir)
+		if err != nil {
+			return err
+		}
+		if err := generate.WriteFiles(brainDir, files); err != nil {
+			return err
+		}
+		if err := verify.Check(brainDir, verify.Options{}); err != nil {
+			return fmt.Errorf("cannot rebuild search index after repairing modified dates because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
+		}
 	}
 	if err := searchindex.RebuildBrain(ctx, brainDir); err != nil {
 		return err

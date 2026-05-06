@@ -51,4 +51,4 @@ lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --so
 
 - Ingest sources into wiki pages: .agents/skills/lumbrera-ingest/SKILL.md
 - Answer questions from the brain: .agents/skills/lumbrera-query/SKILL.md
-- Check semantic health: .agents/skills/lumbrera-lint/SKILL.md
+- Check semantic health: .agents/skills/lumbrera-health/SKILL.md

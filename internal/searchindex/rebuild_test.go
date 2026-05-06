@@ -49,17 +49,18 @@ func TestRebuildReplacesExistingRowsAndFTSIndex(t *testing.T) {
 	}
 
 	nextDocs := []Document{{
-		ID:          "doc_only",
-		Path:        "wiki/only.md",
-		Kind:        KindWiki,
-		Title:       "Only page",
-		Summary:     "Replacement summary",
-		TagsJSON:    `["replacement"]`,
-		SourcesJSON: `[]`,
-		LinksJSON:   `[]`,
-		TagsText:    "replacement",
-		Hash:        "hash-only",
-		SizeBytes:   42,
+		ID:           "doc_only",
+		Path:         "wiki/only.md",
+		Kind:         KindWiki,
+		Title:        "Only page",
+		Summary:      "Replacement summary",
+		TagsJSON:     `["replacement"]`,
+		SourcesJSON:  `[]`,
+		LinksJSON:    `[]`,
+		TagsText:     "replacement",
+		ModifiedDate: "2026-05-06",
+		Hash:         "hash-only",
+		SizeBytes:    42,
 	}}
 	nextSections := []Section{{
 		DocumentID: "doc_only",
@@ -90,6 +91,66 @@ func TestRebuildReplacesExistingRowsAndFTSIndex(t *testing.T) {
 	if len(sectionsDump) != 1 || sectionsDump[0][0] != "1" || sectionsDump[0][1] != "doc_only#section-0001" {
 		t.Fatalf("replacement section rowid/id = %#v, want rowid 1 doc_only#section-0001", sectionsDump)
 	}
+}
+
+func TestRebuildPopulatesRelationshipFactTables(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t)
+
+	docs := []Document{
+		{
+			ID:           "doc_a",
+			Path:         "wiki/a.md",
+			Kind:         KindWiki,
+			Title:        "A",
+			Summary:      "A summary.",
+			TagsJSON:     `["topic","alpha"]`,
+			SourcesJSON:  `["sources/raw.md"]`,
+			LinksJSON:    `["wiki/b.md"]`,
+			TagsText:     "alpha topic",
+			SourcesText:  "sources/raw.md",
+			LinksText:    "wiki/b.md",
+			ModifiedDate: "2026-05-06",
+			Hash:         "hash-a",
+			SizeBytes:    100,
+		},
+		{
+			ID:           "doc_b",
+			Path:         "wiki/b.md",
+			Kind:         KindWiki,
+			Title:        "B",
+			Summary:      "B summary.",
+			TagsJSON:     `["topic"]`,
+			ModifiedDate: "2026-05-06",
+			Hash:         "hash-b",
+			SizeBytes:    100,
+		},
+		{
+			ID:        "doc_source_raw",
+			Path:      "sources/raw.md",
+			Kind:      KindSource,
+			Title:     "Raw",
+			Hash:      "hash-raw",
+			SizeBytes: 100,
+		},
+	}
+	sections := []Section{
+		{DocumentID: "doc_a", Ordinal: 1, Body: "A body."},
+		{DocumentID: "doc_b", Ordinal: 1, Body: "B body."},
+		{DocumentID: "doc_source_raw", Ordinal: 1, Body: "Raw body."},
+	}
+	if err := RebuildRecords(ctx, db, docs, sections, map[string]string{"manifest_hash": "relationships"}); err != nil {
+		t.Fatalf("rebuild relationship fixture: %v", err)
+	}
+
+	links := queryStrings(t, db, `SELECT from_document_id, from_path, to_path, to_document_id, kind FROM document_links ORDER BY rowid`, 5)
+	assertSameDump(t, links, [][]string{{"doc_a", "wiki/a.md", "wiki/b.md", "doc_b", KindWiki}}, "document_links")
+
+	citations := queryStrings(t, db, `SELECT document_id, wiki_path, source_path, source_anchor, citation_kind FROM document_citations ORDER BY rowid`, 5)
+	assertSameDump(t, citations, [][]string{{"doc_a", "wiki/a.md", "sources/raw.md", "", "frontmatter_source"}}, "document_citations")
+
+	tags := queryStrings(t, db, `SELECT document_id, path, tag FROM document_tags ORDER BY rowid`, 3)
+	assertSameDump(t, tags, [][]string{{"doc_a", "wiki/a.md", "alpha"}, {"doc_a", "wiki/a.md", "topic"}, {"doc_b", "wiki/b.md", "topic"}}, "document_tags")
 }
 
 func TestRebuildDefaultsJSONArrays(t *testing.T) {
@@ -123,15 +184,16 @@ func TestRebuildNormalizesJSONArrays(t *testing.T) {
 	db := openTestDB(t)
 
 	docs := []Document{{
-		ID:          "doc_json",
-		Path:        "wiki/json.md",
-		Kind:        KindWiki,
-		Title:       "JSON",
-		TagsJSON:    `["zeta", "alpha", "zeta"]`,
-		SourcesJSON: `["sources/b.md", "sources/a.md", "sources/a.md"]`,
-		LinksJSON:   `["wiki/b.md", "wiki/a.md"]`,
-		Hash:        "hash-json",
-		SizeBytes:   12,
+		ID:           "doc_json",
+		Path:         "wiki/json.md",
+		Kind:         KindWiki,
+		Title:        "JSON",
+		TagsJSON:     `["zeta", "alpha", "zeta"]`,
+		SourcesJSON:  `["sources/b.md", "sources/a.md", "sources/a.md"]`,
+		LinksJSON:    `["wiki/b.md", "wiki/a.md"]`,
+		ModifiedDate: "2026-05-06",
+		Hash:         "hash-json",
+		SizeBytes:    12,
 	}}
 	sections := []Section{{DocumentID: "doc_json", Ordinal: 1, Body: "body"}}
 	if err := RebuildRecords(ctx, db, docs, sections, nil); err != nil {
@@ -198,19 +260,20 @@ func TestRebuildRejectsInvalidInput(t *testing.T) {
 func deterministicFixture() ([]Document, []Section) {
 	docs := []Document{
 		{
-			ID:          "doc_tempo",
-			Path:        "wiki/tempo.md",
-			Kind:        KindWiki,
-			Title:       "Tempo limits",
-			Summary:     "Tempo ingestion and retention limits",
-			TagsJSON:    `["tempo","limits"]`,
-			SourcesJSON: `["sources/tempo-notes.md"]`,
-			LinksJSON:   `["wiki/mimir.md"]`,
-			TagsText:    "limits tempo",
-			SourcesText: "sources/tempo-notes.md",
-			LinksText:   "wiki/mimir.md",
-			Hash:        "hash-tempo",
-			SizeBytes:   100,
+			ID:           "doc_tempo",
+			Path:         "wiki/tempo.md",
+			Kind:         KindWiki,
+			Title:        "Tempo limits",
+			Summary:      "Tempo ingestion and retention limits",
+			TagsJSON:     `["tempo","limits"]`,
+			SourcesJSON:  `["sources/tempo-notes.md"]`,
+			LinksJSON:    `["wiki/mimir.md"]`,
+			TagsText:     "limits tempo",
+			SourcesText:  "sources/tempo-notes.md",
+			LinksText:    "wiki/mimir.md",
+			ModifiedDate: "2026-05-06",
+			Hash:         "hash-tempo",
+			SizeBytes:    100,
 		},
 		{
 			ID:          "doc_source_tempo",
@@ -225,18 +288,19 @@ func deterministicFixture() ([]Document, []Section) {
 			SizeBytes:   80,
 		},
 		{
-			ID:          "doc_mimir",
-			Path:        "wiki/mimir.md",
-			Kind:        KindWiki,
-			Title:       "Mimir limits",
-			Summary:     "Mimir tenant limits",
-			TagsJSON:    `["mimir","limits"]`,
-			SourcesJSON: `[]`,
-			LinksJSON:   `["wiki/tempo.md"]`,
-			TagsText:    "limits mimir",
-			LinksText:   "wiki/tempo.md",
-			Hash:        "hash-mimir",
-			SizeBytes:   90,
+			ID:           "doc_mimir",
+			Path:         "wiki/mimir.md",
+			Kind:         KindWiki,
+			Title:        "Mimir limits",
+			Summary:      "Mimir tenant limits",
+			TagsJSON:     `["mimir","limits"]`,
+			SourcesJSON:  `[]`,
+			LinksJSON:    `["wiki/tempo.md"]`,
+			TagsText:     "limits mimir",
+			LinksText:    "wiki/tempo.md",
+			ModifiedDate: "2026-05-06",
+			Hash:         "hash-mimir",
+			SizeBytes:    90,
 		},
 	}
 	sections := []Section{
@@ -266,12 +330,12 @@ func reversedSections(input []Section) []Section {
 
 func dumpDocuments(t *testing.T, db *sql.DB) [][]string {
 	t.Helper()
-	return queryStrings(t, db, `SELECT id, path, kind, title, summary, tags_json, sources_json, links_json, tags_text, sources_text, links_text, hash, CAST(size_bytes AS TEXT) FROM documents ORDER BY path, id`, 13)
+	return queryStrings(t, db, `SELECT id, path, kind, title, summary, tags_json, sources_json, links_json, tags_text, sources_text, links_text, modified_date, hash, CAST(size_bytes AS TEXT) FROM documents ORDER BY path, id`, 14)
 }
 
 func dumpSections(t *testing.T, db *sql.DB) [][]string {
 	t.Helper()
-	return queryStrings(t, db, `SELECT CAST(rowid AS TEXT), id, document_id, CAST(ordinal AS TEXT), path, kind, title, summary, tags_json, sources_json, links_json, tags_text, sources_text, links_text, COALESCE(heading, ''), COALESCE(anchor, ''), COALESCE(CAST(level AS TEXT), ''), body FROM sections ORDER BY rowid`, 18)
+	return queryStrings(t, db, `SELECT CAST(rowid AS TEXT), id, document_id, CAST(ordinal AS TEXT), path, kind, title, summary, tags_json, sources_json, links_json, tags_text, sources_text, links_text, modified_date, COALESCE(heading, ''), COALESCE(anchor, ''), COALESCE(CAST(level AS TEXT), ''), body FROM sections ORDER BY rowid`, 19)
 }
 
 func dumpMeta(t *testing.T, db *sql.DB) [][]string {

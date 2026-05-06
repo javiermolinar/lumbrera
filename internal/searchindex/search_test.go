@@ -212,17 +212,18 @@ func TestSearchFiltersAndLimit(t *testing.T) {
 func TestSearchPenalizesGeneratedNavigationSections(t *testing.T) {
 	db := openTestDB(t)
 	docs := []Document{{
-		ID:          "doc_generated_sections",
-		Path:        "wiki/generated-sections.md",
-		Kind:        KindWiki,
-		Title:       "Generated sections",
-		Summary:     "generatedunique summary",
-		TagsJSON:    `["generated"]`,
-		SourcesJSON: `[]`,
-		LinksJSON:   `[]`,
-		TagsText:    "generated",
-		Hash:        "hash-generated",
-		SizeBytes:   100,
+		ID:           "doc_generated_sections",
+		Path:         "wiki/generated-sections.md",
+		Kind:         KindWiki,
+		Title:        "Generated sections",
+		Summary:      "generatedunique summary",
+		TagsJSON:     `["generated"]`,
+		SourcesJSON:  `[]`,
+		LinksJSON:    `[]`,
+		TagsText:     "generated",
+		ModifiedDate: "2026-05-06",
+		Hash:         "hash-generated",
+		SizeBytes:    100,
 	}}
 	sections := []Section{
 		{DocumentID: "doc_generated_sections", Ordinal: 1, Heading: "Generated sections", Anchor: "generated-sections", Level: 1, Body: "body"},
@@ -423,6 +424,11 @@ func searchFixtureDB(t *testing.T) *sql.DB {
 			SizeBytes:   100,
 		},
 	}
+	for i := range docs {
+		if docs[i].Kind == KindWiki {
+			docs[i].ModifiedDate = "2026-05-06"
+		}
+	}
 	sections := []Section{
 		{DocumentID: "doc_tempo_downscale", Ordinal: 1, Heading: "Tempo downscale", Anchor: "tempo-downscale", Level: 1, Body: "Tempo downscale procedure for ingesters."},
 		{DocumentID: "doc_tempo_downscale", Ordinal: 2, Heading: "Rollback", Anchor: "rollback", Level: 2, Body: "Rollback after downscale."},
@@ -442,7 +448,7 @@ func searchFixtureDB(t *testing.T) *sql.DB {
 }
 
 func newTestDocument(id, pathValue, kind, title, summary, tagsJSON, tagsText string) Document {
-	return Document{
+	doc := Document{
 		ID:          id,
 		Path:        pathValue,
 		Kind:        kind,
@@ -455,6 +461,10 @@ func newTestDocument(id, pathValue, kind, title, summary, tagsJSON, tagsText str
 		Hash:        "hash-" + id,
 		SizeBytes:   100,
 	}
+	if kind == KindWiki {
+		doc.ModifiedDate = "2026-05-06"
+	}
+	return doc
 }
 
 func assertRecommendedSectionTargets(t *testing.T, got []RecommendedSection, want []string) {

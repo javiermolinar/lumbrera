@@ -16,53 +16,71 @@ import (
 // ExtractMarkdownRecords converts one canonical Markdown file into normalized
 // document and section records for RebuildRecords.
 func ExtractMarkdownRecords(relPath string, content []byte) (Document, []Section, error) {
+	doc, sections, _, _, _, err := ExtractMarkdownRecordsWithFacts(relPath, content)
+	return doc, sections, err
+}
+
+// ExtractMarkdownRecordsWithFacts converts one canonical Markdown file into
+// normalized document, section, and relationship fact records.
+func ExtractMarkdownRecordsWithFacts(relPath string, content []byte) (Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, error) {
 	normalizedPath, kind, err := pathpolicy.NormalizeTargetPath(relPath)
 	if err != nil {
-		return Document{}, nil, fmt.Errorf("normalize indexed path: %w", err)
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("normalize indexed path: %w", err)
 	}
 
 	switch kind {
 	case KindWiki:
 		return extractWikiRecords(normalizedPath, content)
 	case KindSource:
-		return extractSourceRecords(normalizedPath, content)
+		doc, sections, err := extractSourceRecords(normalizedPath, content)
+		return doc, sections, nil, nil, nil, err
 	default:
-		return Document{}, nil, fmt.Errorf("unsupported indexed path kind %q", kind)
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("unsupported indexed path kind %q", kind)
 	}
 }
 
-func extractWikiRecords(relPath string, content []byte) (Document, []Section, error) {
+func extractWikiRecords(relPath string, content []byte) (Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, error) {
 	meta, body, hasFrontmatter, err := frontmatter.Split(content)
 	if err != nil {
-		return Document{}, nil, fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
 	}
 	if !hasFrontmatter {
-		return Document{}, nil, fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
 	}
 	if meta.Lumbrera.Kind != KindWiki {
-		return Document{}, nil, fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, KindWiki)
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, KindWiki)
 	}
 
 	sections, err := markdownSections(meta.Lumbrera.ID, body)
 	if err != nil {
-		return Document{}, nil, fmt.Errorf("split %s into sections: %w", relPath, err)
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("split %s into sections: %w", relPath, err)
+	}
+	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: true})
+	if err != nil {
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("analyze %s relationships: %w", relPath, err)
+	}
+	modifiedDate := strings.TrimSpace(meta.Lumbrera.ModifiedDate)
+	if modifiedDate == "" {
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s is missing generated lumbrera.modified_date; run lumbrera index --rebuild --brain <path> to repair older pages", relPath)
 	}
 	doc := Document{
-		ID:          meta.Lumbrera.ID,
-		Path:        relPath,
-		Kind:        KindWiki,
-		Title:       strings.TrimSpace(meta.Title),
-		Summary:     strings.TrimSpace(meta.Summary),
-		TagsJSON:    jsonStringArray(meta.Tags),
-		SourcesJSON: jsonStringArray(meta.Lumbrera.Sources),
-		LinksJSON:   jsonStringArray(meta.Lumbrera.Links),
-		TagsText:    textList(meta.Tags),
-		SourcesText: textList(meta.Lumbrera.Sources),
-		LinksText:   textList(meta.Lumbrera.Links),
-		Hash:        contentHash(content),
-		SizeBytes:   int64(len(content)),
+		ID:           meta.Lumbrera.ID,
+		Path:         relPath,
+		Kind:         KindWiki,
+		Title:        strings.TrimSpace(meta.Title),
+		Summary:      strings.TrimSpace(meta.Summary),
+		TagsJSON:     jsonStringArray(meta.Tags),
+		SourcesJSON:  jsonStringArray(meta.Lumbrera.Sources),
+		LinksJSON:    jsonStringArray(meta.Lumbrera.Links),
+		TagsText:     textList(meta.Tags),
+		SourcesText:  textList(meta.Lumbrera.Sources),
+		LinksText:    textList(meta.Lumbrera.Links),
+		ModifiedDate: modifiedDate,
+		Hash:         contentHash(content),
+		SizeBytes:    int64(len(content)),
 	}
-	return doc, sections, nil
+	links, citations, tags := wikiRelationshipFacts(doc, meta, analysis)
+	return doc, sections, links, citations, tags, nil
 }
 
 func extractSourceRecords(relPath string, content []byte) (Document, []Section, error) {
@@ -125,6 +143,49 @@ func sourceTitle(relPath string, sections []Section) string {
 func sourceDocumentID(relPath string) string {
 	sum := sha256.Sum256([]byte(relPath))
 	return "source_" + hex.EncodeToString(sum[:16])
+}
+
+func wikiRelationshipFacts(doc Document, meta frontmatter.Document, analysis md.Analysis) ([]DocumentLink, []DocumentCitation, []DocumentTag) {
+	links := make([]DocumentLink, 0, len(analysis.LinkReferences))
+	for _, ref := range analysis.LinkReferences {
+		if ref.Path == "" || ref.Path == doc.Path {
+			continue
+		}
+		links = append(links, DocumentLink{
+			FromDocumentID: doc.ID,
+			FromPath:       doc.Path,
+			ToPath:         ref.Path,
+			ToAnchor:       ref.Anchor,
+			Kind:           kindForLinkedPath(ref.Path),
+		})
+	}
+
+	citations := make([]DocumentCitation, 0, len(meta.Lumbrera.Sources)+len(analysis.SourceCitations))
+	for _, source := range uniqueSortedStrings(meta.Lumbrera.Sources) {
+		citations = append(citations, DocumentCitation{
+			DocumentID:   doc.ID,
+			WikiPath:     doc.Path,
+			SourcePath:   source,
+			CitationText: source,
+			CitationKind: "frontmatter_source",
+		})
+	}
+	for _, ref := range analysis.SourceCitations {
+		citations = append(citations, DocumentCitation{
+			DocumentID:   doc.ID,
+			WikiPath:     doc.Path,
+			SourcePath:   ref.Path,
+			SourceAnchor: ref.Anchor,
+			CitationText: ref.String(),
+			CitationKind: "inline_source",
+		})
+	}
+
+	tags := make([]DocumentTag, 0, len(meta.Tags))
+	for _, tag := range uniqueSortedStrings(meta.Tags) {
+		tags = append(tags, DocumentTag{DocumentID: doc.ID, Path: doc.Path, Tag: tag})
+	}
+	return links, citations, tags
 }
 
 func contentHash(content []byte) string {

@@ -29,14 +29,22 @@ func TestCreateSchemaCreatesTablesIndexesAndVersion(t *testing.T) {
 	}
 
 	assertObjectsExist(t, db, map[string]string{
-		"meta":                          "table",
-		"documents":                     "table",
-		"sections":                      "table",
-		"sections_fts":                  "table",
-		"idx_documents_kind_path":       "index",
-		"idx_sections_document_ordinal": "index",
-		"idx_sections_kind_path":        "index",
-		"idx_sections_path_ordinal":     "index",
+		"meta":                               "table",
+		"documents":                          "table",
+		"sections":                           "table",
+		"document_links":                     "table",
+		"document_citations":                 "table",
+		"document_tags":                      "table",
+		"sections_fts":                       "table",
+		"idx_documents_kind_path":            "index",
+		"idx_sections_document_ordinal":      "index",
+		"idx_sections_kind_path":             "index",
+		"idx_sections_path_ordinal":          "index",
+		"idx_document_links_from":            "index",
+		"idx_document_links_to_path":         "index",
+		"idx_document_citations_document":    "index",
+		"idx_document_citations_source_path": "index",
+		"idx_document_tags_tag":              "index",
 	})
 }
 
@@ -115,20 +123,20 @@ func insertSearchFixture(t *testing.T, db *sql.DB) {
 
 	if _, err := db.Exec(`INSERT INTO documents(
 		id, path, kind, title, summary, tags_json, sources_json, links_json,
-		tags_text, sources_text, links_text, hash, size_bytes
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		tags_text, sources_text, links_text, modified_date, hash, size_bytes
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"doc_fixture", "wiki/fixture.md", "wiki", "Fixture", "Summary", "[]", "[]", "[]",
-		"", "", "", "hash", 100,
+		"", "", "", "2026-05-06", "hash", 100,
 	); err != nil {
 		t.Fatalf("insert document fixture: %v", err)
 	}
 
 	if _, err := db.Exec(`INSERT INTO sections(
 		rowid, id, document_id, ordinal, path, kind, title, summary, tags_json, sources_json,
-		links_json, tags_text, sources_text, links_text, heading, anchor, level, body
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		links_json, tags_text, sources_text, links_text, modified_date, heading, anchor, level, body
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		1, "doc_fixture#section-0001", "doc_fixture", 1, "wiki/fixture.md", "wiki", "Fixture", "Summary",
-		"[]", "[]", "[]", "", "", "", "Heading", "heading", 1, "the uniquefterm appears in section body",
+		"[]", "[]", "[]", "", "", "", "2026-05-06", "Heading", "heading", 1, "the uniquefterm appears in section body",
 	); err != nil {
 		t.Fatalf("insert section fixture: %v", err)
 	}

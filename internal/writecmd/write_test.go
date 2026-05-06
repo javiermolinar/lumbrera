@@ -37,6 +37,9 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	if meta.Lumbrera.ID == "" {
 		t.Fatal("expected generated document id")
 	}
+	if meta.Lumbrera.ModifiedDate == "" {
+		t.Fatal("expected generated modified date")
+	}
 	if len(meta.Tags) != 1 || meta.Tags[0] != "design" {
 		t.Fatalf("unexpected tags: %#v", meta.Tags)
 	}

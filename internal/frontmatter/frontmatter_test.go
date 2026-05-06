@@ -64,6 +64,14 @@ func TestRenderRejectsInvalidWikiTags(t *testing.T) {
 	}
 }
 
+func TestRenderRejectsInvalidModifiedDate(t *testing.T) {
+	doc := New("wiki", "Dated", "Dated summary.", []string{"dated"}, []string{"sources/raw.md"}, nil)
+	doc.Lumbrera.ModifiedDate = "05/06/2026"
+	if _, err := Render(doc); err == nil {
+		t.Fatal("expected invalid modified date to be rejected")
+	}
+}
+
 func TestSplitRejectsMissingIDUnlessAllowed(t *testing.T) {
 	content := []byte("---\ntitle: Old\nsummary: Old summary.\ntags:\n  - old\nlumbrera:\n  schema: document-v1\n  kind: wiki\n  sources:\n    - sources/raw.md\n  links: []\n---\n\n# Old\n")
 	_, _, has, err := Split(content)

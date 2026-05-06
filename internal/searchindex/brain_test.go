@@ -27,6 +27,7 @@ func TestRebuildBrainBuildsSQLiteIndexFromRepoMarkdown(t *testing.T) {
 		[]string{"sources/raw.md"},
 		nil,
 	)
+	wikiMeta.Lumbrera.ModifiedDate = "2026-05-06"
 	wikiContent, err := frontmatter.Attach(wikiMeta, "# Tempo limits\n\nTempo body mentions tempounique.\n\n## Ingestion\n\nDistributors enforce limits.\n")
 	if err != nil {
 		t.Fatalf("attach wiki frontmatter: %v", err)
@@ -60,6 +61,15 @@ func TestRebuildBrainBuildsSQLiteIndexFromRepoMarkdown(t *testing.T) {
 	if got := countFTSMatches(t, db, "orphanunique"); got != 1 {
 		t.Fatalf("unreferenced source FTS matches = %d, want 1", got)
 	}
+	if got := countRows(t, db, "document_tags"); got != 2 {
+		t.Fatalf("document_tags rows = %d, want 2", got)
+	}
+	if got := countRows(t, db, "document_citations"); got != 1 {
+		t.Fatalf("document_citations rows = %d, want 1", got)
+	}
+	if got := countRows(t, db, "document_links"); got != 0 {
+		t.Fatalf("document_links rows = %d, want 0", got)
+	}
 
 	meta := readMeta(t, db)
 	for _, key := range []string{"schema_version", manifestHashMetaKey, indexedPathsHashMetaKey, indexerVersionMetaKey, markdownSectionsVersionMetaKey, manifestDebugMetaKey} {
@@ -69,7 +79,7 @@ func TestRebuildBrainBuildsSQLiteIndexFromRepoMarkdown(t *testing.T) {
 	}
 	manifest := meta[manifestDebugMetaKey]
 	for _, want := range []string{
-		"schema_version=1",
+		"schema_version=2",
 		"indexer_version=1",
 		"markdown_sections_version=1",
 		"path=sources/raw.md ",
@@ -221,6 +231,7 @@ func newBrainRepo(t *testing.T) string {
 func wikiContent(t *testing.T, id, title, summary, tag string) string {
 	t.Helper()
 	meta := frontmatter.NewWithID(id, KindWiki, title, summary, []string{tag}, nil, nil)
+	meta.Lumbrera.ModifiedDate = "2026-05-06"
 	content, err := frontmatter.Attach(meta, "# "+title+"\n\nBody.\n")
 	if err != nil {
 		t.Fatalf("attach wiki content: %v", err)

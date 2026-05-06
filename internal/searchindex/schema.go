@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const CurrentSchemaVersion = 1
+const CurrentSchemaVersion = 2
 
 var schemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS meta(
@@ -28,6 +28,7 @@ var schemaStatements = []string{
 		tags_text TEXT NOT NULL,
 		sources_text TEXT NOT NULL,
 		links_text TEXT NOT NULL,
+		modified_date TEXT NOT NULL,
 		hash TEXT NOT NULL,
 		size_bytes INTEGER NOT NULL CHECK(size_bytes >= 0)
 	)`,
@@ -46,12 +47,45 @@ var schemaStatements = []string{
 		tags_text TEXT NOT NULL,
 		sources_text TEXT NOT NULL,
 		links_text TEXT NOT NULL,
+		modified_date TEXT NOT NULL,
 		heading TEXT,
 		anchor TEXT,
 		level INTEGER CHECK(level IS NULL OR level >= 1),
 		body TEXT NOT NULL,
 		FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,
 		UNIQUE(document_id, ordinal)
+	)`,
+	`CREATE TABLE IF NOT EXISTS document_links(
+		rowid INTEGER PRIMARY KEY,
+		from_document_id TEXT NOT NULL,
+		from_path TEXT NOT NULL,
+		from_anchor TEXT NOT NULL,
+		to_path TEXT NOT NULL,
+		to_anchor TEXT NOT NULL,
+		to_document_id TEXT NOT NULL,
+		link_text TEXT NOT NULL,
+		source_section_id TEXT NOT NULL,
+		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'source', 'external')),
+		FOREIGN KEY(from_document_id) REFERENCES documents(id) ON DELETE CASCADE
+	)`,
+	`CREATE TABLE IF NOT EXISTS document_citations(
+		rowid INTEGER PRIMARY KEY,
+		document_id TEXT NOT NULL,
+		wiki_path TEXT NOT NULL,
+		source_path TEXT NOT NULL,
+		source_anchor TEXT NOT NULL,
+		citation_text TEXT NOT NULL,
+		section_id TEXT NOT NULL,
+		citation_kind TEXT NOT NULL CHECK(citation_kind IN ('frontmatter_source', 'inline_source')),
+		FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
+	)`,
+	`CREATE TABLE IF NOT EXISTS document_tags(
+		rowid INTEGER PRIMARY KEY,
+		document_id TEXT NOT NULL,
+		path TEXT NOT NULL,
+		tag TEXT NOT NULL,
+		FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE,
+		UNIQUE(document_id, tag)
 	)`,
 	`CREATE VIRTUAL TABLE IF NOT EXISTS sections_fts USING fts5(
 		title,
@@ -69,6 +103,11 @@ var schemaStatements = []string{
 	`CREATE INDEX IF NOT EXISTS idx_sections_document_ordinal ON sections(document_id, ordinal)`,
 	`CREATE INDEX IF NOT EXISTS idx_sections_kind_path ON sections(kind, path)`,
 	`CREATE INDEX IF NOT EXISTS idx_sections_path_ordinal ON sections(path, ordinal)`,
+	`CREATE INDEX IF NOT EXISTS idx_document_links_from ON document_links(from_document_id, from_path)`,
+	`CREATE INDEX IF NOT EXISTS idx_document_links_to_path ON document_links(to_path, to_anchor)`,
+	`CREATE INDEX IF NOT EXISTS idx_document_citations_document ON document_citations(document_id, wiki_path)`,
+	`CREATE INDEX IF NOT EXISTS idx_document_citations_source_path ON document_citations(source_path, source_anchor)`,
+	`CREATE INDEX IF NOT EXISTS idx_document_tags_tag ON document_tags(tag, path)`,
 }
 
 // CreateSchema initializes the current search index schema. It is idempotent
