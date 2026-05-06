@@ -2,9 +2,31 @@
 
 ## Context
 
-Lumbrera v2's core SQLite lexical search milestone is mostly implemented. The CLI includes deterministic SQLite/FTS5 indexing under `.brain/search.sqlite`, `lumbrera index --status`, `lumbrera index --rebuild`, JSON `lumbrera search`, stale/missing auto-rebuild, wiki/source Markdown extraction, generated search-first agent guidance, and scaffold `.gitignore` coverage for `.brain/search.sqlite*`.
+Lumbrera now has deterministic SQLite/FTS5 search and a first-cut health workflow. The CLI includes deterministic indexing under `.brain/search.sqlite`, `lumbrera index`, JSON `lumbrera search`, and read-only `lumbrera health` candidates for LLM review. Relationship facts (`document_links`, `document_citations`, and `document_tags`) and generated wiki `modified_date` metadata support explainable health candidates.
 
-This file is now the active tracker for consolidated v2+ backlog ideas. The older SQLite search plan has been removed.
+This file is the active tracker for consolidated v2+ backlog ideas. Completed implementation plans should be folded into this file and removed.
+
+## Priority backlog
+
+### P0 — Stabilize health output contracts
+
+- Add formal JSON output contract fixtures for `lumbrera health` once the command surface stabilizes.
+- Add formal compact human output fixtures for `lumbrera health` if humans or agents begin relying on exact text shape.
+- Keep `candidates` terminology and avoid `drifted_pages` or other conclusion-shaped fields.
+
+### P1 — Improve health candidate quality from real review feedback
+
+- Continue ranking tuning only when real candidate review exposes noisy reason combinations.
+- Consider splitting display semantics into relation strength vs action priority if `score` remains confusing.
+- Downrank broad same-source/same-product relationships further if they do not produce useful links.
+- Add page-neighborhood UX if global medium-confidence `missing_link` review feels repetitive.
+- Consider persistent skip/ignore state only if repeated false positives become a practical problem.
+
+### P2 — Health workflow expansion
+
+- Source freshness: derive later from source path conventions, explicit source metadata, or `.brain/ops.log` indexing if source staleness becomes important.
+- Consolidation moves: defer a dedicated move command until there is evidence that identity-preserving renames are needed. A true move would need multi-file atomicity, document ID preservation, and link rewriting.
+- Cluster detection: intentionally deferred; first-cut health remains single-page and page-pair candidates.
 
 ## Consolidated deferred v2+ backlog
 
@@ -12,7 +34,6 @@ This file is now the active tracker for consolidated v2+ backlog ideas. The olde
 
 - Exact `--tag` and `--source` filters if lexical search plus returned context is not enough.
 - Optional raw FTS or prefix-search mode behind an explicit flag.
-- Separate link/citation tables if graph queries or exact citation filters become necessary.
 - Graph traversal command if agents need structured neighborhood exploration.
 - `.brain/ops.log` operation-history search.
 - Incremental sync if measured full rebuild cost becomes painful.
@@ -22,10 +43,8 @@ This file is now the active tracker for consolidated v2+ backlog ideas. The olde
 
 ### Retrieval intelligence
 
-- Search-powered health/curation workflow: generated lint/health workflow uses ranked related documents as LLM review context for duplicates, contradictions, stale claims, missing cross-links, orphan pages, missing concept pages, and source gaps before any `lumbrera write` mutation.
 - Optional semantic/vector search and embeddings.
 - Hybrid lexical plus semantic retrieval.
-- Semantic lint suggestions for stale claims, duplicates, contradictions, weakly connected pages, and missing sources.
 - LLM-assisted conflict reconciliation.
 
 ### Repository and product expansion
