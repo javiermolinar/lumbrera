@@ -5,13 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
-	"github.com/javiermolinar/lumbrera/internal/generate"
+	"github.com/javiermolinar/lumbrera/internal/cmdutil"
+	"github.com/javiermolinar/lumbrera/internal/indexruntime"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
-	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 type options struct {
@@ -51,30 +49,10 @@ func Run(args []string) error {
 		return err
 	}
 
-	lock, err := brainlock.Acquire(brainDir, "index")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = lock.Release() }()
-
-	if err := verify.Check(brainDir, verify.Options{}); err != nil {
-		return fmt.Errorf("cannot rebuild search index because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
-	}
-	if repaired, err := searchindex.RepairMissingModifiedDates(brainDir, time.Now().Format("2006-01-02")); err != nil {
-		return err
-	} else if repaired {
-		files, err := generate.FilesForRepo(brainDir)
-		if err != nil {
-			return err
-		}
-		if err := generate.WriteFiles(brainDir, files); err != nil {
-			return err
-		}
-		if err := verify.Check(brainDir, verify.Options{}); err != nil {
-			return fmt.Errorf("cannot rebuild search index after repairing modified dates because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
-		}
-	}
-	if err := searchindex.RebuildBrain(ctx, brainDir); err != nil {
+	if err := indexruntime.Rebuild(ctx, brainDir, indexruntime.RebuildOptions{
+		LockName:                   "index",
+		RepairMissingModifiedDates: true,
+	}); err != nil {
 		return err
 	}
 	fmt.Printf("Lumbrera search index rebuilt: %s\n", searchindex.SearchIndexPath(brainDir))
@@ -83,7 +61,7 @@ func Run(args []string) error {
 
 func parseArgs(args []string) (options, error) {
 	for _, arg := range args {
-		if isHelp(arg) {
+		if cmdutil.IsHelp(arg) {
 			return options{Help: true}, nil
 		}
 	}
@@ -123,10 +101,6 @@ func printStatus(brainDir string, status searchindex.Status) {
 	if status.Reason != "" {
 		fmt.Printf("reason: %s\n", status.Reason)
 	}
-}
-
-func isHelp(arg string) bool {
-	return arg == "--help" || arg == "-h" || arg == "help"
 }
 
 func printHelp() {

@@ -1,0 +1,43 @@
+{
+  "candidates": [
+    {
+      "type": "possible_duplicate",
+      "confidence": "medium",
+      "score": 0.69,
+      "pages": [
+        "wiki/topic-first.md",
+        "wiki/topic-second.md"
+      ],
+      "sources": [
+        "sources/raw.md"
+      ],
+      "reasons": [
+        {
+          "code": "shared_tag",
+          "value": "fixtureunique"
+        },
+        {
+          "code": "shared_tag",
+          "value": "retention"
+        },
+        {
+          "code": "shared_source",
+          "value": "sources/raw.md"
+        },
+        {
+          "code": "lexical_overlap",
+          "value": "retention,topic,compaction,fixtureunique,raw"
+        },
+        {
+          "code": "not_linked"
+        }
+      ],
+      "suggested_queries": [
+        "fixtureunique retention topic compaction raw first second",
+        "raw fixtureunique retention topic compaction"
+      ],
+      "review_instruction": "Read both pages and cited sources before deciding whether to merge, cross-link, or leave separate."
+    }
+  ],
+  "stop_rule": "Review top candidates first. Do not scan the repo unless candidates are insufficient."
+}

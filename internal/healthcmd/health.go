@@ -2,18 +2,17 @@ package healthcmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
+	"github.com/javiermolinar/lumbrera/internal/cmdutil"
+	"github.com/javiermolinar/lumbrera/internal/indexruntime"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
-	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
 type options struct {
@@ -68,7 +67,7 @@ func RunWithOutput(args []string, out io.Writer) error {
 	}
 
 	ctx := context.Background()
-	if err := ensureSearchIndex(ctx, brainDir); err != nil {
+	if err := indexruntime.EnsureFresh(ctx, brainDir); err != nil {
 		return err
 	}
 
@@ -96,78 +95,24 @@ func RunWithOutput(args []string, out io.Writer) error {
 	return writeHuman(out, response)
 }
 
-func ensureSearchIndex(ctx context.Context, brainDir string) error {
-	status, err := searchindex.CheckStatus(ctx, brainDir)
-	if err != nil {
-		return err
-	}
-	switch status.State {
-	case searchindex.StatusFresh:
-		return nil
-	case searchindex.StatusMissing, searchindex.StatusStale:
-		return autoRebuild(ctx, brainDir, status.State)
-	case searchindex.StatusIncompatible:
-		return fmt.Errorf("search index is incompatible: %s; run lumbrera index --rebuild --brain %s", status.Reason, brainDir)
-	default:
-		return fmt.Errorf("search index has unknown status %q; run lumbrera index --status --brain %s", status.State, brainDir)
-	}
-}
-
-func autoRebuild(ctx context.Context, brainDir string, state searchindex.StatusState) error {
-	lock, err := brainlock.Acquire(brainDir, "search-index")
-	if err != nil {
-		return fmt.Errorf("search index is %s and automatic rebuild could not acquire lock: %w; run lumbrera index --rebuild --brain %s", state, err, brainDir)
-	}
-	defer func() { _ = lock.Release() }()
-
-	status, err := searchindex.CheckStatus(ctx, brainDir)
-	if err != nil {
-		return err
-	}
-	if status.State == searchindex.StatusFresh {
-		return nil
-	}
-	if status.State == searchindex.StatusIncompatible {
-		return fmt.Errorf("search index is incompatible: %s; run lumbrera index --rebuild --brain %s", status.Reason, brainDir)
-	}
-	if status.State != searchindex.StatusMissing && status.State != searchindex.StatusStale {
-		return fmt.Errorf("search index has unknown status %q; run lumbrera index --status --brain %s", status.State, brainDir)
-	}
-
-	if err := verify.Check(brainDir, verify.Options{}); err != nil {
-		return fmt.Errorf("cannot automatically rebuild search index because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
-	}
-	if err := searchindex.RebuildBrain(ctx, brainDir); err != nil {
-		return fmt.Errorf("search index is %s and automatic rebuild failed: %w; run lumbrera index --rebuild --brain %s", state, err, brainDir)
-	}
-	status, err = searchindex.CheckStatus(ctx, brainDir)
-	if err != nil {
-		return err
-	}
-	if status.State != searchindex.StatusFresh {
-		return fmt.Errorf("automatic rebuild completed but search index is %s: %s; run lumbrera index --rebuild --brain %s", status.State, status.Reason, brainDir)
-	}
-	return nil
-}
-
 func parseArgs(args []string) (options, error) {
 	var opts options
 	var positional []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		name, inlineValue, hasInlineValue := splitInlineFlag(arg)
+		name, inlineValue, hasInlineValue := cmdutil.SplitInlineFlag(arg)
 		switch name {
 		case "--help", "-h", "help":
 			return options{Help: true}, nil
 		case "--brain", "--repo":
-			value, next, err := optionValue(args, i, name, inlineValue, hasInlineValue)
+			value, next, err := cmdutil.OptionValue(args, i, name, inlineValue, hasInlineValue)
 			if err != nil {
 				return options{}, err
 			}
 			opts.Brain = value
 			i = next
 		case "--limit":
-			value, next, err := optionValue(args, i, name, inlineValue, hasInlineValue)
+			value, next, err := cmdutil.OptionValue(args, i, name, inlineValue, hasInlineValue)
 			if err != nil {
 				return options{}, err
 			}
@@ -178,14 +123,14 @@ func parseArgs(args []string) (options, error) {
 			opts.Limit = limit
 			i = next
 		case "--kind":
-			value, next, err := optionValue(args, i, name, inlineValue, hasInlineValue)
+			value, next, err := cmdutil.OptionValue(args, i, name, inlineValue, hasInlineValue)
 			if err != nil {
 				return options{}, err
 			}
 			opts.Kind = value
 			i = next
 		case "--path":
-			value, next, err := optionValue(args, i, name, inlineValue, hasInlineValue)
+			value, next, err := cmdutil.OptionValue(args, i, name, inlineValue, hasInlineValue)
 			if err != nil {
 				return options{}, err
 			}
@@ -232,31 +177,6 @@ func isValidCandidateKind(kind string) bool {
 	}
 }
 
-func splitInlineFlag(arg string) (name, value string, ok bool) {
-	if !strings.HasPrefix(arg, "--") {
-		return arg, "", false
-	}
-	name, value, ok = strings.Cut(arg, "=")
-	return name, value, ok
-}
-
-func optionValue(args []string, index int, flag, inlineValue string, hasInlineValue bool) (string, int, error) {
-	if hasInlineValue {
-		if strings.TrimSpace(inlineValue) == "" {
-			return "", index, fmt.Errorf("%s requires a non-empty value", flag)
-		}
-		return inlineValue, index, nil
-	}
-	if index+1 >= len(args) {
-		return "", index, fmt.Errorf("%s requires a value", flag)
-	}
-	value := args[index+1]
-	if strings.TrimSpace(value) == "" {
-		return "", index, fmt.Errorf("%s requires a non-empty value", flag)
-	}
-	return value, index + 1, nil
-}
-
 func writeJSON(out io.Writer, response searchindex.CandidateResponse) error {
 	payload := jsonOutput{
 		Candidates: make([]jsonCandidate, 0, len(response.Candidates)),
@@ -267,10 +187,10 @@ func writeJSON(out io.Writer, response searchindex.CandidateResponse) error {
 			Type:              candidate.Type,
 			Confidence:        candidate.Confidence,
 			Score:             candidate.Score,
-			Pages:             nonNilStrings(candidate.Pages),
-			Sources:           nonNilStrings(candidate.Sources),
+			Pages:             cmdutil.NonNilStrings(candidate.Pages),
+			Sources:           cmdutil.NonNilStrings(candidate.Sources),
 			Reasons:           make([]jsonReason, 0, len(candidate.Reasons)),
-			SuggestedQueries:  nonNilStrings(candidate.SuggestedQueries),
+			SuggestedQueries:  cmdutil.NonNilStrings(candidate.SuggestedQueries),
 			ReviewInstruction: candidate.ReviewInstruction,
 		}
 		for _, reason := range candidate.Reasons {
@@ -278,12 +198,7 @@ func writeJSON(out io.Writer, response searchindex.CandidateResponse) error {
 		}
 		payload.Candidates = append(payload.Candidates, item)
 	}
-	encoded, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(out, "%s\n", encoded)
-	return err
+	return cmdutil.WriteJSON(out, payload)
 }
 
 func writeHuman(out io.Writer, response searchindex.CandidateResponse) error {
@@ -347,13 +262,6 @@ func formatSuggestedQueries(queries []string) string {
 		parts = append(parts, fmt.Sprintf("search %q", query))
 	}
 	return strings.Join(parts, "; ")
-}
-
-func nonNilStrings(values []string) []string {
-	if values == nil {
-		return []string{}
-	}
-	return values
 }
 
 func printHelp(out io.Writer) {

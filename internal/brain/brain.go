@@ -17,6 +17,10 @@ const (
 	MaxWikiBodyLines = 400
 )
 
+func GeneratedFilePaths() []string {
+	return []string{IndexPath, ChangelogPath, BrainSumPath, TagsPath}
+}
+
 func ValidateRepo(repo string) error {
 	content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(MarkerPath)))
 	if err != nil {

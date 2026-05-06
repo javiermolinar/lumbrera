@@ -4,11 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 )
 
@@ -44,49 +43,14 @@ func Generate(entries []Entry) (string, error) {
 }
 
 func EntriesForRepo(repo string) ([]Entry, error) {
-	var entries []Entry
-	root := filepath.Join(repo, "wiki")
-	if _, err := os.Stat(root); err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("manifest refuses non-regular Markdown file %s", path)
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("manifest refuses non-regular Markdown file %s", path)
-		}
-		rel, err := filepath.Rel(repo, path)
-		if err != nil {
-			return err
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		entries = append(entries, Entry{Path: filepath.ToSlash(rel), Hash: HashContent(content)})
-		return nil
-	})
+	files, err := brainfs.ReadMarkdownFiles(repo, []string{"wiki"})
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
+	entries := make([]Entry, 0, len(files))
+	for _, file := range files {
+		entries = append(entries, Entry{Path: file.RelPath, Hash: HashContent(file.Content)})
+	}
 	return entries, nil
 }
 

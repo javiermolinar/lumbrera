@@ -30,14 +30,8 @@ type writeBackup struct {
 }
 
 func newWriteBackup(brainDir, target string) (*writeBackup, error) {
-	paths := []string{
-		target,
-		brain.IndexPath,
-		brain.ChangelogPath,
-		brain.BrainSumPath,
-		brain.TagsPath,
-		ops.LogPath,
-	}
+	paths := append([]string{target}, brain.GeneratedFilePaths()...)
+	paths = append(paths, ops.LogPath)
 	seen := map[string]struct{}{}
 	backup := &writeBackup{}
 	for _, rel := range paths {

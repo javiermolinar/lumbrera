@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
+	"github.com/javiermolinar/lumbrera/internal/brainfs"
 )
 
 type StatusState string
@@ -125,24 +125,20 @@ func ManifestMetadataForRepo(repo string) (map[string]string, error) {
 }
 
 func validateBrainForStatus(repo string) error {
-	if _, err := validateIndexDirectory(repo, ".brain", true); err != nil {
+	if _, err := brainfs.ValidateDirectory(repo, ".brain", true); err != nil {
 		return err
 	}
 	return brain.ValidateRepo(repo)
 }
 
 func indexedFilesForRepo(repo string) ([]indexedFile, error) {
-	paths, err := indexedMarkdownPaths(repo)
+	markdownFiles, err := brainfs.ReadMarkdownFiles(repo, []string{"sources", "wiki"})
 	if err != nil {
 		return nil, err
 	}
-	files := make([]indexedFile, 0, len(paths))
-	for _, relPath := range paths {
-		content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(relPath)))
-		if err != nil {
-			return nil, fmt.Errorf("read indexed Markdown file %s: %w", relPath, err)
-		}
-		files = append(files, indexedFile{Path: relPath, Hash: contentHash(content), Size: len(content)})
+	files := make([]indexedFile, 0, len(markdownFiles))
+	for _, file := range markdownFiles {
+		files = append(files, indexedFile{Path: file.RelPath, Hash: contentHash(file.Content), Size: len(file.Content)})
 	}
 	return files, nil
 }

@@ -3,10 +3,10 @@ package searchindex
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 )
 
@@ -21,33 +21,15 @@ func RepairMissingModifiedDates(repo, modifiedDate string) (bool, error) {
 		return false, fmt.Errorf("modified date %q must use YYYY-MM-DD: %w", modifiedDate, err)
 	}
 
-	root := filepath.Join(repo, "wiki")
-	if _, err := os.Stat(root); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
 	repaired := false
-	err := filepath.WalkDir(root, func(absPath string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
-			return nil
-		}
-		content, err := os.ReadFile(absPath)
+	err := brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+		content, err := os.ReadFile(file.AbsPath)
 		if err != nil {
 			return err
 		}
 		meta, body, has, err := frontmatter.Split(content)
 		if err != nil {
-			rel, relErr := filepath.Rel(repo, absPath)
-			if relErr != nil {
-				return relErr
-			}
-			return fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", filepath.ToSlash(rel), err)
+			return fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", file.RelPath, err)
 		}
 		if !has || meta.Lumbrera.Kind != KindWiki || strings.TrimSpace(meta.Lumbrera.ModifiedDate) != "" {
 			return nil
@@ -57,7 +39,7 @@ func RepairMissingModifiedDates(repo, modifiedDate string) (bool, error) {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(absPath, []byte(updated), 0o644); err != nil {
+		if err := os.WriteFile(file.AbsPath, []byte(updated), 0o644); err != nil {
 			return err
 		}
 		repaired = true

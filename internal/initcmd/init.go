@@ -3,10 +3,12 @@ package initcmd
 import (
 	"errors"
 	"path/filepath"
+
+	"github.com/javiermolinar/lumbrera/internal/cmdutil"
 )
 
 func Run(args []string) error {
-	if len(args) == 1 && isHelp(args[0]) {
+	if len(args) == 1 && cmdutil.IsHelp(args[0]) {
 		printHelp()
 		return nil
 	}
@@ -45,8 +47,4 @@ func completeInit(repo string) error {
 	}
 	printSuccess(repo)
 	return nil
-}
-
-func isHelp(arg string) bool {
-	return arg == "--help" || arg == "-h" || arg == "help"
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
+	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
@@ -70,33 +71,15 @@ func Check(repo string, opts Options) error {
 }
 
 func RepairMissingIDs(repo string) (bool, error) {
-	root := filepath.Join(repo, "wiki")
-	if _, err := os.Stat(root); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-		return false, err
-	}
-
 	repaired := false
-	err := filepath.WalkDir(root, func(absPath string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
-			return nil
-		}
-		content, err := os.ReadFile(absPath)
+	err := brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+		content, err := os.ReadFile(file.AbsPath)
 		if err != nil {
 			return err
 		}
 		meta, body, has, err := frontmatter.SplitWithOptions(content, frontmatter.SplitOptions{AllowMissingID: true})
 		if err != nil {
-			rel, relErr := filepath.Rel(repo, absPath)
-			if relErr != nil {
-				return relErr
-			}
-			return fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", filepath.ToSlash(rel), err)
+			return fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", file.RelPath, err)
 		}
 		if !has || meta.Lumbrera.Kind != "wiki" || strings.TrimSpace(meta.Lumbrera.ID) != "" {
 			return nil
@@ -110,7 +93,7 @@ func RepairMissingIDs(repo string) (bool, error) {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(absPath, []byte(updated), 0o644); err != nil {
+		if err := os.WriteFile(file.AbsPath, []byte(updated), 0o644); err != nil {
 			return err
 		}
 		repaired = true
@@ -201,47 +184,16 @@ func isAllowedRootFile(rel string) bool {
 }
 
 func ValidateDocuments(repo string) error {
-	root := filepath.Join(repo, "wiki")
-	if _, err := os.Stat(root); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
 	seenIDs := map[string]string{}
-	return filepath.WalkDir(root, func(absPath string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("%s is not a regular Markdown file", absPath)
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("%s is not a regular Markdown file", absPath)
-		}
-		rel, err := filepath.Rel(repo, absPath)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		id, err := validateWikiDocument(repo, absPath, rel)
+	return brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+		id, err := validateWikiDocument(repo, file.AbsPath, file.RelPath)
 		if err != nil {
 			return err
 		}
 		if existing, ok := seenIDs[id]; ok {
-			return fmt.Errorf("%s duplicates Lumbrera document id %s from %s", rel, id, existing)
+			return fmt.Errorf("%s duplicates Lumbrera document id %s from %s", file.RelPath, id, existing)
 		}
-		seenIDs[id] = rel
+		seenIDs[id] = file.RelPath
 		return nil
 	})
 }

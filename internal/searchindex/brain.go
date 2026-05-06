@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
+	"github.com/javiermolinar/lumbrera/internal/brainfs"
 )
 
 const (
@@ -32,7 +33,7 @@ type indexedFile struct {
 // RebuildBrain rebuilds the disposable SQLite search cache for a Lumbrera brain
 // repository from canonical Markdown files.
 func RebuildBrain(ctx context.Context, repo string) error {
-	if _, err := validateIndexDirectory(repo, ".brain", true); err != nil {
+	if _, err := brainfs.ValidateDirectory(repo, ".brain", true); err != nil {
 		return err
 	}
 	if err := brain.ValidateRepo(repo); err != nil {
@@ -96,23 +97,19 @@ func RecordsForRepo(repo string) ([]Document, []Section, map[string]string, erro
 // facts, and manifest metadata from all indexed Markdown files in a Lumbrera
 // brain repository.
 func RecordsForRepoWithFacts(repo string) ([]Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, map[string]string, error) {
-	paths, err := indexedMarkdownPaths(repo)
+	markdownFiles, err := brainfs.ReadMarkdownFiles(repo, []string{"sources", "wiki"})
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err
 	}
 
-	documents := make([]Document, 0, len(paths))
+	documents := make([]Document, 0, len(markdownFiles))
 	var sections []Section
 	var links []DocumentLink
 	var citations []DocumentCitation
 	var tags []DocumentTag
-	files := make([]indexedFile, 0, len(paths))
-	for _, relPath := range paths {
-		content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(relPath)))
-		if err != nil {
-			return nil, nil, nil, nil, nil, nil, fmt.Errorf("read indexed Markdown file %s: %w", relPath, err)
-		}
-		doc, docSections, docLinks, docCitations, docTags, err := ExtractMarkdownRecordsWithFacts(relPath, content)
+	files := make([]indexedFile, 0, len(markdownFiles))
+	for _, file := range markdownFiles {
+		doc, docSections, docLinks, docCitations, docTags, err := ExtractMarkdownRecordsWithFacts(file.RelPath, file.Content)
 		if err != nil {
 			return nil, nil, nil, nil, nil, nil, err
 		}
@@ -121,57 +118,14 @@ func RecordsForRepoWithFacts(repo string) ([]Document, []Section, []DocumentLink
 		links = append(links, docLinks...)
 		citations = append(citations, docCitations...)
 		tags = append(tags, docTags...)
-		files = append(files, indexedFile{Path: relPath, Hash: contentHash(content), Size: len(content)})
+		files = append(files, indexedFile{Path: file.RelPath, Hash: contentHash(file.Content), Size: len(file.Content)})
 	}
 	metadata := manifestMetadata(files)
 	return documents, sections, links, citations, tags, metadata, nil
 }
 
 func indexedMarkdownPaths(repo string) ([]string, error) {
-	var paths []string
-	for _, root := range []string{"sources", "wiki"} {
-		exists, err := validateIndexDirectory(repo, root, false)
-		if err != nil {
-			return nil, err
-		}
-		if !exists {
-			continue
-		}
-		absRoot := filepath.Join(repo, filepath.FromSlash(root))
-		err = filepath.WalkDir(absRoot, func(absPath string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.IsDir() {
-				return nil
-			}
-			if strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
-				return nil
-			}
-			info, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			if entry.Type()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-				rel, relErr := filepath.Rel(repo, absPath)
-				if relErr != nil {
-					return relErr
-				}
-				return fmt.Errorf("%s is not a regular Markdown file", filepath.ToSlash(rel))
-			}
-			rel, err := filepath.Rel(repo, absPath)
-			if err != nil {
-				return err
-			}
-			paths = append(paths, filepath.ToSlash(rel))
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	sort.Strings(paths)
-	return paths, nil
+	return brainfs.MarkdownPaths(repo, []string{"sources", "wiki"})
 }
 
 func manifestMetadata(files []indexedFile) map[string]string {
@@ -212,24 +166,6 @@ func sortedIndexedFiles(files []indexedFile) []indexedFile {
 	out := append([]indexedFile(nil), files...)
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out
-}
-
-func validateIndexDirectory(repo, rel string, required bool) (bool, error) {
-	absPath := filepath.Join(repo, filepath.FromSlash(rel))
-	info, err := os.Lstat(absPath)
-	if err != nil {
-		if os.IsNotExist(err) && !required {
-			return false, nil
-		}
-		return false, err
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return false, fmt.Errorf("%s must be a real directory, not a symlink", rel)
-	}
-	if !info.IsDir() {
-		return false, fmt.Errorf("%s must be a directory", rel)
-	}
-	return true, nil
 }
 
 func removeSQLiteFiles(path string) {

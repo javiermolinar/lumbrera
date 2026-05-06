@@ -7,6 +7,7 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
+	"github.com/javiermolinar/lumbrera/internal/cmdutil"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
@@ -43,7 +44,7 @@ func Run(args []string) error {
 
 func parseArgs(args []string) (options, error) {
 	for _, arg := range args {
-		if isHelp(arg) {
+		if cmdutil.IsHelp(arg) {
 			return options{Help: true}, nil
 		}
 	}
@@ -59,10 +60,6 @@ func parseArgs(args []string) (options, error) {
 		return options{}, fmt.Errorf("verify does not accept positional arguments")
 	}
 	return opts, nil
-}
-
-func isHelp(arg string) bool {
-	return arg == "--help" || arg == "-h" || arg == "help"
 }
 
 func printHelp() {

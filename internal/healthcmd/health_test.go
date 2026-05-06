@@ -42,6 +42,25 @@ func TestHealthAutoRebuildsMissingIndexAndOutputsJSON(t *testing.T) {
 	}
 }
 
+func TestHealthJSONOutputContractFixture(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Raw source\n\nRaw notes mention fixtureunique retention.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	runWrite(t, repo, "# First topic\n\nFixtureunique retention compaction notes.\n", "wiki/topic-first.md", "--title", "First topic", "--summary", "Retention compaction notes.", "--tag", "retention", "--tag", "fixtureunique", "--source", "sources/raw.md", "--reason", "Create first topic", "--actor", "test")
+	runWrite(t, repo, "# Second topic\n\nFixtureunique retention compaction overlap.\n", "wiki/topic-second.md", "--title", "Second topic", "--summary", "Retention compaction overlap.", "--tag", "retention", "--tag", "fixtureunique", "--source", "sources/raw.md", "--reason", "Create second topic", "--actor", "test")
+
+	var out bytes.Buffer
+	if err := RunWithOutput([]string{"--brain", repo, "--kind", "duplicates", "--limit", "1", "--json"}, &out); err != nil {
+		t.Fatalf("health failed: %v", err)
+	}
+	want, err := os.ReadFile(filepath.Join("testdata", "health_duplicates.golden.json"))
+	if err != nil {
+		t.Fatalf("read golden fixture: %v", err)
+	}
+	if out.String() != string(want) {
+		t.Fatalf("health JSON output mismatch\nwant:\n%s\ngot:\n%s", string(want), out.String())
+	}
+}
+
 func TestHealthHumanOutputAndPositionalFilter(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes mention humanunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")

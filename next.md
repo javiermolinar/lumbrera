@@ -10,7 +10,6 @@ This file is the active tracker for consolidated v2+ backlog ideas. Completed im
 
 ### P0 — Stabilize health output contracts
 
-- Add formal JSON output contract fixtures for `lumbrera health` once the command surface stabilizes.
 - Add formal compact human output fixtures for `lumbrera health` if humans or agents begin relying on exact text shape.
 - Keep `candidates` terminology and avoid `drifted_pages` or other conclusion-shaped fields.
 

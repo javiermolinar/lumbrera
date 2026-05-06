@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
+	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/manifest"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
@@ -179,53 +180,23 @@ func renderIndexNode(b *strings.Builder, node *indexNode, depth int) {
 }
 
 func indexDocs(repo, dir string) ([]indexDoc, error) {
-	root := filepath.Join(repo, dir)
-	if _, err := os.Stat(root); err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	var docs []indexDoc
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
-			return nil
-		}
-		rel, err := filepath.Rel(repo, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		title, err := titleForFile(path, rel)
-		if err != nil {
-			return err
-		}
-		docs = append(docs, indexDoc{Path: rel, Title: title})
-		return nil
-	})
+	paths, err := brainfs.MarkdownPaths(repo, []string{dir})
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(docs, func(i, j int) bool { return docs[i].Path < docs[j].Path })
+
+	docs := make([]indexDoc, 0, len(paths))
+	for _, rel := range paths {
+		title, err := titleForFile(filepath.Join(repo, filepath.FromSlash(rel)), rel)
+		if err != nil {
+			return nil, err
+		}
+		docs = append(docs, indexDoc{Path: rel, Title: title})
+	}
 	return docs, nil
 }
 
 func sourceIndexDocsFromWiki(repo string) ([]indexDoc, error) {
-	root := filepath.Join(repo, "wiki")
-	if _, err := os.Stat(root); err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
 	seen := map[string]struct{}{}
 	var docs []indexDoc
 	err := walkWikiMetadata(repo, func(rel string, meta frontmatter.Document) error {
@@ -264,37 +235,19 @@ func tagDocsFromWiki(repo string) (map[string]int, error) {
 }
 
 func walkWikiMetadata(repo string, visit func(rel string, meta frontmatter.Document) error) error {
-	root := filepath.Join(repo, "wiki")
-	if _, err := os.Stat(root); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || strings.ToLower(filepath.Ext(entry.Name())) != ".md" {
-			return nil
-		}
-		rel, err := filepath.Rel(repo, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		content, err := os.ReadFile(path)
+	return brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+		content, err := os.ReadFile(file.AbsPath)
 		if err != nil {
 			return err
 		}
 		meta, _, hasFrontmatter, err := frontmatter.Split(content)
 		if err != nil {
-			return fmt.Errorf("%s has invalid frontmatter: %w", rel, err)
+			return fmt.Errorf("%s has invalid frontmatter: %w", file.RelPath, err)
 		}
 		if !hasFrontmatter {
 			return nil
 		}
-		return visit(rel, meta)
+		return visit(file.RelPath, meta)
 	})
 }
 

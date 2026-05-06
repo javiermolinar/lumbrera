@@ -47,6 +47,35 @@ func TestHealthCandidatesRanksPairBySharedFactsAndMissingLink(t *testing.T) {
 	}
 }
 
+func TestHealthCandidatesFindsLexicalOnlyMissingLinks(t *testing.T) {
+	db := openTestDB(t)
+	docs := []Document{
+		candidateWikiDoc("doc_alpha_one", "wiki/alpha-one.md", "Alpha one", "Lexical hydra flux notes.", `["one"]`, `[]`, `[]`, "2026-05-06"),
+		candidateWikiDoc("doc_alpha_two", "wiki/alpha-two.md", "Alpha two", "Lexical hydra flux guidance.", `["two"]`, `[]`, `[]`, "2026-05-06"),
+	}
+	sections := []Section{
+		{DocumentID: "doc_alpha_one", Ordinal: 1, Heading: "Alpha one", Anchor: "alpha-one", Level: 1, Body: "Lexical hydra flux overlap for missing link review."},
+		{DocumentID: "doc_alpha_two", Ordinal: 1, Heading: "Alpha two", Anchor: "alpha-two", Level: 1, Body: "Lexical hydra flux overlap for related page review."},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "candidate-lexical"}); err != nil {
+		t.Fatalf("rebuild lexical candidate fixture: %v", err)
+	}
+
+	response, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindLinks, Limit: 3})
+	if err != nil {
+		t.Fatalf("health candidates: %v", err)
+	}
+	if len(response.Candidates) != 1 {
+		t.Fatalf("candidate count = %d, want 1: %#v", len(response.Candidates), response.Candidates)
+	}
+	candidate := response.Candidates[0]
+	if candidate.Type != CandidateTypeMissingLink {
+		t.Fatalf("candidate type = %q, want missing link: %#v", candidate.Type, candidate)
+	}
+	assertCandidateReasonCode(t, candidate, ReasonLexicalOverlap)
+	assertCandidateReason(t, candidate, ReasonNotLinked, "")
+}
+
 func TestHealthCandidatesFindsOrphanPagesAndUncitedSources(t *testing.T) {
 	db := openTestDB(t)
 	docs := []Document{
