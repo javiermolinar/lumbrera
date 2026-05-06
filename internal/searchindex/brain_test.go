@@ -10,12 +10,13 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
+	"github.com/javiermolinar/lumbrera/internal/testfs"
 )
 
 func TestRebuildBrainBuildsSQLiteIndexFromRepoMarkdown(t *testing.T) {
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "sources/unreferenced.md", "# Orphan Source\n\nThis source has orphanunique evidence.\n")
-	writeFile(t, repo, "sources/raw.md", "# Raw Source\n\nRaw body mentions rawunique.\n")
+	testfs.WriteFile(t, repo, "sources/unreferenced.md", "# Orphan Source\n\nThis source has orphanunique evidence.\n")
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw Source\n\nRaw body mentions rawunique.\n")
 
 	wikiID := "doc_0123456789abcdef0123456789abcdef"
 	wikiMeta := frontmatter.NewWithID(
@@ -32,7 +33,7 @@ func TestRebuildBrainBuildsSQLiteIndexFromRepoMarkdown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("attach wiki frontmatter: %v", err)
 	}
-	writeFile(t, repo, "wiki/tempo.md", wikiContent)
+	testfs.WriteFile(t, repo, "wiki/tempo.md", wikiContent)
 
 	if err := RebuildBrain(context.Background(), repo); err != nil {
 		t.Fatalf("rebuild brain: %v", err)
@@ -94,10 +95,10 @@ func TestRebuildBrainBuildsSQLiteIndexFromRepoMarkdown(t *testing.T) {
 
 func TestRecordsForRepoIsDeterministic(t *testing.T) {
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "wiki/b.md", wikiContent(t, "doc_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "B", "B summary.", "bravo"))
-	writeFile(t, repo, "sources/z.md", "# Zeta\n\nZ body.\n")
-	writeFile(t, repo, "sources/a.md", "# Alpha\n\nA body.\n")
-	writeFile(t, repo, "wiki/a.md", wikiContent(t, "doc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "A", "A summary.", "alpha"))
+	testfs.WriteFile(t, repo, "wiki/b.md", wikiContent(t, "doc_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "B", "B summary.", "bravo"))
+	testfs.WriteFile(t, repo, "sources/z.md", "# Zeta\n\nZ body.\n")
+	testfs.WriteFile(t, repo, "sources/a.md", "# Alpha\n\nA body.\n")
+	testfs.WriteFile(t, repo, "wiki/a.md", wikiContent(t, "doc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "A", "A summary.", "alpha"))
 
 	docs, sections, metadata, err := RecordsForRepo(repo)
 	if err != nil {
@@ -182,7 +183,7 @@ func TestRebuildBrainRejectsSymlinkedRoots(t *testing.T) {
 func TestRebuildBrainFailureDoesNotLeaveOrReplaceFinalIndex(t *testing.T) {
 	t.Run("no final index is created", func(t *testing.T) {
 		repo := newBrainRepo(t)
-		writeFile(t, repo, "wiki/bad.md", "# Missing frontmatter\n")
+		testfs.WriteFile(t, repo, "wiki/bad.md", "# Missing frontmatter\n")
 
 		if err := RebuildBrain(context.Background(), repo); err == nil {
 			t.Fatal("RebuildBrain succeeded with invalid wiki, want error")
@@ -194,13 +195,13 @@ func TestRebuildBrainFailureDoesNotLeaveOrReplaceFinalIndex(t *testing.T) {
 
 	t.Run("existing final index is preserved", func(t *testing.T) {
 		repo := newBrainRepo(t)
-		writeFile(t, repo, "sources/raw.md", "# Raw\n\nRaw preserved.\n")
-		writeFile(t, repo, "wiki/good.md", wikiContent(t, "doc_cccccccccccccccccccccccccccccccc", "Good", "Good summary.", "good"))
+		testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nRaw preserved.\n")
+		testfs.WriteFile(t, repo, "wiki/good.md", wikiContent(t, "doc_cccccccccccccccccccccccccccccccc", "Good", "Good summary.", "good"))
 		if err := RebuildBrain(context.Background(), repo); err != nil {
 			t.Fatalf("initial rebuild: %v", err)
 		}
 
-		writeFile(t, repo, "wiki/bad.md", "# Missing frontmatter\n")
+		testfs.WriteFile(t, repo, "wiki/bad.md", "# Missing frontmatter\n")
 		if err := RebuildBrain(context.Background(), repo); err == nil {
 			t.Fatal("RebuildBrain succeeded with invalid wiki, want error")
 		}
@@ -224,7 +225,7 @@ func newBrainRepo(t *testing.T) string {
 			t.Fatalf("create %s: %v", rel, err)
 		}
 	}
-	writeFile(t, repo, brain.MarkerPath, brain.Version+"\n")
+	testfs.WriteFile(t, repo, brain.MarkerPath, brain.Version+"\n")
 	return repo
 }
 
@@ -237,17 +238,6 @@ func wikiContent(t *testing.T, id, title, summary, tag string) string {
 		t.Fatalf("attach wiki content: %v", err)
 	}
 	return content
-}
-
-func writeFile(t *testing.T, repo, rel, content string) {
-	t.Helper()
-	absPath := filepath.Join(repo, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		t.Fatalf("create parent for %s: %v", rel, err)
-	}
-	if err := os.WriteFile(absPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write %s: %v", rel, err)
-	}
 }
 
 func queryColumn(t *testing.T, db *sql.DB, query string) []string {

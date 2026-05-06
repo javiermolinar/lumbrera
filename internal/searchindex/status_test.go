@@ -7,13 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/javiermolinar/lumbrera/internal/testfs"
 )
 
 func TestCheckStatusMissingFreshAndStale(t *testing.T) {
 	ctx := context.Background()
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "sources/raw.md", "# Raw\n\nRaw status body.\n")
-	writeFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_dddddddddddddddddddddddddddddddd", "Topic", "Topic summary.", "topic"))
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nRaw status body.\n")
+	testfs.WriteFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_dddddddddddddddddddddddddddddddd", "Topic", "Topic summary.", "topic"))
 
 	status, err := CheckStatus(ctx, repo)
 	if err != nil {
@@ -39,7 +41,7 @@ func TestCheckStatusMissingFreshAndStale(t *testing.T) {
 		t.Fatalf("unexpected fresh status fields: %#v", status)
 	}
 
-	writeFile(t, repo, "sources/new.md", "# New\n\nNew status body.\n")
+	testfs.WriteFile(t, repo, "sources/new.md", "# New\n\nNew status body.\n")
 	status, err = CheckStatus(ctx, repo)
 	if err != nil {
 		t.Fatalf("check stale status: %v", err)
@@ -53,13 +55,13 @@ func TestCheckStatusMissingFreshAndStale(t *testing.T) {
 func TestCheckStatusDetectsContentHashStale(t *testing.T) {
 	ctx := context.Background()
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "sources/raw.md", "# Raw\n\nBefore status body.\n")
-	writeFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "Topic", "Topic summary.", "topic"))
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nBefore status body.\n")
+	testfs.WriteFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "Topic", "Topic summary.", "topic"))
 	if err := RebuildBrain(ctx, repo); err != nil {
 		t.Fatalf("rebuild brain: %v", err)
 	}
 
-	writeFile(t, repo, "sources/raw.md", "# Raw\n\nAfter status body.\n")
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nAfter status body.\n")
 	status, err := CheckStatus(ctx, repo)
 	if err != nil {
 		t.Fatalf("check stale status: %v", err)
@@ -73,8 +75,8 @@ func TestCheckStatusDetectsContentHashStale(t *testing.T) {
 func TestCheckStatusIncompatibleSchema(t *testing.T) {
 	ctx := context.Background()
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
-	writeFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_ffffffffffffffffffffffffffffffff", "Topic", "Topic summary.", "topic"))
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
+	testfs.WriteFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_ffffffffffffffffffffffffffffffff", "Topic", "Topic summary.", "topic"))
 	if err := RebuildBrain(ctx, repo); err != nil {
 		t.Fatalf("rebuild brain: %v", err)
 	}
@@ -98,8 +100,8 @@ func TestCheckStatusIncompatibleSchema(t *testing.T) {
 func TestCheckStatusIncompatibleMissingMetadata(t *testing.T) {
 	ctx := context.Background()
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
-	writeFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_11111111111111111111111111111111", "Topic", "Topic summary.", "topic"))
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
+	testfs.WriteFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_11111111111111111111111111111111", "Topic", "Topic summary.", "topic"))
 	if err := RebuildBrain(ctx, repo); err != nil {
 		t.Fatalf("rebuild brain: %v", err)
 	}
@@ -122,9 +124,9 @@ func TestCheckStatusIncompatibleMissingMetadata(t *testing.T) {
 
 func TestCheckStatusIncompatibleIndexPath(t *testing.T) {
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
-	writeFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_22222222222222222222222222222222", "Topic", "Topic summary.", "topic"))
-	writeFile(t, repo, SearchIndexRelPath, "not sqlite\n")
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
+	testfs.WriteFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_22222222222222222222222222222222", "Topic", "Topic summary.", "topic"))
+	testfs.WriteFile(t, repo, SearchIndexRelPath, "not sqlite\n")
 
 	status, err := CheckStatus(context.Background(), repo)
 	if err != nil {
@@ -141,8 +143,8 @@ func TestCheckStatusRejectsNonBrainRepo(t *testing.T) {
 
 func TestManifestMetadataForRepoIsDeterministic(t *testing.T) {
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "wiki/b.md", wikiContent(t, "doc_33333333333333333333333333333333", "B", "B summary.", "bravo"))
-	writeFile(t, repo, "sources/a.md", "# A\n\nA body.\n")
+	testfs.WriteFile(t, repo, "wiki/b.md", wikiContent(t, "doc_33333333333333333333333333333333", "B", "B summary.", "bravo"))
+	testfs.WriteFile(t, repo, "sources/a.md", "# A\n\nA body.\n")
 
 	first, err := ManifestMetadataForRepo(repo)
 	if err != nil {
@@ -181,8 +183,8 @@ func assertStatus(t *testing.T, status Status, want StatusState) {
 
 func TestCheckStatusRejectsSymlinkIndexPath(t *testing.T) {
 	repo := newBrainRepo(t)
-	writeFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
-	writeFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_44444444444444444444444444444444", "Topic", "Topic summary.", "topic"))
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n\nRaw body.\n")
+	testfs.WriteFile(t, repo, "wiki/topic.md", wikiContent(t, "doc_44444444444444444444444444444444", "Topic", "Topic summary.", "topic"))
 	target := filepath.Join(t.TempDir(), "outside.sqlite")
 	if err := os.WriteFile(target, []byte("outside"), 0o644); err != nil {
 		t.Fatal(err)

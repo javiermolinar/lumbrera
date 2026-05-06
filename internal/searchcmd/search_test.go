@@ -4,19 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/javiermolinar/lumbrera/internal/initcmd"
+	"github.com/javiermolinar/lumbrera/internal/braintest"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
-	"github.com/javiermolinar/lumbrera/internal/writecmd"
 )
 
 func TestSearchAutoRebuildsMissingIndexAndOutputsJSON(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes mention searchunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Search topic\n\nSearch body mentions searchunique.\n", "wiki/search-topic.md", "--title", "Search topic", "--summary", "Search topic summary.", "--tag", "search", "--source", "sources/raw.md", "--reason", "Create search topic", "--actor", "test")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes mention searchunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Search topic\n\nSearch body mentions searchunique.\n", "wiki/search-topic.md", "--title", "Search topic", "--summary", "Search topic summary.", "--tag", "search", "--source", "sources/raw.md", "--reason", "Create search topic", "--actor", "test")
 
 	var out bytes.Buffer
 	if err := RunWithOutput([]string{"searchunique", "--brain", repo, "--json"}, &out); err != nil {
@@ -47,16 +45,16 @@ func TestSearchAutoRebuildsMissingIndexAndOutputsJSON(t *testing.T) {
 }
 
 func TestSearchAutoRebuildsStaleIndex(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes mention oldunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody mentions oldunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes mention oldunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Topic\n\nBody mentions oldunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	var first bytes.Buffer
 	if err := RunWithOutput([]string{"oldu unique", "--brain", repo}, &first); err != nil {
 		// The query intentionally has no match. It is only used to trigger initial rebuild.
 		t.Fatalf("initial search failed: %v", err)
 	}
-	writeFile(t, repo, "sources/unreferenced.md", "# Unreferenced\n\nThis unreferenced source mentions freshunique.\n")
+	braintest.WriteFile(t, repo, "sources/unreferenced.md", "# Unreferenced\n\nThis unreferenced source mentions freshunique.\n")
 
 	var out bytes.Buffer
 	if err := RunWithOutput([]string{"freshunique", "--brain", repo}, &out); err != nil {
@@ -69,10 +67,10 @@ func TestSearchAutoRebuildsStaleIndex(t *testing.T) {
 }
 
 func TestSearchRejectsVerifyDriftDuringAutoRebuild(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
-	writeFile(t, repo, "tags.md", readFile(t, repo, "tags.md")+"\nManual drift.\n")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	braintest.WriteFile(t, repo, "tags.md", braintest.ReadFile(t, repo, "tags.md")+"\nManual drift.\n")
 
 	var out bytes.Buffer
 	err := RunWithOutput([]string{"topic", "--brain", repo}, &out)
@@ -85,9 +83,9 @@ func TestSearchRejectsVerifyDriftDuringAutoRebuild(t *testing.T) {
 }
 
 func TestSearchFiltersAndFlagsAfterQuery(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes mention filterunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody mentions filterunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes mention filterunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Topic\n\nBody mentions filterunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	var out bytes.Buffer
 	if err := RunWithOutput([]string{"filterunique", "--brain=" + repo, "--kind=wiki", "--path=wiki/", "--limit=1"}, &out); err != nil {
@@ -115,43 +113,6 @@ func TestSearchInvalidArgsAndHelp(t *testing.T) {
 	if err := RunWithOutput([]string{"--help"}, &bytes.Buffer{}); err != nil {
 		t.Fatalf("search help failed: %v", err)
 	}
-}
-
-func initBrain(t *testing.T) string {
-	t.Helper()
-	repo := filepath.Join(t.TempDir(), "brain")
-	if err := initcmd.Run([]string{repo}); err != nil {
-		t.Fatalf("init failed: %v", err)
-	}
-	return repo
-}
-
-func runWrite(t *testing.T, repo, stdin, target string, args ...string) {
-	t.Helper()
-	fullArgs := append([]string{target, "--brain", repo}, args...)
-	if err := writecmd.Run(fullArgs, strings.NewReader(stdin)); err != nil {
-		t.Fatalf("write %v failed: %v", fullArgs, err)
-	}
-}
-
-func writeFile(t *testing.T, repo, rel, content string) {
-	t.Helper()
-	absPath := filepath.Join(repo, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		t.Fatalf("create parent for %s: %v", rel, err)
-	}
-	if err := os.WriteFile(absPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write %s: %v", rel, err)
-	}
-}
-
-func readFile(t *testing.T, repo, rel string) string {
-	t.Helper()
-	content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
-	if err != nil {
-		t.Fatalf("read %s: %v", rel, err)
-	}
-	return string(content)
 }
 
 func decodeOutput(t *testing.T, content []byte) jsonOutput {

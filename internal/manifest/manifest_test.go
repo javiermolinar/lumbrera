@@ -1,9 +1,9 @@
 package manifest
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/javiermolinar/lumbrera/internal/testfs"
 )
 
 func TestGenerateSortsEntries(t *testing.T) {
@@ -19,8 +19,8 @@ func TestGenerateSortsEntries(t *testing.T) {
 
 func TestEntriesForRepoIncludeOnlyWikiMarkdown(t *testing.T) {
 	repo := t.TempDir()
-	writeFile(t, repo, "sources/raw.md", "# Raw\n")
-	writeFile(t, repo, "wiki/topic.md", "# Topic\n")
+	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n")
+	testfs.WriteFile(t, repo, "wiki/topic.md", "# Topic\n")
 
 	entries, err := EntriesForRepo(repo)
 	if err != nil {
@@ -34,16 +34,5 @@ func TestEntriesForRepoIncludeOnlyWikiMarkdown(t *testing.T) {
 func TestHashContentNormalizesCRLF(t *testing.T) {
 	if HashContent([]byte("a\r\nb\r\n")) != HashContent([]byte("a\nb\n")) {
 		t.Fatal("expected CRLF and LF content to hash the same")
-	}
-}
-
-func writeFile(t *testing.T, repo, rel, content string) {
-	t.Helper()
-	path := filepath.Join(repo, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
 	}
 }

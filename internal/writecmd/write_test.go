@@ -10,6 +10,7 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
 	"github.com/javiermolinar/lumbrera/internal/initcmd"
+	"github.com/javiermolinar/lumbrera/internal/testfs"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
@@ -17,13 +18,13 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	repo := initBrain(t)
 
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/2026/05/04/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	if frontmatter.StartsWithFrontmatter([]byte(readFile(t, repo, "sources/2026/05/04/raw.md"))) {
+	if frontmatter.StartsWithFrontmatter([]byte(testfs.ReadFile(t, repo, "sources/2026/05/04/raw.md"))) {
 		t.Fatal("source writes should preserve raw source content without generated frontmatter")
 	}
 	runWrite(t, repo, "# Related\n\nCompanion page.\n", "wiki/related.md", "--title", "Related", "--summary", "Related companion page.", "--tag", "related", "--source", "sources/2026/05/04/raw.md", "--reason", "Create related", "--actor", "test")
 	runWrite(t, repo, "# Topic\n\nSee [Related](./related.md).\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--source", "sources/2026/05/04/raw.md", "--reason", "Create topic", "--actor", "test", "--tag", "design")
 
-	wiki := readFile(t, repo, "wiki/topic.md")
+	wiki := testfs.ReadFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
 	if err != nil {
 		t.Fatal(err)
@@ -74,13 +75,13 @@ func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 	assertFileContains(t, repo, "wiki/topic.md", "Initial.\n\nAppended note.")
 	assertFileContains(t, repo, "CHANGELOG.md", "[append] [test]: Append note")
 
-	beforeUpdateMeta, _, _, err := frontmatter.Split([]byte(readFile(t, repo, "wiki/topic.md")))
+	beforeUpdateMeta, _, _, err := frontmatter.Split([]byte(testfs.ReadFile(t, repo, "wiki/topic.md")))
 	if err != nil {
 		t.Fatal(err)
 	}
 	runWrite(t, repo, "# Topic\n\nReplacement.\n", "wiki/topic.md", "--source", "sources/raw.md", "--reason", "Replace topic", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Replacement.")
-	afterUpdateMeta, _, _, err := frontmatter.Split([]byte(readFile(t, repo, "wiki/topic.md")))
+	afterUpdateMeta, _, _, err := frontmatter.Split([]byte(testfs.ReadFile(t, repo, "wiki/topic.md")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +102,7 @@ func TestWriteRejectsEmptyAppendFlag(t *testing.T) {
 
 	assertWriteError(t, repo, "Should append.\n", "wiki/topic.md", "--append=", "--source", "sources/raw.md", "--reason", "Append with empty section", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Initial.")
-	if strings.Contains(readFile(t, repo, "wiki/topic.md"), "Should append") {
+	if strings.Contains(testfs.ReadFile(t, repo, "wiki/topic.md"), "Should append") {
 		t.Fatal("failed empty append wrote snippet into page")
 	}
 }
@@ -113,7 +114,7 @@ func TestWriteRejectsOversizedWikiPage(t *testing.T) {
 	body := "# Large\n\n" + strings.Repeat("Line.\n", 401)
 	assertWriteError(t, repo, body, "wiki/large.md", "--title", "Large", "--summary", "Large summary.", "--tag", "large", "--source", "sources/raw.md", "--reason", "Create large", "--actor", "test")
 	assertMissing(t, repo, "wiki/large.md")
-	if strings.Contains(readFile(t, repo, "CHANGELOG.md"), "Create large") {
+	if strings.Contains(testfs.ReadFile(t, repo, "CHANGELOG.md"), "Create large") {
 		t.Fatal("failed oversized write left changelog entry")
 	}
 }
@@ -124,7 +125,7 @@ func TestWriteRejectsAppendToGeneratedSourcesSection(t *testing.T) {
 	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	assertWriteError(t, repo, "This would be discarded.\n", "wiki/topic.md", "--append", "Sources", "--source", "sources/raw.md", "--reason", "Append to generated sources", "--actor", "test")
-	if strings.Contains(readFile(t, repo, "wiki/topic.md"), "This would be discarded") {
+	if strings.Contains(testfs.ReadFile(t, repo, "wiki/topic.md"), "This would be discarded") {
 		t.Fatal("append to generated Sources section wrote snippet into page")
 	}
 }
@@ -149,10 +150,10 @@ func TestWriteRejectsMissingInternalLinksAndRollsBack(t *testing.T) {
 
 	assertWriteError(t, repo, "# Missing link\n\nSee [Missing](./missing.md).\n", "wiki/missing-link.md", "--title", "Missing link", "--summary", "Missing link summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create missing link", "--actor", "test")
 	assertMissing(t, repo, "wiki/missing-link.md")
-	if strings.Contains(readFile(t, repo, "CHANGELOG.md"), "Create missing link") {
+	if strings.Contains(testfs.ReadFile(t, repo, "CHANGELOG.md"), "Create missing link") {
 		t.Fatal("failed write left pending changelog entry")
 	}
-	if strings.Contains(readFile(t, repo, ".brain/ops.log"), "Create missing link") {
+	if strings.Contains(testfs.ReadFile(t, repo, ".brain/ops.log"), "Create missing link") {
 		t.Fatal("failed write left operation log entry")
 	}
 }
@@ -182,7 +183,7 @@ func TestWriteRejectsMissingAnchorsAndRollsBack(t *testing.T) {
 	for _, tc := range cases {
 		assertWriteError(t, repo, tc.body, tc.target, "--title", tc.title, "--summary", tc.title+" summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", tc.reason, "--actor", "test")
 		assertMissing(t, repo, tc.target)
-		if strings.Contains(readFile(t, repo, "CHANGELOG.md"), tc.reason) {
+		if strings.Contains(testfs.ReadFile(t, repo, "CHANGELOG.md"), tc.reason) {
 			t.Fatalf("failed write left changelog entry for %q", tc.reason)
 		}
 	}
@@ -194,7 +195,7 @@ func TestWriteExtractsSourceCitationsIntoGeneratedSources(t *testing.T) {
 	runWrite(t, repo, "# Raw B\n\n## Claim Detail\n\nB.\n", "sources/raw-b.md", "--title", "Raw B", "--reason", "Preserve raw B", "--actor", "test")
 
 	runWrite(t, repo, "# Topic\n\nImportant claim. [source: ../sources/raw-b.md#claim-detail]\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw-a.md", "--reason", "Create cited topic", "--actor", "test")
-	wiki := readFile(t, repo, "wiki/topic.md")
+	wiki := testfs.ReadFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
 	if err != nil {
 		t.Fatal(err)
@@ -218,7 +219,7 @@ func TestWriteIgnoresInlineCodeAndExternalSourceText(t *testing.T) {
 	runWrite(t, repo, "# Raw source\n\nRaw text can mention external markers. [source: https://example.com/report]\n\nRaw text can also mention local-looking markers without turning into citations. [source: ../sources/missing.md#missing]\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
 
 	runWrite(t, repo, "# Topic\n\nLiteral citation syntax: `[source: ../sources/raw.md#missing]`.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
-	wiki := readFile(t, repo, "wiki/topic.md")
+	wiki := testfs.ReadFile(t, repo, "wiki/topic.md")
 	meta, body, has, err := frontmatter.Split([]byte(wiki))
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +241,7 @@ func TestWritePreflightRejectsExistingBrokenAnchor(t *testing.T) {
 	runWrite(t, repo, "# Topic\n\nSee [Evidence](../sources/raw.md#evidence).\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	rawPath := filepath.Join(repo, "sources", "raw.md")
-	raw := strings.Replace(readFile(t, repo, "sources/raw.md"), "## Evidence", "## Renamed", 1)
+	raw := strings.Replace(testfs.ReadFile(t, repo, "sources/raw.md"), "## Evidence", "## Renamed", 1)
 	if err := os.WriteFile(rawPath, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +331,7 @@ func assertWriteError(t *testing.T, repo, stdin, target string, args ...string) 
 
 func regenerateChecksumsOnly(t *testing.T, repo string) {
 	t.Helper()
-	content := readFile(t, repo, "BRAIN.sum")
+	content := testfs.ReadFile(t, repo, "BRAIN.sum")
 	if !strings.Contains(content, "sha256:") {
 		t.Fatal("expected BRAIN.sum to have checksums")
 	}
@@ -348,18 +349,9 @@ func regenerateChecksumsOnly(t *testing.T, repo string) {
 	}
 }
 
-func readFile(t *testing.T, repo, rel string) string {
-	t.Helper()
-	content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
-	if err != nil {
-		t.Fatalf("read %s: %v", rel, err)
-	}
-	return string(content)
-}
-
 func assertFileContains(t *testing.T, repo, rel, want string) {
 	t.Helper()
-	got := readFile(t, repo, rel)
+	got := testfs.ReadFile(t, repo, rel)
 	if !strings.Contains(got, want) {
 		t.Fatalf("expected %s to contain %q, got:\n%s", rel, want, got)
 	}
@@ -367,7 +359,7 @@ func assertFileContains(t *testing.T, repo, rel, want string) {
 
 func assertFileNotContains(t *testing.T, repo, rel, unwanted string) {
 	t.Helper()
-	got := readFile(t, repo, rel)
+	got := testfs.ReadFile(t, repo, rel)
 	if strings.Contains(got, unwanted) {
 		t.Fatalf("expected %s not to contain %q, got:\n%s", rel, unwanted, got)
 	}

@@ -7,15 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/javiermolinar/lumbrera/internal/braintest"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/generate"
-	"github.com/javiermolinar/lumbrera/internal/initcmd"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
-	"github.com/javiermolinar/lumbrera/internal/writecmd"
 )
 
 func TestIndexStatusMissingDoesNotCreateIndex(t *testing.T) {
-	repo := initBrain(t)
+	repo := braintest.InitBrain(t)
 
 	if err := Run([]string{"--brain", repo, "--status"}); err != nil {
 		t.Fatalf("index status failed: %v", err)
@@ -26,9 +25,9 @@ func TestIndexStatusMissingDoesNotCreateIndex(t *testing.T) {
 }
 
 func TestIndexRebuildCreatesFreshIndex(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes mention indexunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody mentions topicunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes mention indexunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Topic\n\nBody mentions topicunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	if err := Run([]string{"--brain", repo, "--rebuild"}); err != nil {
 		t.Fatalf("index rebuild failed: %v", err)
@@ -45,12 +44,12 @@ func TestIndexRebuildCreatesFreshIndex(t *testing.T) {
 }
 
 func TestIndexRebuildRepairsMissingModifiedDate(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes mention dateunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody mentions dateunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes mention dateunique.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Topic\n\nBody mentions dateunique.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	path := filepath.Join(repo, "wiki", "topic.md")
-	withoutModifiedDate := removeModifiedDateLine(readFile(t, repo, "wiki/topic.md"))
+	withoutModifiedDate := removeModifiedDateLine(braintest.ReadFile(t, repo, "wiki/topic.md"))
 	if err := os.WriteFile(path, []byte(withoutModifiedDate), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +64,7 @@ func TestIndexRebuildRepairsMissingModifiedDate(t *testing.T) {
 	if err := Run([]string{"--brain", repo, "--rebuild"}); err != nil {
 		t.Fatalf("index rebuild should repair missing modified date: %v", err)
 	}
-	meta, _, _, err := frontmatter.Split([]byte(readFile(t, repo, "wiki/topic.md")))
+	meta, _, _, err := frontmatter.Split([]byte(braintest.ReadFile(t, repo, "wiki/topic.md")))
 	if err != nil {
 		t.Fatalf("read repaired wiki frontmatter: %v", err)
 	}
@@ -76,12 +75,12 @@ func TestIndexRebuildRepairsMissingModifiedDate(t *testing.T) {
 }
 
 func TestIndexRebuildRunsVerify(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	path := filepath.Join(repo, "tags.md")
-	if err := os.WriteFile(path, []byte(readFile(t, repo, "tags.md")+"\nManual drift.\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(braintest.ReadFile(t, repo, "tags.md")+"\nManual drift.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -98,12 +97,12 @@ func TestIndexRebuildRunsVerify(t *testing.T) {
 }
 
 func TestIndexRebuildDoesNotRepairMissingWikiDocumentID(t *testing.T) {
-	repo := initBrain(t)
-	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
-	runWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Topic\n\nBody.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
 	path := filepath.Join(repo, "wiki", "topic.md")
-	withoutID := removeIDLine(readFile(t, repo, "wiki/topic.md"))
+	withoutID := removeIDLine(braintest.ReadFile(t, repo, "wiki/topic.md"))
 	if err := os.WriteFile(path, []byte(withoutID), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +111,7 @@ func TestIndexRebuildDoesNotRepairMissingWikiDocumentID(t *testing.T) {
 	if err == nil {
 		t.Fatal("index rebuild repaired or accepted missing ID, want verify error")
 	}
-	if strings.Contains(readFile(t, repo, "wiki/topic.md"), "id: doc_") {
+	if strings.Contains(braintest.ReadFile(t, repo, "wiki/topic.md"), "id: doc_") {
 		t.Fatal("index rebuild mutated wiki file by repairing missing ID")
 	}
 	if _, statErr := os.Stat(searchindex.SearchIndexPath(repo)); !os.IsNotExist(statErr) {
@@ -136,32 +135,6 @@ func TestIndexHelp(t *testing.T) {
 	if err := Run([]string{"--help"}); err != nil {
 		t.Fatalf("index help failed: %v", err)
 	}
-}
-
-func initBrain(t *testing.T) string {
-	t.Helper()
-	repo := filepath.Join(t.TempDir(), "brain")
-	if err := initcmd.Run([]string{repo}); err != nil {
-		t.Fatalf("init failed: %v", err)
-	}
-	return repo
-}
-
-func runWrite(t *testing.T, repo, stdin, target string, args ...string) {
-	t.Helper()
-	fullArgs := append([]string{target, "--brain", repo}, args...)
-	if err := writecmd.Run(fullArgs, strings.NewReader(stdin)); err != nil {
-		t.Fatalf("write %v failed: %v", fullArgs, err)
-	}
-}
-
-func readFile(t *testing.T, repo, rel string) string {
-	t.Helper()
-	content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
-	if err != nil {
-		t.Fatalf("read %s: %v", rel, err)
-	}
-	return string(content)
 }
 
 func removeIDLine(content string) string {
