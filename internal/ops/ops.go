@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const LogPath = ".brain/ops.log"
+const LogPath = "ops.log"
 
 type Entry struct {
 	Date      string `json:"date"`

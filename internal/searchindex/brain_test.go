@@ -144,25 +144,6 @@ func TestRebuildBrainRejectsNonBrainRepo(t *testing.T) {
 }
 
 func TestRebuildBrainRejectsSymlinkedRoots(t *testing.T) {
-	t.Run("brain", func(t *testing.T) {
-		repo := newBrainRepo(t)
-		externalBrain := filepath.Join(t.TempDir(), "external-brain")
-		if err := os.MkdirAll(externalBrain, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(externalBrain, "VERSION"), []byte(brain.Version+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.RemoveAll(filepath.Join(repo, ".brain")); err != nil {
-			t.Fatal(err)
-		}
-		mustSymlink(t, externalBrain, filepath.Join(repo, ".brain"))
-
-		if err := RebuildBrain(context.Background(), repo); err == nil || !strings.Contains(err.Error(), ".brain") {
-			t.Fatalf("RebuildBrain with symlinked .brain error = %v, want .brain error", err)
-		}
-	})
-
 	t.Run("sources", func(t *testing.T) {
 		repo := newBrainRepo(t)
 		externalSources := filepath.Join(t.TempDir(), "external-sources")
@@ -220,7 +201,7 @@ func TestRebuildBrainFailureDoesNotLeaveOrReplaceFinalIndex(t *testing.T) {
 func newBrainRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
-	for _, rel := range []string{".brain", "sources", "wiki"} {
+	for _, rel := range []string{"sources", "wiki"} {
 		if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(rel)), 0o755); err != nil {
 			t.Fatalf("create %s: %v", rel, err)
 		}

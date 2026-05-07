@@ -64,7 +64,7 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	assertFileContains(t, repo, "tags.md", "## Tags")
 	assertFileContains(t, repo, "tags.md", "- design (1)")
 	assertFileNotContains(t, repo, "tags.md", "wiki/topic.md")
-	assertFileContains(t, repo, ".brain/ops.log", `"operation":"create"`)
+	assertFileContains(t, repo, "ops.log", `"operation":"create"`)
 }
 
 func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
@@ -154,7 +154,7 @@ func TestWriteRejectsMissingInternalLinksAndRollsBack(t *testing.T) {
 	if strings.Contains(testfs.ReadFile(t, repo, "CHANGELOG.md"), "Create missing link") {
 		t.Fatal("failed write left pending changelog entry")
 	}
-	if strings.Contains(testfs.ReadFile(t, repo, ".brain/ops.log"), "Create missing link") {
+	if strings.Contains(testfs.ReadFile(t, repo, "ops.log"), "Create missing link") {
 		t.Fatal("failed write left operation log entry")
 	}
 }

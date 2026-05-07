@@ -73,7 +73,7 @@ Behavior:
   - then checks deterministic consistency
 
 Checks:
-  - .brain/VERSION matches the supported brain format
+  - VERSION matches the supported brain format
   - content paths obey Lumbrera policy
   - wiki documents have valid generated frontmatter
   - wiki pages are at most 400 Markdown body lines

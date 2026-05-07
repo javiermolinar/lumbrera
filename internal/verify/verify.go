@@ -9,16 +9,6 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/generate"
 )
 
-var allowedRootFiles = map[string]struct{}{
-	brain.IndexPath:     {},
-	brain.ChangelogPath: {},
-	brain.BrainSumPath:  {},
-	brain.TagsPath:      {},
-	"AGENTS.md":         {},
-	"CLAUDE.md":         {},
-	".gitignore":        {},
-}
-
 type Options struct{}
 
 // Run performs the user-facing verify command behavior, including the legacy

@@ -9,7 +9,7 @@ import (
 
 const (
 	Version          = "lumbrera-brain-v1"
-	MarkerPath       = ".brain/VERSION"
+	MarkerPath       = "VERSION"
 	IndexPath        = "INDEX.md"
 	ChangelogPath    = "CHANGELOG.md"
 	BrainSumPath     = "BRAIN.sum"

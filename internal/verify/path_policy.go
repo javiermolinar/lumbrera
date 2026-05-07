@@ -9,12 +9,42 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 )
 
+// ValidatePathPolicy checks that the Lumbrera content directories exist and
+// that files inside sources/ and wiki/ obey path policy. Everything outside
+// those directories is ignored — the brain repo may contain arbitrary
+// non-Lumbrera files such as .github/, README.md, CI configs, etc.
 func ValidatePathPolicy(repo string) error {
-	return filepath.WalkDir(repo, func(absPath string, entry os.DirEntry, err error) error {
+	for _, dir := range []string{"sources", "wiki"} {
+		if err := validateContentDir(repo, dir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateContentDir checks that a content directory exists as a real
+// directory (not a symlink) and that all files inside obey path policy.
+func validateContentDir(repo, root string) error {
+	absRoot := filepath.Join(repo, root)
+	info, err := os.Lstat(absRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("required directory %s/ is missing", root)
+		}
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s must be a real directory, not a symlink", root)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s must be a directory", root)
+	}
+
+	return filepath.WalkDir(absRoot, func(absPath string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if absPath == repo {
+		if absPath == absRoot {
 			return nil
 		}
 		rel, err := filepath.Rel(repo, absPath)
@@ -23,58 +53,21 @@ func ValidatePathPolicy(repo string) error {
 		}
 		rel = filepath.ToSlash(rel)
 
-		if rel == ".git" || strings.HasPrefix(rel, ".git/") {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if rel == ".brain" || strings.HasPrefix(rel, ".brain/") || rel == ".agents" || strings.HasPrefix(rel, ".agents/") {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if rel == ".claude" || strings.HasPrefix(rel, ".claude/") {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
 		if entry.Type()&os.ModeSymlink != 0 {
-			if rel == "CLAUDE.md" || rel == ".claude" {
-				return nil
-			}
 			return fmt.Errorf("path %s is a symlink; Lumbrera content paths must not use symlinks", rel)
 		}
 
 		if entry.IsDir() {
-			if rel == "sources" || strings.HasPrefix(rel, "sources/") || rel == "wiki" || strings.HasPrefix(rel, "wiki/") {
-				return nil
-			}
-			return fmt.Errorf("unexpected directory %s; Lumbrera content must live under sources/ or wiki/", rel)
-		}
-
-		if strings.HasPrefix(rel, "sources/") || strings.HasPrefix(rel, "wiki/") {
-			if entry.IsDir() {
-				if err := validateTierDirectory(rel); err != nil {
-					return err
-				}
-			}
-			if strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
-				if _, _, err := pathpolicy.NormalizeTargetPath(rel); err != nil {
-					return err
-				}
+			if err := validateTierDirectory(rel); err != nil {
+				return err
 			}
 			return nil
 		}
 
-		if isAllowedRootFile(rel) {
-			return nil
-		}
 		if strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
-			return fmt.Errorf("unexpected Markdown file %s; Lumbrera content must live under sources/ or wiki/", rel)
+			if _, _, err := pathpolicy.NormalizeTargetPath(rel); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -103,16 +96,4 @@ func validateTierDirectory(rel string) error {
 	}
 	_ = root
 	return nil
-}
-
-func isAllowedRootFile(rel string) bool {
-	if _, ok := allowedRootFiles[rel]; ok {
-		return true
-	}
-	switch strings.ToUpper(rel) {
-	case "README", "README.MD", "LICENSE", "LICENSE.MD", "LICENSE.TXT", "COPYING", "COPYING.MD":
-		return true
-	default:
-		return false
-	}
 }

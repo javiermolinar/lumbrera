@@ -1,5 +1,9 @@
 # Lumbrera
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/javiermolinar/lumbrera.svg)](https://pkg.go.dev/github.com/javiermolinar/lumbrera)
+[![Go Report Card](https://goreportcard.com/badge/github.com/javiermolinar/lumbrera)](https://goreportcard.com/report/github.com/javiermolinar/lumbrera)
+[![Latest Release](https://img.shields.io/github/v/release/javiermolinar/lumbrera)](https://github.com/javiermolinar/lumbrera/releases)
+
 Lumbrera is a backendless, Markdown-native second brain for humans and LLM agents.
 
 It is inspired by the Karpathy [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): preserve raw source material, distill it into a durable human-readable Markdown wiki, and let agents help maintain that knowledge base over time.
@@ -92,3 +96,4 @@ lumbrera search "querier batching" --tier design --json
 ```
 
 When ingesting a design doc, preserve under `sources/design/` and create wiki pages under `wiki/design/`. The LLM sees the tier label in search results and naturally prefers canonical answers for operational questions.
+

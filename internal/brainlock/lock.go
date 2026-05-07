@@ -28,6 +28,9 @@ func Acquire(brain, operation string) (*Lock, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
 	if err := os.Mkdir(path, 0o700); err != nil {
 		if errors.Is(err, os.ErrExist) {
 			return nil, lockedError(path)

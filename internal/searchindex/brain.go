@@ -33,9 +33,6 @@ type indexedFile struct {
 // RebuildBrain rebuilds the disposable SQLite search cache for a Lumbrera brain
 // repository from canonical Markdown files.
 func RebuildBrain(ctx context.Context, repo string) error {
-	if _, err := brainfs.ValidateDirectory(repo, ".brain", true); err != nil {
-		return err
-	}
 	if err := brain.ValidateRepo(repo); err != nil {
 		return err
 	}
@@ -54,6 +51,9 @@ func SearchIndexPath(repo string) string {
 
 func rebuildBrainAtomically(ctx context.Context, repo string, documents []Document, sections []Section, links []DocumentLink, citations []DocumentCitation, tags []DocumentTag, metadata map[string]string) error {
 	brainDir := filepath.Join(repo, ".brain")
+	if err := os.MkdirAll(brainDir, 0o755); err != nil {
+		return fmt.Errorf("create .brain cache directory: %w", err)
+	}
 	tmpFile, err := os.CreateTemp(brainDir, "search.sqlite-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create temporary search index: %w", err)

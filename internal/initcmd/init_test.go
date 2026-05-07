@@ -14,7 +14,7 @@ func TestInitMissingDirectory(t *testing.T) {
 		t.Fatalf("init failed: %v", err)
 	}
 
-	assertFile(t, repo, ".brain/VERSION", brainVersion)
+	assertFile(t, repo, "VERSION", brainVersion)
 	assertFileExact(t, repo, "INDEX.md", indexContent)
 	assertFileExact(t, repo, "CHANGELOG.md", changelogContent)
 	assertFileExact(t, repo, "BRAIN.sum", brainSumContent)
@@ -32,8 +32,8 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertExists(t, repo, "CHANGELOG.md")
 	assertExists(t, repo, "BRAIN.sum")
 	assertExists(t, repo, "tags.md")
-	assertExists(t, repo, ".brain/ops.log")
-	assertFileContains(t, repo, ".gitignore", ".brain/search.sqlite*")
+	assertExists(t, repo, "ops.log")
+	assertFileContains(t, repo, ".gitignore", ".brain/")
 	assertExists(t, repo, "AGENTS.md")
 	assertFileContains(t, repo, "AGENTS.md", "## Read")
 	assertFileContains(t, repo, "AGENTS.md", "## Write")
@@ -96,8 +96,8 @@ func TestInitAllowsBoilerplate(t *testing.T) {
 
 	assertFile(t, repo, "README.md", "# Brain")
 	assertFileContains(t, repo, ".gitignore", "dist/")
-	assertFileContains(t, repo, ".gitignore", ".brain/search.sqlite*")
-	assertExists(t, repo, ".brain/VERSION")
+	assertFileContains(t, repo, ".gitignore", ".brain/")
+	assertExists(t, repo, "VERSION")
 }
 
 func TestInitRejectsExistingContentRepo(t *testing.T) {
@@ -115,19 +115,17 @@ func TestInitRejectsExistingContentRepo(t *testing.T) {
 	}
 }
 
-func TestInitRejectsInvalidBrainDirectory(t *testing.T) {
+func TestInitIgnoresBrainCacheDirectory(t *testing.T) {
 	repo := t.TempDir()
+	// A leftover .brain/ cache directory should not prevent init.
 	if err := os.Mkdir(filepath.Join(repo, ".brain"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	err := Run([]string{repo})
-	if err == nil {
-		t.Fatal("expected init to reject invalid .brain directory")
+	if err := Run([]string{repo}); err != nil {
+		t.Fatalf("init should succeed with leftover .brain/ cache: %v", err)
 	}
-	if !strings.Contains(err.Error(), ".brain") {
-		t.Fatalf("expected error to mention .brain, got %v", err)
-	}
+	assertExists(t, repo, "VERSION")
 }
 
 func assertExists(t *testing.T, repo, rel string) {

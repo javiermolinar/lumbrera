@@ -26,9 +26,6 @@ func detectInitState(repo string) (initState, error) {
 	if marker == brainVersion {
 		return initStateComplete, nil
 	}
-	if exists(filepath.Join(repo, ".brain")) {
-		return 0, fmt.Errorf("refusing to initialize %s: .brain/ exists but .brain/VERSION is missing or invalid", repo)
-	}
 	if err := validateFreshBoilerplate(repo); err != nil {
 		return 0, err
 	}

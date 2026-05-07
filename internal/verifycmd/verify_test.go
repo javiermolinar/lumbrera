@@ -107,18 +107,21 @@ func TestVerifyAllowsRawSourceWithoutGeneratedFrontmatter(t *testing.T) {
 	}
 }
 
-func TestVerifyRejectsUnexpectedRootMarkdown(t *testing.T) {
+func TestVerifyIgnoresNonLumbreraRootFiles(t *testing.T) {
 	repo := braintest.InitBrain(t)
+	// Arbitrary files at root (e.g. .github/, rogue.md) should be ignored.
 	if err := os.WriteFile(filepath.Join(repo, "rogue.md"), []byte("# Rogue\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-
-	err := Run([]string{"--brain", repo})
-	if err == nil {
-		t.Fatal("expected verify to reject root Markdown")
+	if err := os.MkdirAll(filepath.Join(repo, ".github", "workflows"), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "rogue.md") {
-		t.Fatalf("expected error to mention rogue.md, got %v", err)
+	if err := os.WriteFile(filepath.Join(repo, ".github", "workflows", "ci.yml"), []byte("name: CI\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Run([]string{"--brain", repo}); err != nil {
+		t.Fatalf("verify should ignore non-Lumbrera root files: %v", err)
 	}
 }
 

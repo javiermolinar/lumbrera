@@ -10,7 +10,7 @@ import (
 
 const (
 	brainVersion        = "lumbrera-brain-v1"
-	markerPath          = ".brain/VERSION"
+	markerPath          = "VERSION"
 	agentsPath          = "AGENTS.md"
 	claudePath          = "CLAUDE.md"
 	claudeSymlinkTarget = agentsPath
@@ -25,20 +25,19 @@ var scaffoldDirs = []string{
 	"sources/reference",
 	"wiki",
 	"wiki/design",
-	".brain",
 	".agents/skills/lumbrera-ingest",
 	".agents/skills/lumbrera-query",
 	".agents/skills/lumbrera-health",
 }
 
 var scaffoldFiles = map[string]string{
-	markerPath:       brainVersion + "\n",
-	"INDEX.md":       indexContent,
-	"CHANGELOG.md":   changelogContent,
-	"BRAIN.sum":      brainSumContent,
-	"tags.md":        tagsContent,
-	".brain/ops.log": "",
-	agentsPath:       agentsContent,
+	markerPath:     brainVersion + "\n",
+	"INDEX.md":     indexContent,
+	"CHANGELOG.md": changelogContent,
+	"BRAIN.sum":    brainSumContent,
+	"tags.md":      tagsContent,
+	"ops.log":      "",
+	agentsPath:     agentsContent,
 	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
 	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,
 	".agents/skills/lumbrera-health/SKILL.md": healthSkillContent,
@@ -65,7 +64,7 @@ func ensureScaffold(repo string) error {
 }
 
 func ensureGitignore(path string) error {
-	const searchIndexIgnore = ".brain/search.sqlite*"
+	const brainDirIgnore = ".brain/"
 	info, statErr := os.Lstat(path)
 	if statErr == nil {
 		if info.Mode()&os.ModeSymlink != 0 {
@@ -83,9 +82,9 @@ func ensureGitignore(path string) error {
 		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		return writeExpectedFile(path, "# Lumbrera derived cache\n"+searchIndexIgnore+"\n")
+		return writeExpectedFile(path, "# Lumbrera derived cache\n"+brainDirIgnore+"\n")
 	}
-	if hasGitignoreLine(string(content), searchIndexIgnore) {
+	if hasGitignoreLine(string(content), brainDirIgnore) {
 		return nil
 	}
 
@@ -96,7 +95,7 @@ func ensureGitignore(path string) error {
 	if updated != "" {
 		updated += "\n"
 	}
-	updated += "# Lumbrera derived cache\n" + searchIndexIgnore + "\n"
+	updated += "# Lumbrera derived cache\n" + brainDirIgnore + "\n"
 	return os.WriteFile(path, []byte(updated), 0o644)
 }
 
@@ -158,7 +157,7 @@ func validateFreshBoilerplate(repo string) error {
 	}
 	for _, entry := range entries {
 		name := entry.Name()
-		if name == ".git" {
+		if name == ".git" || name == ".brain" {
 			continue
 		}
 		if entry.IsDir() {

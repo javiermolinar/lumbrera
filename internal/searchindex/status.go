@@ -125,9 +125,6 @@ func ManifestMetadataForRepo(repo string) (map[string]string, error) {
 }
 
 func validateBrainForStatus(repo string) error {
-	if _, err := brainfs.ValidateDirectory(repo, ".brain", true); err != nil {
-		return err
-	}
 	return brain.ValidateRepo(repo)
 }
 
