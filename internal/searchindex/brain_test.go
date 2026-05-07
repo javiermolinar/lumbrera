@@ -80,7 +80,7 @@ func TestRebuildBrainBuildsSQLiteIndexFromRepoMarkdown(t *testing.T) {
 	}
 	manifest := meta[manifestDebugMetaKey]
 	for _, want := range []string{
-		"schema_version=2",
+		"schema_version=3",
 		"indexer_version=1",
 		"markdown_sections_version=1",
 		"path=sources/raw.md ",

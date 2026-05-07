@@ -22,6 +22,7 @@ type options struct {
 	PathPrefix string
 	Tags       []string
 	Sources    []string
+	Tiers      []string
 	JSON       bool
 	Help       bool
 }
@@ -60,6 +61,7 @@ type jsonResult struct {
 	Path      string   `json:"path"`
 	Anchor    string   `json:"anchor,omitempty"`
 	Kind      string   `json:"kind"`
+	Tier      string   `json:"tier"`
 	Title     string   `json:"title"`
 	Heading   string   `json:"heading,omitempty"`
 	Summary   string   `json:"summary"`
@@ -107,6 +109,7 @@ func RunWithOutput(args []string, out io.Writer) error {
 		PathPrefix: opts.PathPrefix,
 		Tags:       opts.Tags,
 		Sources:    opts.Sources,
+		Tiers:      opts.Tiers,
 	})
 	if err != nil {
 		return err
@@ -169,6 +172,13 @@ func parseArgs(args []string) (options, error) {
 			}
 			opts.Sources = append(opts.Sources, value)
 			i = next
+		case "--tier":
+			value, next, err := cmdutil.OptionValue(args, i, name, inlineValue, hasInlineValue)
+			if err != nil {
+				return options{}, err
+			}
+			opts.Tiers = append(opts.Tiers, value)
+			i = next
 		case "--json":
 			if hasInlineValue {
 				return options{}, fmt.Errorf("--json does not accept a value")
@@ -223,6 +233,7 @@ func writeJSON(out io.Writer, response searchindex.SearchResponse) error {
 			Path:      result.Path,
 			Anchor:    result.Anchor,
 			Kind:      result.Kind,
+			Tier:      result.Tier,
 			Title:     result.Title,
 			Heading:   result.Heading,
 			Summary:   result.Summary,

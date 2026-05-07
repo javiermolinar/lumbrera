@@ -29,6 +29,15 @@ Use when the user asks a question about knowledge in the brain.
 7. If the top results are insufficient, run one refined search using better terms from the first results.
 8. Only after search is insufficient, use INDEX.md and tags.md as fallback navigation and state why search was insufficient.
 
+## Tier awareness
+
+Search results include a `tier` field: `canonical`, `design`, or `reference`. Canonical content ranks highest by default.
+
+- Prefer canonical results for operational, how-to, and current-behavior questions.
+- Use design-tier results only when the user asks about proposals, future plans, or design rationale.
+- When citing design-tier content, state that it is a proposal and not implemented.
+- Use `--tier design` to search only design proposals: `lumbrera search "<query>" --tier design --json`
+
 ## Guardrails
 
 - Do not start by scanning the repo, running broad find/rg, or reading every INDEX.md entry.

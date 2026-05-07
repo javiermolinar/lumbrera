@@ -21,7 +21,10 @@ const (
 
 var scaffoldDirs = []string{
 	"sources",
+	"sources/design",
+	"sources/reference",
 	"wiki",
+	"wiki/design",
 	".brain",
 	".agents/skills/lumbrera-ingest",
 	".agents/skills/lumbrera-query",

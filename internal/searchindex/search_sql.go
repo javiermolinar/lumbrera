@@ -26,6 +26,14 @@ func runSearch(ctx context.Context, db *sql.DB, match string, opts SearchOptions
 		where = append(where, `EXISTS (SELECT 1 FROM document_citations dc WHERE dc.document_id = s.document_id AND dc.source_path = ?)`)
 		args = append(args, source)
 	}
+	if len(opts.Tiers) > 0 {
+		placeholders := make([]string, len(opts.Tiers))
+		for i, tier := range opts.Tiers {
+			placeholders[i] = "?"
+			args = append(args, tier)
+		}
+		where = append(where, fmt.Sprintf(`d.tier IN (%s)`, strings.Join(placeholders, ", ")))
+	}
 	args = append(args, searchCandidateLimit(opts.Limit))
 
 	query := fmt.Sprintf(`WITH matches AS (
@@ -35,6 +43,7 @@ func runSearch(ctx context.Context, db *sql.DB, match string, opts SearchOptions
 		s.path,
 		s.anchor,
 		s.kind,
+		d.tier,
 		s.title,
 		s.heading,
 		s.summary,
@@ -52,9 +61,15 @@ func runSearch(ctx context.Context, db *sql.DB, match string, opts SearchOptions
 			WHEN 'contents' THEN 3.5
 			WHEN 'navigation' THEN 3.5
 			ELSE 0
-		END AS heading_penalty
+		END AS heading_penalty,
+		CASE d.tier
+			WHEN 'design' THEN 0.45
+			WHEN 'reference' THEN 0.60
+			ELSE 0.00
+		END AS tier_penalty
 	FROM sections_fts
 	JOIN sections s ON s.rowid = sections_fts.rowid
+	JOIN documents d ON d.id = s.document_id
 	WHERE %s
 )
 SELECT
@@ -63,6 +78,7 @@ SELECT
 	path,
 	COALESCE(anchor, ''),
 	kind,
+	tier,
 	title,
 	COALESCE(heading, ''),
 	summary,
@@ -70,7 +86,7 @@ SELECT
 	sources_json,
 	links_json,
 	snippet,
-	lexical_score - CASE kind WHEN 'wiki' THEN abs(lexical_score) * %.2f ELSE 0 END + heading_penalty AS score,
+	(lexical_score - CASE kind WHEN 'wiki' THEN abs(lexical_score) * %.2f ELSE 0 END + heading_penalty) + (abs(lexical_score) * tier_penalty) AS score,
 	lexical_score
 FROM matches
 ORDER BY
@@ -98,6 +114,7 @@ LIMIT ?`, strings.Join(where, " AND "), wikiScoreBoost)
 			&result.Path,
 			&result.Anchor,
 			&result.Kind,
+			&result.Tier,
 			&result.Title,
 			&result.Heading,
 			&result.Summary,

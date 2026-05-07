@@ -89,11 +89,15 @@ func RebuildRecordsWithFacts(ctx context.Context, db *sql.DB, documents []Docume
 	}
 
 	for _, doc := range docs {
+		tier := doc.Tier
+		if tier == "" {
+			tier = TierCanonical
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO documents(
-			id, path, kind, title, summary, tags_json, sources_json, links_json,
+			id, path, kind, tier, title, summary, tags_json, sources_json, links_json,
 			tags_text, sources_text, links_text, modified_date, hash, size_bytes
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			doc.ID, doc.Path, doc.Kind, doc.Title, doc.Summary, doc.TagsJSON, doc.SourcesJSON, doc.LinksJSON,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			doc.ID, doc.Path, doc.Kind, tier, doc.Title, doc.Summary, doc.TagsJSON, doc.SourcesJSON, doc.LinksJSON,
 			doc.TagsText, doc.SourcesText, doc.LinksText, doc.ModifiedDate, doc.Hash, doc.SizeBytes,
 		); err != nil {
 			return fmt.Errorf("insert search index document %q: %w", doc.ID, err)

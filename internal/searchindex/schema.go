@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const CurrentSchemaVersion = 2
+const CurrentSchemaVersion = 3
 
 var schemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS meta(
@@ -20,6 +20,7 @@ var schemaStatements = []string{
 		id TEXT PRIMARY KEY,
 		path TEXT UNIQUE NOT NULL,
 		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'source')),
+		tier TEXT NOT NULL DEFAULT 'canonical' CHECK(tier IN ('canonical', 'design', 'reference')),
 		title TEXT NOT NULL,
 		summary TEXT NOT NULL,
 		tags_json TEXT NOT NULL,

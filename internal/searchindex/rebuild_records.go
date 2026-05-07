@@ -7,6 +7,10 @@ import (
 const (
 	KindWiki   = "wiki"
 	KindSource = "source"
+
+	TierCanonical = "canonical"
+	TierDesign    = "design"
+	TierReference = "reference"
 )
 
 // Document is the normalized file-level projection inserted into the derived
@@ -16,6 +20,7 @@ type Document struct {
 	ID           string
 	Path         string
 	Kind         string
+	Tier         string
 	Title        string
 	Summary      string
 	TagsJSON     string

@@ -144,9 +144,14 @@ func normalizeSearchOptions(opts SearchOptions) (SearchOptions, error) {
 	if err != nil {
 		return SearchOptions{}, err
 	}
+	tiers, err := normalizeSearchTiers(opts.Tiers)
+	if err != nil {
+		return SearchOptions{}, err
+	}
 	opts.PathPrefix = prefix
 	opts.Tags = tags
 	opts.Sources = sources
+	opts.Tiers = tiers
 	return opts, nil
 }
 
@@ -155,6 +160,22 @@ func normalizeSearchTags(tags []string) ([]string, error) {
 	for _, tag := range out {
 		if err := frontmatter.ValidateTags([]string{tag}); err != nil {
 			return nil, fmt.Errorf("invalid search tag %q: %w", tag, err)
+		}
+	}
+	return out, nil
+}
+
+var validTiers = map[string]bool{
+	TierCanonical: true,
+	TierDesign:    true,
+	TierReference: true,
+}
+
+func normalizeSearchTiers(tiers []string) ([]string, error) {
+	out := uniqueSortedStrings(tiers)
+	for _, tier := range out {
+		if !validTiers[tier] {
+			return nil, fmt.Errorf("invalid search tier %q; valid tiers: canonical, design, reference", tier)
 		}
 	}
 	return out, nil

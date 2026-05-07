@@ -27,6 +27,7 @@ type SearchOptions struct {
 	PathPrefix string
 	Tags       []string
 	Sources    []string
+	Tiers      []string
 }
 
 type SearchResponse struct {
@@ -68,6 +69,7 @@ type SearchResult struct {
 	Path         string
 	Anchor       string
 	Kind         string
+	Tier         string
 	Title        string
 	Heading      string
 	Summary      string

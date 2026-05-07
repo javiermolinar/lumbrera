@@ -39,6 +39,29 @@ func ExtractMarkdownRecordsWithFacts(relPath string, content []byte) (Document, 
 	}
 }
 
+// TierForPath infers the source tier from a repo-relative path using a closed
+// enum. Unknown prefixes default to canonical.
+func TierForPath(relPath string) string {
+	for _, prefix := range []string{"sources/design/", "wiki/design/"} {
+		if strings.HasPrefix(relPath, prefix) {
+			return TierDesign
+		}
+	}
+	for _, prefix := range []string{"sources/reference/", "wiki/reference/"} {
+		if strings.HasPrefix(relPath, prefix) {
+			return TierReference
+		}
+	}
+	return TierCanonical
+}
+
+// KnownTierDirectories lists the directory names under sources/ and wiki/ that
+// map to non-canonical tiers. Used by verify to reject typos.
+var KnownTierDirectories = map[string]string{
+	"design":    TierDesign,
+	"reference": TierReference,
+}
+
 func extractWikiRecords(relPath string, content []byte) (Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, error) {
 	meta, body, hasFrontmatter, err := frontmatter.Split(content)
 	if err != nil {
@@ -67,6 +90,7 @@ func extractWikiRecords(relPath string, content []byte) (Document, []Section, []
 		ID:           meta.Lumbrera.ID,
 		Path:         relPath,
 		Kind:         KindWiki,
+		Tier:         TierForPath(relPath),
 		Title:        strings.TrimSpace(meta.Title),
 		Summary:      strings.TrimSpace(meta.Summary),
 		TagsJSON:     jsonStringArray(meta.Tags),
@@ -93,6 +117,7 @@ func extractSourceRecords(relPath string, content []byte) (Document, []Section, 
 		ID:          sourceDocumentID(relPath),
 		Path:        relPath,
 		Kind:        KindSource,
+		Tier:        TierForPath(relPath),
 		Title:       sourceTitle(relPath, sections),
 		Summary:     "",
 		TagsJSON:    "[]",

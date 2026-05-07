@@ -64,16 +64,34 @@ From time to time, run the health skill to review semantic maintenance candidate
 ```
 
 
+## Source tiers
+
+Not all sources are equal. Lumbrera infers a tier from the path and uses it to rank search results:
+
+| Tier | Path prefix | Ranking | Use for |
+|---|---|---|---|
+| canonical | `sources/` `wiki/` | default (1.0) | Current product docs, operations, reference |
+| design | `sources/design/` `wiki/design/` | demoted (0.45 penalty) | Proposals, ADRs, specs not yet implemented |
+| reference | `sources/reference/` | demoted (0.60 penalty) | Historical docs, competition, meeting notes |
+
+Canonical content ranks first in search. Design and reference content is still findable but structurally deprioritized. Use `--tier` to filter:
+
+```sh
+lumbrera search "querier batching" --tier design --json
+```
+
+When ingesting a design doc, preserve under `sources/design/` and create wiki pages under `wiki/design/`. The LLM sees the tier label in search results and naturally prefers canonical answers for operational questions.
+
 ## Goals
 
-The goal is simple, a way to summary the content so both human and agents can benefit from it.
+The goal is simple: a way to summarize content so both humans and agents can benefit from it.
 Lumbrera is not trying to be a new chat UI or a full knowledge-management app. It is a small protocol and CLI boundary for maintaining source-grounded Markdown knowledge safely in local files. Git, cloud sync, backups, and sharing are external choices.
 
 ## Commands
 
 Agents use the generated `AGENTS.md` and bundled skills. The core protocol is intentionally small:
 
-- `lumbrera search "<query>" --brain <path> --json` searches wiki synthesis and preserved Markdown sources with a deterministic local SQLite/FTS5 index. Optional exact `--tag <tag>` and `--source <sources/path.md>` filters narrow wiki results by generated tags or cited provenance. Output treats `recommended_sections` as the primary agent read plan, with section reasons, `agent_instructions`, entity `coverage`, ranked raw hits, snippets, tags, sources, links, `recommended_read_order`, and a stop rule.
+- `lumbrera search "<query>" --brain <path> --json` searches wiki synthesis and preserved Markdown sources with a deterministic local SQLite/FTS5 index. Optional `--tag <tag>`, `--source <sources/path.md>`, and `--tier <canonical|design|reference>` filters narrow results. Output treats `recommended_sections` as the primary agent read plan, with section reasons, `agent_instructions`, entity `coverage`, ranked raw hits, snippets, tags, tier, sources, links, `recommended_read_order`, and a stop rule.
 - `lumbrera health --brain <path> --json` returns deterministic health/consolidation review candidates for LLM review. Candidates are not conclusions; they identify pages or sources worth reading for possible links, consolidation, stale-risk, orphan pages, or source coverage gaps.
 - `lumbrera index --status --brain <path>` reports whether `.brain/search.sqlite` is missing, fresh, stale, or incompatible without mutating files.
 - `lumbrera index --rebuild --brain <path>` verifies the brain and rebuilds `.brain/search.sqlite` as a disposable cache.

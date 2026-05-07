@@ -20,16 +20,48 @@ This is a Lumbrera brain: a managed Markdown knowledge base for humans and LLM a
 - Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
 - .brain/search.sqlite is a disposable generated cache; rebuild it with lumbrera index, do not edit or cite it.
 
-## Wiki rules
+## Source tiers
 
-- Wiki pages require a title, single-line summary, 1-5 lowercase slug tags, source references, and at most 400 Markdown body lines.
+Sources and wiki pages are ranked by tier, inferred from path:
+
+- `sources/` and `wiki/` — canonical (current product docs, operations, reference). Default.
+- `sources/design/` and `wiki/design/` — design proposals, ADRs, specs. Not implemented.
+- `sources/reference/` — preserved context that rarely surfaces (historical, competition, meeting notes).
+
+Search ranks canonical content above design and reference. Use `--tier` to filter search results.
+
+When ingesting design docs, preserve under `sources/design/` and create wiki pages under `wiki/design/` with tags like `design` and `draft`. Mark the wiki body with the proposal status. Do not tag design pages with `operations` or `architecture`.
+
+## Wiki style
+
+- Atomic, source-grounded, searchable, and useful without reopening the source.
+- One durable concept, task, runbook, decision, or reference per page; not organized by source chunk.
+- Clear title, single-line summary, 1-5 lowercase slug tags, and a stable path.
+- Every page under the hard maximum of 400 Markdown body lines.
+- Use precise source citations for important claims and real wiki links for related knowledge.
+- Troubleshooting/runbooks prefer symptom → cause → fix structure.
+- Split when a draft covers multiple concepts, has independent sections, needs more than 5 tags, or becomes a grab bag.
+- Every new wiki page should have at least one wiki link unless genuinely standalone.
+- Prefer inline links; use a short "Related pages" section only when inline links are awkward.
+- Reuse existing tags from tags.md when they fit.
 - Lumbrera generates document IDs, frontmatter, source sections, index, changelog, checksums, and the tag registry.
-- Read tags.md before wiki writes and reuse existing tags when they fit.
+
+## Inline source citations
+
+~~~md
+Important claim [source: ../sources/example.md#heading-anchor].
+~~~
+
+- Use for operationally important, numeric, destructive, version-sensitive, surprising, or easily disputed claims.
+- Prefer stable heading anchors over line numbers.
+- Pass file-level provenance with `lumbrera write --source`; inline citations complement it.
+- Do not add citations to every sentence.
 
 ## Commands
 
 ~~~sh
 lumbrera search "question" --brain . --json
+lumbrera search "question" --tier design --json
 lumbrera index --status --brain .
 lumbrera index --rebuild --brain .
 lumbrera verify --brain .

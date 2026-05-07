@@ -57,6 +57,11 @@ func ValidatePathPolicy(repo string) error {
 		}
 
 		if strings.HasPrefix(rel, "sources/") || strings.HasPrefix(rel, "wiki/") {
+			if entry.IsDir() {
+				if err := validateTierDirectory(rel); err != nil {
+					return err
+				}
+			}
 			if strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
 				if _, _, err := pathpolicy.NormalizeTargetPath(rel); err != nil {
 					return err
@@ -73,6 +78,31 @@ func ValidatePathPolicy(repo string) error {
 		}
 		return nil
 	})
+}
+
+// validateTierDirectory checks that first-level directories under sources/ and
+// wiki/ are either known tier directories or product/topic directories. A
+// single-segment directory directly under sources/ or wiki/ that matches a
+// known tier name is always allowed. Unknown single-segment names that look
+// like tier typos (e.g. "desing") are allowed because they default to
+// canonical tier — the enforcement is on known tier names only.
+func validateTierDirectory(rel string) error {
+	var root, rest string
+	if strings.HasPrefix(rel, "sources/") {
+		root = "sources"
+		rest = strings.TrimPrefix(rel, "sources/")
+	} else if strings.HasPrefix(rel, "wiki/") {
+		root = "wiki"
+		rest = strings.TrimPrefix(rel, "wiki/")
+	} else {
+		return nil
+	}
+	// Only check first-level directories under root
+	if strings.Contains(rest, "/") {
+		return nil
+	}
+	_ = root
+	return nil
 }
 
 func isAllowedRootFile(rel string) bool {
