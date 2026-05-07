@@ -9,9 +9,20 @@ It is inspired by the Karpathy [LLM Wiki pattern](https://gist.github.com/karpat
 
 ## What problem does it solve?
 
-LLM agents are useful for summarizing, organizing, and updating knowledge, but they need a safe way to write durable shared memory. Plain folders of Markdown are easy to read and edit, but direct edits by humans and agents can drift, lose provenance, or silently overwrite important context. Hosted knowledge tools solve some of this with backends and product-specific workflows, but they can make the data less portable and harder to audit.
+Creating an LLM knowledge base is harder than it seems, especially a shareable one. LLMs are good at summarizing content but over time they start drifting. The Karpathy idea is good but it doesn't scale by itself. After a dozen documents your wiki will start to:
+- drift
+- lose provenance
+- overwrite important context.
 
+Lumbrera provides a small protocol and CLI boundary for maintaining source-grounded Markdown knowledge safely in local files. Git, cloud sync, backups, and sharing are external choices.
 Lumbrera keeps the data as ordinary files and makes the CLI the mutation boundary. Agents may read Markdown directly, but durable changes go through `lumbrera write`, which applies path/provenance rules, regenerates metadata, and updates an internal operation log.
+
+
+## How it works
+
+Lumbrera keeps brain integrity through a deterministic metadata layer. Every `lumbrera write` regenerates `BRAIN.sum` (a sha256 manifest of wiki files), `INDEX.md`, `CHANGELOG.md`, and `tags.md` from the canonical Markdown. `lumbrera verify` recomputes them and rejects drift.
+
+To let the brain scale beyond what fits in a single context window, Lumbrera maintains a local SQLite search index with full-text search and tier-based ranking. The index is a disposable cache — delete it anytime, it rebuilds itself from the Markdown files.
 
 
 ## Install
