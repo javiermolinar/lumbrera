@@ -13,6 +13,7 @@ import (
 
 type options struct {
 	Brain string
+	Fix   bool
 	Help  bool
 }
 
@@ -35,7 +36,7 @@ func Run(args []string) error {
 		return err
 	}
 	defer func() { _ = lock.Release() }()
-	if err := verify.Run(brainDir, verify.Options{}); err != nil {
+	if err := verify.Run(brainDir, verify.Options{Fix: opts.Fix}); err != nil {
 		return err
 	}
 	fmt.Printf("Lumbrera verify passed: %s\n", brainDir)
@@ -53,6 +54,7 @@ func parseArgs(args []string) (options, error) {
 	var opts options
 	fs.StringVar(&opts.Brain, "brain", "", "target Lumbrera brain directory")
 	fs.StringVar(&opts.Brain, "repo", "", "deprecated alias for --brain")
+	fs.BoolVar(&opts.Fix, "fix", false, "regenerate stale generated files")
 	if err := fs.Parse(args); err != nil {
 		return options{}, err
 	}
@@ -66,11 +68,13 @@ func printHelp() {
 	fmt.Println(`Verify a Lumbrera brain repo for deterministic consistency.
 
 Usage:
-  lumbrera verify [--brain <path>]
+  lumbrera verify [--brain <path>] [--fix]
 
 Behavior:
   - repairs missing wiki frontmatter document IDs for backward compatibility
   - then checks deterministic consistency
+  - with --fix, regenerates stale generated files (INDEX.md, CHANGELOG.md,
+    BRAIN.sum, tags.md) before checking
 
 Checks:
   - VERSION matches the supported brain format
@@ -84,6 +88,7 @@ Checks:
 Options:
   --brain <path>      target brain directory, defaults to the current directory
   --repo <path>       deprecated alias for --brain
+  --fix               regenerate stale generated files instead of failing
 
 This command may repair missing generated document IDs. Knowledge mutations should still use lumbrera write.`)
 }

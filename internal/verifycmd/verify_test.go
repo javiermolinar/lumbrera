@@ -17,6 +17,37 @@ func TestVerifyPassesForInitializedBrain(t *testing.T) {
 	}
 }
 
+func TestVerifyFixRegeneratesStaleIndex(t *testing.T) {
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+
+	// Manually add a source without lumbrera write.
+	if err := os.WriteFile(filepath.Join(repo, "sources", "extra.md"), []byte("# Extra\n\nExtra notes.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Without --fix, should fail.
+	if err := Run([]string{"--brain", repo}); err == nil {
+		t.Fatal("expected verify to fail with stale INDEX.md")
+	}
+
+	// With --fix, should pass.
+	if err := Run([]string{"--brain", repo, "--fix"}); err != nil {
+		t.Fatalf("verify --fix should regenerate stale files: %v", err)
+	}
+
+	// Subsequent verify without --fix should pass.
+	if err := Run([]string{"--brain", repo}); err != nil {
+		t.Fatalf("verify should pass after fix: %v", err)
+	}
+
+	// INDEX.md should include the manually-added source.
+	index := braintest.ReadFile(t, repo, "INDEX.md")
+	if !strings.Contains(index, "sources/extra.md") {
+		t.Fatalf("expected INDEX.md to include extra.md, got:\n%s", index)
+	}
+}
+
 func TestVerifyRejectsManifestDrift(t *testing.T) {
 	repo := braintest.InitBrain(t)
 	braintest.RunWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
