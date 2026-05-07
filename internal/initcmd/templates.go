@@ -25,3 +25,6 @@ var querySkillContent string
 
 //go:embed templates/skills/lumbrera-health/SKILL.md
 var healthSkillContent string
+
+//go:embed templates/skills/lumbrera-delete/SKILL.md
+var deleteSkillContent string

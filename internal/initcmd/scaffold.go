@@ -28,6 +28,7 @@ var scaffoldDirs = []string{
 	".agents/skills/lumbrera-ingest",
 	".agents/skills/lumbrera-query",
 	".agents/skills/lumbrera-health",
+	".agents/skills/lumbrera-delete",
 }
 
 var scaffoldFiles = map[string]string{
@@ -41,6 +42,7 @@ var scaffoldFiles = map[string]string{
 	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
 	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,
 	".agents/skills/lumbrera-health/SKILL.md": healthSkillContent,
+	".agents/skills/lumbrera-delete/SKILL.md": deleteSkillContent,
 }
 
 func ensureScaffold(repo string) error {

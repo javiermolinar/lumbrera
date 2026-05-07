@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/deletecmd"
 	"github.com/javiermolinar/lumbrera/internal/healthcmd"
 	"github.com/javiermolinar/lumbrera/internal/indexcmd"
 	initcmd "github.com/javiermolinar/lumbrera/internal/initcmd"
@@ -37,7 +39,14 @@ func run(args []string) error {
 		return searchcmd.Run(rest)
 	case "verify":
 		return verifycmd.Run(rest)
+	case "delete":
+		return deletecmd.Run(rest)
 	case "write":
+		// Deprecation: intercept --delete and delegate to delete command.
+		if writeHasDelete(rest) {
+			fmt.Fprintln(os.Stderr, `warning: "write --delete" is deprecated, use "lumbrera delete <path> --reason <reason>" instead`)
+			return deletecmd.Run(writeDeleteArgs(rest))
+		}
 		return writecmd.Run(rest, os.Stdin)
 	case "help", "--help", "-h":
 		printUsage()
@@ -67,6 +76,7 @@ Commands:
   search <query> [options] Search the local SQLite index with JSON output
   verify [--brain <path>]  Check deterministic brain integrity
   write <path> [options]   Perform one atomic knowledge mutation
+  delete <path> [options]  Delete a source or wiki page with cascade cleanup
 
 Run:
   lumbrera <command> --help
@@ -77,5 +87,44 @@ Examples:
   lumbrera index --rebuild --brain ./brain
   lumbrera health --brain ./brain --json
   lumbrera search "tempo downscale" --brain ./brain --json
-  lumbrera write wiki/topic.md --title "Topic" --summary "Durable summary" --tag topic --source sources/input.md --reason "Create topic page" < topic.md`)
+  lumbrera write wiki/topic.md --title "Topic" --summary "Durable summary" --tag topic --source sources/input.md --reason "Create topic page" < topic.md
+  lumbrera delete sources/bad.md --reason "Remove poison source"`)
+}
+
+// writeHasDelete returns true if the write args contain --delete.
+func writeHasDelete(args []string) bool {
+	for _, arg := range args {
+		if arg == "--delete" {
+			return true
+		}
+	}
+	return false
+}
+
+// writeDeleteArgs converts write args into delete args by stripping --delete
+// and any write-only flags (--title, --summary, --tag, --source, --append).
+func writeDeleteArgs(args []string) []string {
+	var out []string
+	skipNext := false
+	for i, arg := range args {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		if arg == "--delete" {
+			continue
+		}
+		// Strip write-only flags that delete doesn't accept.
+		name, _, _ := strings.Cut(arg, "=")
+		switch name {
+		case "--title", "--summary", "--tag", "--source", "--append":
+			// If value is not inline (no =), skip the next arg too.
+			if !strings.Contains(arg, "=") && i+1 < len(args) {
+				skipNext = true
+			}
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out
 }

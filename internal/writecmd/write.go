@@ -52,6 +52,13 @@ func Run(args []string, stdin io.Reader) (err error) {
 		return nil
 	}
 
+	// Deprecation: --delete is handled by the CLI dispatcher in main.go.
+	// If we reach here with opts.Delete, it means Run was called directly
+	// (e.g. from tests). Return an error pointing to the new command.
+	if opts.Delete {
+		return fmt.Errorf("--delete is deprecated, use \"lumbrera delete <path> --reason <reason>\" instead")
+	}
+
 	brainDir, err := cliutil.ResolveBrain(opts.Brain)
 	if err != nil {
 		return err

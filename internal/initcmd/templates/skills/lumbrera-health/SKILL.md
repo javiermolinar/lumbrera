@@ -89,4 +89,4 @@ If consolidation is approved, prefer updating the canonical page first, then rew
 - Do not edit files directly or create generated metadata, including tags.md entries.
 - Do not mutate sources; sources are preserved raw material.
 - Prefer updating a canonical page plus adding a duplicate-page stub before deletion.
-- Use `lumbrera write --delete` only when content is fully covered elsewhere and verification confirms no broken links.
+- Use `lumbrera delete` only when content is fully covered elsewhere. The delete command handles cascade cleanup of references and broken links automatically.

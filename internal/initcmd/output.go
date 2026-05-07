@@ -21,7 +21,7 @@ Creates:
   .gitignore        ignores disposable Lumbrera search cache files
   AGENTS.md         standing instructions for agents
   CLAUDE.md         symlink to AGENTS.md for Claude
-  .agents/skills/   bundled Lumbrera ingest, query, and health skills
+  .agents/skills/   bundled Lumbrera ingest, query, health, and delete skills
   .claude           symlink to .agents for Claude skills
   sources/          preserved raw source material
   wiki/             distilled knowledge
@@ -65,10 +65,11 @@ Created:
   .agents/skills/lumbrera-ingest/SKILL.md
   .agents/skills/lumbrera-query/SKILL.md
   .agents/skills/lumbrera-health/SKILL.md
+  .agents/skills/lumbrera-delete/SKILL.md
   .claude -> .agents
   VERSION
   ops.log
 
-Agents should follow AGENTS.md, CLAUDE.md, or the bundled Lumbrera ingest/query/health skills. Use lumbrera search before broad file exploration and lumbrera write for all future mutations.
+Agents should follow AGENTS.md, CLAUDE.md, or the bundled Lumbrera skills. Use lumbrera search before broad file exploration, lumbrera write for mutations, and lumbrera delete for removals.
 `, repo)
 }

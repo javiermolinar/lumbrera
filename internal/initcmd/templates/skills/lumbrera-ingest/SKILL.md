@@ -47,3 +47,13 @@ For a new wiki page, pass --title, --summary, 1-5 --tag flags, --source, and --r
 ~~~sh
 lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --source sources/<source>.md --reason "Distill source" < page.md
 ~~~
+
+## Delete command
+
+If a source is bad, incorrect, or superseded, use `lumbrera delete` to remove it and cascade-clean all wiki pages that reference it. Wiki pages left with zero sources are automatically deleted.
+
+~~~sh
+lumbrera delete sources/<path>.md --reason "Remove bad source"
+~~~
+
+Use the dedicated delete skill (.agents/skills/lumbrera-delete/SKILL.md) when removing sources or wiki pages.

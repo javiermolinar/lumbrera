@@ -91,9 +91,10 @@ func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 	}
 	assertFileContains(t, repo, "CHANGELOG.md", "[update] [test]: Replace topic")
 
-	runWrite(t, repo, "", "wiki/topic.md", "--delete", "--reason", "Remove topic", "--actor", "test")
-	assertMissing(t, repo, "wiki/topic.md")
-	assertFileContains(t, repo, "CHANGELOG.md", "[delete] [test]: Remove topic")
+	// write --delete is now deprecated and returns an error when called
+	// directly through writecmd.Run. The CLI dispatcher in main.go
+	// intercepts it and delegates to deletecmd.Run.
+	assertWriteError(t, repo, "", "wiki/topic.md", "--delete", "--reason", "Remove topic", "--actor", "test")
 }
 
 func TestWriteRejectsEmptyAppendFlag(t *testing.T) {

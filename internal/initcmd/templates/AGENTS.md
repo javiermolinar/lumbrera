@@ -67,6 +67,8 @@ lumbrera index --rebuild --brain .
 lumbrera verify --brain .
 lumbrera write sources/<path>.md --reason "Preserve source" < source.md
 lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --source sources/<path>.md --reason "Distill source" < page.md
+lumbrera delete sources/<path>.md --reason "Remove bad source"
+lumbrera delete wiki/<path>.md --reason "Remove obsolete page"
 ~~~
 
 ## Team Git/GitHub errors
@@ -84,3 +86,4 @@ lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --so
 - Ingest sources into wiki pages: .agents/skills/lumbrera-ingest/SKILL.md
 - Answer questions from the brain: .agents/skills/lumbrera-query/SKILL.md
 - Check semantic health: .agents/skills/lumbrera-health/SKILL.md
+- Delete sources or wiki pages: .agents/skills/lumbrera-delete/SKILL.md
