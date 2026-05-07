@@ -37,7 +37,6 @@ var scaffoldFiles = map[string]string{
 	"CHANGELOG.md": changelogContent,
 	"BRAIN.sum":    brainSumContent,
 	"tags.md":      tagsContent,
-	"ops.log":      "",
 	agentsPath:     agentsContent,
 	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
 	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,

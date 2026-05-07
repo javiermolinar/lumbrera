@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
-	"github.com/javiermolinar/lumbrera/internal/ops"
 	"github.com/javiermolinar/lumbrera/internal/verify"
 )
 
@@ -31,7 +30,7 @@ type writeBackup struct {
 
 func newWriteBackup(brainDir, target string) (*writeBackup, error) {
 	paths := append([]string{target}, brain.GeneratedFilePaths()...)
-	paths = append(paths, ops.LogPath)
+	paths = append(paths, brain.ChangelogPath)
 	seen := map[string]struct{}{}
 	backup := &writeBackup{}
 	for _, rel := range paths {

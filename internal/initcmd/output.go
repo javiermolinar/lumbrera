@@ -15,7 +15,7 @@ missing generated wiki document IDs for older brains.
 
 Creates:
   INDEX.md          generated navigation map
-  CHANGELOG.md      generated semantic history from ops.log
+  CHANGELOG.md      append-only operation changelog
   BRAIN.sum         generated wiki checksum manifest
   tags.md           generated read-only tag registry from wiki frontmatter
   .gitignore        ignores disposable Lumbrera search cache files
@@ -26,7 +26,6 @@ Creates:
   sources/          preserved raw source material
   wiki/             distilled knowledge
   VERSION           Lumbrera brain format marker
-  ops.log           Lumbrera operation log
   .brain/           disposable cache directory (search index, lock), ignored by Git
 
 Behavior:
@@ -68,7 +67,6 @@ Created:
   .agents/skills/lumbrera-delete/SKILL.md
   .claude -> .agents
   VERSION
-  ops.log
 
 Agents should follow AGENTS.md, CLAUDE.md, or the bundled Lumbrera skills. Use lumbrera search before broad file exploration, lumbrera write for mutations, and lumbrera delete for removals.
 `, repo)

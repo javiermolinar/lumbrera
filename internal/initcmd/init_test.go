@@ -32,7 +32,7 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertExists(t, repo, "CHANGELOG.md")
 	assertExists(t, repo, "BRAIN.sum")
 	assertExists(t, repo, "tags.md")
-	assertExists(t, repo, "ops.log")
+	assertExists(t, repo, "CHANGELOG.md")
 	assertFileContains(t, repo, ".gitignore", ".brain/")
 	assertExists(t, repo, "AGENTS.md")
 	assertFileContains(t, repo, "AGENTS.md", "## Read")

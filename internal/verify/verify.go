@@ -63,10 +63,9 @@ func VerifyGeneratedFiles(repo string) error {
 		return err
 	}
 	checks := map[string]string{
-		brain.IndexPath:     files.Index,
-		brain.ChangelogPath: files.Changelog,
-		brain.BrainSumPath:  files.BrainSum,
-		brain.TagsPath:      files.Tags,
+		brain.IndexPath:    files.Index,
+		brain.BrainSumPath: files.BrainSum,
+		brain.TagsPath:     files.Tags,
 	}
 	for rel, want := range checks {
 		got, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
@@ -78,6 +77,22 @@ func VerifyGeneratedFiles(repo string) error {
 			return fmt.Errorf("generated file %s is stale:%s\nRegenerate through lumbrera write, or run lumbrera verify --fix", rel, diff)
 		}
 	}
+
+	// CHANGELOG.md is the source of truth (append-only), not generated.
+	// Verify it round-trips cleanly: parse → render must match on-disk.
+	changelogWant, err := generate.ChangelogForRepo(repo)
+	if err != nil {
+		return fmt.Errorf("%s is malformed: %w", brain.ChangelogPath, err)
+	}
+	changelogGot, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(brain.ChangelogPath)))
+	if err != nil {
+		return fmt.Errorf("%s is missing: %w", brain.ChangelogPath, err)
+	}
+	if string(changelogGot) != changelogWant {
+		diff := staleDiff(changelogWant, string(changelogGot), 5)
+		return fmt.Errorf("%s has been hand-edited and does not match expected format:%s", brain.ChangelogPath, diff)
+	}
+
 	return nil
 }
 

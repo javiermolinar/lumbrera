@@ -272,7 +272,7 @@ func newDeleteBackup(brainDir string, filesToDelete []string, wikiUpdates map[st
 	for _, p := range brain.GeneratedFilePaths() {
 		add(p)
 	}
-	add(ops.LogPath)
+	add(brain.ChangelogPath)
 
 	backup := &deleteBackup{}
 	for _, rel := range paths {

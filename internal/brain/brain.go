@@ -18,7 +18,7 @@ const (
 )
 
 func GeneratedFilePaths() []string {
-	return []string{IndexPath, ChangelogPath, BrainSumPath, TagsPath}
+	return []string{IndexPath, BrainSumPath, TagsPath}
 }
 
 func ValidateRepo(repo string) error {
