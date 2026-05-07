@@ -92,30 +92,3 @@ lumbrera search "querier batching" --tier design --json
 ```
 
 When ingesting a design doc, preserve under `sources/design/` and create wiki pages under `wiki/design/`. The LLM sees the tier label in search results and naturally prefers canonical answers for operational questions.
-
-## Goals
-
-The goal is simple: a way to summarize content so both humans and agents can benefit from it.
-Lumbrera is not trying to be a new chat UI or a full knowledge-management app. It is a small protocol and CLI boundary for maintaining source-grounded Markdown knowledge safely in local files. Git, cloud sync, backups, and sharing are external choices.
-
-## Commands
-
-Agents use the generated `AGENTS.md` and bundled skills. The core protocol is intentionally small:
-
-- `lumbrera search "<query>" --brain <path> --json` searches wiki synthesis and preserved Markdown sources with a deterministic local SQLite/FTS5 index. Optional `--tag <tag>`, `--source <sources/path.md>`, and `--tier <canonical|design|reference>` filters narrow results. Output treats `recommended_sections` as the primary agent read plan, with section reasons, `agent_instructions`, entity `coverage`, ranked raw hits, snippets, tags, tier, sources, links, `recommended_read_order`, and a stop rule.
-- `lumbrera health --brain <path> --json` returns deterministic health/consolidation review candidates for LLM review. Candidates are not conclusions; they identify pages or sources worth reading for possible links, consolidation, stale-risk, orphan pages, or source coverage gaps.
-- `lumbrera index --status --brain <path>` reports whether `.brain/search.sqlite` is missing, fresh, stale, or incompatible without mutating files.
-- `lumbrera index --rebuild --brain <path>` verifies the brain and rebuilds `.brain/search.sqlite` as a disposable cache.
-- `lumbrera write ...` is the only supported mutation boundary for `sources/`, `wiki/`, and generated metadata such as `tags.md`.
-- `lumbrera verify --brain <path>` repairs missing wiki document IDs for backward compatibility, then checks deterministic integrity for managed wiki content: provenance, links, generated files, and checksums. Raw files under `sources/` are not required to have Lumbrera frontmatter.
-- `lumbrera init <path>` creates a brain scaffold and a `.gitignore` entry for `.brain/search.sqlite*`. It does not initialize Git, install hooks, commit, or push.
-
-## Guardrails
-
-Lumbrera does not own Git or GitHub. If a brain is stored in Git, humans can optionally add hooks, GitHub Actions, CI checks, or branch protection that run:
-
-```sh
-lumbrera verify --brain .
-```
-
-These guardrails are defense-in-depth. They catch drift in managed wiki content and generated metadata, but they do not replace `lumbrera write`. If generated files drift, restore them from your external versioning or backup system, then retry the Lumbrera operation.
