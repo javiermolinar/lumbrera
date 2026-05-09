@@ -24,6 +24,8 @@ Lumbrera keeps the data as ordinary files and makes the CLI the mutation boundar
 
 ## How it works
 
+<a href="lumbrera-brain.png"><img src="lumbrera-brain.png" alt="Lumbrera Knowledge Brain architecture: write path, brain structure, search with FTS5 and BM25, link preservation" /></a>
+
 Lumbrera keeps brain integrity through a deterministic metadata layer. Every `lumbrera write` regenerates `BRAIN.sum` (a sha256 manifest of wiki files), `INDEX.md`, `CHANGELOG.md`, and `tags.md` from the canonical Markdown. `lumbrera verify` recomputes them and rejects drift.
 
 To let the brain scale beyond what fits in a single context window, Lumbrera maintains a local SQLite search index with full-text search and tier-based ranking. The index is a disposable cache — delete it anytime, it rebuilds itself from the Markdown files.
