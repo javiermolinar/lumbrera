@@ -94,4 +94,4 @@ lumbrera migrate --brain . # upgrade v1 brain to v2
 - Ingest sources into wiki pages: .agents/skills/lumbrera-ingest/SKILL.md
 - Answer questions from the brain: .agents/skills/lumbrera-query/SKILL.md
 - Check semantic health: .agents/skills/lumbrera-health/SKILL.md
-- Delete sources, wiki pages, or assets: .agents/skills/lumbrera-delete/SKILL.md
+
