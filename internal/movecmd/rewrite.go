@@ -177,40 +177,38 @@ func rewriteLinksInBody(body, fromDoc, oldPath, newPath string) string {
 	oldRelLink := md.RelativeLink(fromDoc, oldPath)
 	newRelLink := md.RelativeLink(fromDoc, newPath)
 
-	for _, old := range []string{oldRelLink, oldPath} {
-		new := newRelLink
-		if old == oldPath {
-			new = newPath
-		}
+	candidates := relVariants(oldRelLink, oldPath)
+	for _, old := range candidates {
 		escaped := regexp.QuoteMeta(old)
-		// Rewrite ![alt](old) → ![alt](new) and [text](old) → [text](new)
-		// Handles optional #anchor
-		pattern := fmt.Sprintf(`(\[(?:[^\]])*\]\()%s((?:#[^\)]*)?\))`, escaped)
+		newRepl := escapeRepl(newRelLink)
+		// Rewrite [text](old) and [text](old#anchor) -- covers links and images.
+		pattern := fmt.Sprintf(`(\]\()%s((?:#[^\)]*)?)\)`, escaped)
 		re := regexp.MustCompile(pattern)
-		body = re.ReplaceAllString(body, "${1}"+escapeRepl(new)+"${2}")
-
-		// Also handle image syntax with !
-		imgPattern := fmt.Sprintf(`(!\[(?:[^\]])*\]\()%s((?:#[^\)]*)?\))`, escaped)
-		imgRe := regexp.MustCompile(imgPattern)
-		body = imgRe.ReplaceAllString(body, "${1}"+escapeRepl(new)+"${2}")
+		body = re.ReplaceAllString(body, "${1}"+newRepl+"${2})")
 	}
 	return body
 }
 
 // rewriteSourceCitations replaces [source: old-path#anchor] with [source: new-path#anchor].
+// relVariants returns all forms of a relative link that might appear in body text.
+func relVariants(relLink, repoPath string) []string {
+	v := []string{relLink, repoPath}
+	if strings.HasPrefix(relLink, "./") {
+		v = append(v, strings.TrimPrefix(relLink, "./"))
+	}
+	return v
+}
+
 func rewriteSourceCitations(body, fromDoc, oldPath, newPath string) string {
 	oldRelLink := md.RelativeLink(fromDoc, oldPath)
 	newRelLink := md.RelativeLink(fromDoc, newPath)
 
-	for _, old := range []string{oldRelLink, oldPath} {
-		new := newRelLink
-		if old == oldPath {
-			new = newPath
-		}
+	candidates := relVariants(oldRelLink, oldPath)
+	for _, old := range candidates {
 		escaped := regexp.QuoteMeta(old)
 		pattern := fmt.Sprintf(`(\[source:\s*)%s((?:#[^\]]*?)?\])`, escaped)
 		re := regexp.MustCompile("(?i)" + pattern)
-		body = re.ReplaceAllString(body, "${1}"+escapeRepl(new)+"${2}")
+		body = re.ReplaceAllString(body, "${1}"+escapeRepl(newRelLink)+"${2}")
 	}
 	return body
 }
@@ -233,26 +231,50 @@ func rewriteMovedWikiPage(content []byte, from, to string) ([]byte, error) {
 		return nil, err
 	}
 
-	// For each internal link, compute the old relative path and the new relative path.
+	// Collect all unique repo-relative paths that appear as relative links.
+	// Build a single old→new replacement map to avoid chained replacements.
+	replacements := map[string]string{}
 	for _, link := range analysis.Links {
 		oldRel := md.RelativeLink(from, link)
 		newRel := md.RelativeLink(to, link)
 		if oldRel != newRel {
-			body = strings.ReplaceAll(body, oldRel, newRel)
+			replacements[oldRel] = newRel
 		}
 	}
 	for _, src := range analysis.Sources {
 		oldRel := md.RelativeLink(from, src)
 		newRel := md.RelativeLink(to, src)
 		if oldRel != newRel {
-			body = strings.ReplaceAll(body, oldRel, newRel)
+			replacements[oldRel] = newRel
 		}
 	}
 	for _, cite := range analysis.SourceCitations {
 		oldRel := md.RelativeLink(from, cite.Path)
 		newRel := md.RelativeLink(to, cite.Path)
 		if oldRel != newRel {
-			body = strings.ReplaceAll(body, oldRel, newRel)
+			replacements[oldRel] = newRel
+		}
+	}
+
+	// Apply replacements using regex to match only inside link/image/citation syntax,
+	// not arbitrary substrings. Try both the ./prefixed and bare forms.
+	for oldRel, newRel := range replacements {
+		variants := []string{oldRel}
+		if strings.HasPrefix(oldRel, "./") {
+			variants = append(variants, strings.TrimPrefix(oldRel, "./"))
+		}
+
+		for _, variant := range variants {
+			escaped := regexp.QuoteMeta(variant)
+			newEscaped := escapeRepl(newRel)
+
+			// Rewrite markdown links: [text](oldRel) and [text](oldRel#anchor)
+			linkPat := fmt.Sprintf(`(\]\()%s((?:#[^\)]*)?)\)`, escaped)
+			body = regexp.MustCompile(linkPat).ReplaceAllString(body, "${1}"+newEscaped+"${2})")
+
+			// Rewrite source citations: [source: oldRel] and [source: oldRel#anchor]
+			citePat := fmt.Sprintf(`(\[source:\s*)%s((?:#[^\]]*?)?)\]`, escaped)
+			body = regexp.MustCompile("(?i)"+citePat).ReplaceAllString(body, "${1}"+newEscaped+"${2}]")
 		}
 	}
 
