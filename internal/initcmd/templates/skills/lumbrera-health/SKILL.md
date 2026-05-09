@@ -37,7 +37,7 @@ Lumbrera handles deterministic consistency for managed wiki content: wiki docume
    - no action.
 7. Report affected paths, deterministic reasons, evidence read, classification, and suggested next action.
 8. If a mutation is needed, ask for explicit user approval first.
-9. After approval, mutate only with `lumbrera write`, then run `lumbrera verify --brain .`.
+9. After approval, mutate with `lumbrera write`, `lumbrera move`, or `lumbrera delete` as appropriate, then run `lumbrera verify --brain .`.
 
 ## What to look for
 
@@ -82,6 +82,14 @@ Classify as:
 
 If consolidation is approved, prefer updating the canonical page first, then rewriting the duplicate page as a short stub that links to the canonical page. Delete only when content is fully covered elsewhere and verification confirms no broken links.
 
+When reorganizing pages into subdirectories (e.g. grouping related pages), use `lumbrera move` to relocate files and deterministically rewrite all references:
+
+~~~sh
+lumbrera move wiki/old-path.md wiki/topic/new-path.md --reason "Reorganize into topic subdirectory"
+~~~
+
+`lumbrera move` preserves document IDs, rewrites all wiki cross-links, source references, inline citations, and asset embeds. It works for sources and assets too.
+
 ## Guardrails
 
 - Do not present deterministic candidates as proven semantic drift.
@@ -90,3 +98,4 @@ If consolidation is approved, prefer updating the canonical page first, then rew
 - Do not mutate sources; sources are preserved raw material.
 - Prefer updating a canonical page plus adding a duplicate-page stub before deletion.
 - Use `lumbrera delete` only when content is fully covered elsewhere. The delete command handles cascade cleanup of references and broken links automatically.
+- Use `lumbrera move` to reorganize pages into subdirectories. Do not delete and recreate pages to move them — move preserves document identity and rewrites all references atomically.

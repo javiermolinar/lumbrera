@@ -18,6 +18,7 @@ This is a Lumbrera brain: a managed Markdown knowledge base for humans and LLM a
 - Do not modify existing files under sources/; sources are immutable.
 - Do not modify existing files under assets/; assets are immutable. To replace an asset, delete it and re-add it.
 - Asset writes require --file to copy a local file: lumbrera write assets/<path> --file <local-path> --reason "..."
+- Use lumbrera move to reorganize files. Do not delete and recreate to move — move preserves document IDs and rewrites all references.
 - Do not edit generated files: INDEX.md, SOURCES.md, ASSETS.md, CHANGELOG.md, BRAIN.sum, or tags.md.
 - Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
 - .brain/search.sqlite is a disposable generated cache; rebuild it with lumbrera index, do not edit or cite it.
@@ -70,6 +71,8 @@ lumbrera verify --brain .
 lumbrera write sources/<path>.md --reason "Preserve source" < source.md
 lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --source sources/<path>.md --reason "Distill source" < page.md
 lumbrera write assets/<path> --file <local-path> --reason "Add diagram"
+lumbrera move wiki/<from>.md wiki/<to>.md --reason "Reorganize"
+lumbrera move sources/<from>.md sources/<to>.md --reason "Reclassify"
 lumbrera delete sources/<path>.md --reason "Remove bad source"
 lumbrera delete wiki/<path>.md --reason "Remove obsolete page"
 lumbrera delete assets/<path> --reason "Remove outdated asset"
