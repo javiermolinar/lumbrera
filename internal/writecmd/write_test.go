@@ -21,7 +21,7 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	if frontmatter.StartsWithFrontmatter([]byte(testfs.ReadFile(t, repo, "sources/2026/05/04/raw.md"))) {
 		t.Fatal("source writes should preserve raw source content without generated frontmatter")
 	}
-	assertFileContains(t, repo, "INDEX.md", "[Raw source](sources/2026/05/04/raw.md)")
+	assertFileContains(t, repo, "SOURCES.md", "[Raw source](sources/2026/05/04/raw.md)")
 	runWrite(t, repo, "# Related\n\nCompanion page.\n", "wiki/related.md", "--title", "Related", "--summary", "Related companion page.", "--tag", "related", "--source", "sources/2026/05/04/raw.md", "--reason", "Create related", "--actor", "test")
 	runWrite(t, repo, "# Topic\n\nSee [Related](./related.md).\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--source", "sources/2026/05/04/raw.md", "--reason", "Create topic", "--actor", "test", "--tag", "design")
 
@@ -55,7 +55,7 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 		t.Fatalf("expected generated Sources section, got:\n%s", body)
 	}
 
-	assertFileContains(t, repo, "INDEX.md", "[Raw source](sources/2026/05/04/raw.md)")
+	assertFileContains(t, repo, "SOURCES.md", "[Raw source](sources/2026/05/04/raw.md)")
 	assertFileContains(t, repo, "INDEX.md", "[Topic](wiki/topic.md)")
 	assertFileNotContains(t, repo, "BRAIN.sum", "sources/2026/05/04/raw.md sha256:")
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/topic.md sha256:")

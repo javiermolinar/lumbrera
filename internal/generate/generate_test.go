@@ -9,7 +9,7 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 )
 
-func TestIndexForRepoListsAllSourcesAndWikiPages(t *testing.T) {
+func TestIndexForRepoListsWikiPagesWithSources(t *testing.T) {
 	repo := t.TempDir()
 	writeRaw(t, repo, "sources/2026/05/04/raw.md", "# Raw source\n")
 	writeRaw(t, repo, "sources/unreferenced.md", "# Unreferenced source\n")
@@ -19,14 +19,50 @@ func TestIndexForRepoListsAllSourcesAndWikiPages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// INDEX.md is wiki-only; sources appear as sub-links.
 	for _, want := range []string{
-		"- 2026/\n  - 05/\n    - 04/\n      - [Raw source](sources/2026/05/04/raw.md)",
-		"- [Unreferenced source](sources/unreferenced.md)",
-		"- architecture/\n  - [Topic title](wiki/architecture/topic.md)",
+		"Wiki knowledge pages",
+		"- architecture/\n  - [Topic title](wiki/architecture/topic.md)\n    - Sources: [Raw](sources/2026/05/04/raw.md)",
 	} {
 		if !strings.Contains(index, want) {
 			t.Fatalf("expected index to contain %q, got:\n%s", want, index)
 		}
+	}
+	// Sources should NOT appear as top-level entries in INDEX.md.
+	if strings.Contains(index, "## Sources") {
+		t.Fatalf("INDEX.md should not have a Sources section, got:\n%s", index)
+	}
+}
+
+func TestSourcesIndexForRepoListsSources(t *testing.T) {
+	repo := t.TempDir()
+	writeRaw(t, repo, "sources/2026/05/04/raw.md", "# Raw source\n")
+	writeRaw(t, repo, "sources/unreferenced.md", "# Unreferenced source\n")
+
+	sources, err := SourcesIndexForRepo(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Immutable reference material",
+		"[Raw source](sources/2026/05/04/raw.md)",
+		"[Unreferenced source](sources/unreferenced.md)",
+	} {
+		if !strings.Contains(sources, want) {
+			t.Fatalf("expected SOURCES.md to contain %q, got:\n%s", want, sources)
+		}
+	}
+}
+
+func TestAssetsIndexForRepoEmpty(t *testing.T) {
+	repo := t.TempDir()
+
+	assets, err := AssetsIndexForRepo(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(assets, "No assets yet.") {
+		t.Fatalf("expected empty assets placeholder, got:\n%s", assets)
 	}
 }
 

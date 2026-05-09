@@ -9,13 +9,23 @@ import (
 )
 
 type Files struct {
-	Index    string
-	BrainSum string
-	Tags     string
+	Index        string
+	SourcesIndex string
+	AssetsIndex  string
+	BrainSum     string
+	Tags         string
 }
 
 func FilesForRepo(repo string) (Files, error) {
 	index, err := IndexForRepo(repo)
+	if err != nil {
+		return Files{}, err
+	}
+	sourcesIndex, err := SourcesIndexForRepo(repo)
+	if err != nil {
+		return Files{}, err
+	}
+	assetsIndex, err := AssetsIndexForRepo(repo)
 	if err != nil {
 		return Files{}, err
 	}
@@ -27,11 +37,23 @@ func FilesForRepo(repo string) (Files, error) {
 	if err != nil {
 		return Files{}, err
 	}
-	return Files{Index: index, BrainSum: brainSum, Tags: tags}, nil
+	return Files{
+		Index:        index,
+		SourcesIndex: sourcesIndex,
+		AssetsIndex:  assetsIndex,
+		BrainSum:     brainSum,
+		Tags:         tags,
+	}, nil
 }
 
 func WriteFiles(repo string, files Files) error {
 	if err := os.WriteFile(filepath.Join(repo, brain.IndexPath), []byte(files.Index), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(repo, brain.SourcesIndexPath), []byte(files.SourcesIndex), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(repo, brain.AssetsIndexPath), []byte(files.AssetsIndex), 0o644); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(repo, brain.BrainSumPath), []byte(files.BrainSum), 0o644); err != nil {

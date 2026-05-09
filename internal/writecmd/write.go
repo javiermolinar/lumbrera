@@ -63,7 +63,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := brain.ValidateRepo(brainDir); err != nil {
+	if err := brain.RequireV2(brainDir); err != nil {
 		return err
 	}
 	lock, err := brainlock.Acquire(brainDir, "write")

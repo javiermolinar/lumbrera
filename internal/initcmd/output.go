@@ -14,7 +14,9 @@ edit brain files directly; they should use lumbrera write. Verify can repair
 missing generated wiki document IDs for older brains.
 
 Creates:
-  INDEX.md          generated navigation map
+  INDEX.md          generated wiki navigation map
+  SOURCES.md        generated source listing
+  ASSETS.md         generated asset listing
   CHANGELOG.md      append-only operation changelog
   BRAIN.sum         generated wiki checksum manifest
   tags.md           generated read-only tag registry from wiki frontmatter
@@ -25,6 +27,7 @@ Creates:
   .claude           symlink to .agents for Claude skills
   sources/          preserved raw source material
   wiki/             distilled knowledge
+  assets/           binary attachments (diagrams, images, PDFs)
   VERSION           Lumbrera brain format marker
   .brain/           disposable cache directory (search index, lock), ignored by Git
 
@@ -54,7 +57,10 @@ func printSuccess(repo string) {
 Created:
   sources/
   wiki/
+  assets/
   INDEX.md
+  SOURCES.md
+  ASSETS.md
   CHANGELOG.md
   BRAIN.sum
   tags.md

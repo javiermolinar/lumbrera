@@ -5,6 +5,12 @@ import _ "embed"
 //go:embed templates/INDEX.md
 var indexContent string
 
+//go:embed templates/SOURCES.md
+var sourcesIndexContent string
+
+//go:embed templates/ASSETS.md
+var assetsIndexContent string
+
 //go:embed templates/CHANGELOG.md
 var changelogContent string
 

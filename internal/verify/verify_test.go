@@ -37,10 +37,10 @@ func TestFixRegeneratesStaleGeneratedFiles(t *testing.T) {
 		t.Fatalf("Check after Fix should pass: %v", err)
 	}
 
-	// INDEX.md should now list the manually-added source.
-	index := testfs.ReadPath(t, filepath.Join(repo, "INDEX.md"))
-	if !strings.Contains(index, "sources/extra.md") {
-		t.Fatalf("expected INDEX.md to include extra.md after fix, got:\n%s", index)
+	// SOURCES.md should now list the manually-added source.
+	sources := testfs.ReadPath(t, filepath.Join(repo, "SOURCES.md"))
+	if !strings.Contains(sources, "sources/extra.md") {
+		t.Fatalf("expected SOURCES.md to include extra.md after fix, got:\n%s", sources)
 	}
 }
 
