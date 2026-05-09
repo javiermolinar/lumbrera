@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 	"github.com/javiermolinar/lumbrera/internal/textutil"
 )
@@ -104,7 +105,7 @@ func normalizeLinkPath(fromPath, destination string) (string, error) {
 	}
 
 	var normalized string
-	if strings.HasPrefix(destination, "sources/") || strings.HasPrefix(destination, "wiki/") {
+	if brain.IsContentPath(destination) {
 		normalized = path.Clean(destination)
 	} else {
 		normalized = path.Clean(path.Join(path.Dir(fromPath), destination))
@@ -115,8 +116,8 @@ func normalizeLinkPath(fromPath, destination string) (string, error) {
 	if pathpolicy.HasParentSegment(normalized) {
 		return "", fmt.Errorf("Markdown link %q resolves outside the repo", destination)
 	}
-	if !strings.HasPrefix(normalized, "sources/") && !strings.HasPrefix(normalized, "wiki/") {
-		return "", fmt.Errorf("Markdown link %q resolves to %q outside sources/ or wiki/", destination, normalized)
+	if !brain.IsContentPath(normalized) {
+		return "", fmt.Errorf("Markdown link %q resolves to %q outside %s", destination, normalized, brain.ContentDirList())
 	}
 	return normalized, nil
 }

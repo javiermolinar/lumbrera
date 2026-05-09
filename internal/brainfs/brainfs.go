@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 type MarkdownFile struct {
@@ -103,12 +105,5 @@ func ValidateDirectory(repo, rel string, required bool) (bool, error) {
 }
 
 func kindForPath(rel string) string {
-	switch {
-	case strings.HasPrefix(rel, "wiki/"):
-		return "wiki"
-	case strings.HasPrefix(rel, "sources/"):
-		return "source"
-	default:
-		return ""
-	}
+	return brain.KindForPath(rel)
 }
