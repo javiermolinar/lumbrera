@@ -37,6 +37,19 @@ func validateOptionsForOperation(repo, target, kind string, exists bool, op oper
 		}
 	}
 
+	if kind == "asset" {
+		if strings.TrimSpace(opts.File) == "" {
+			return fmt.Errorf("asset writes require --file")
+		}
+		if opts.Title != "" || opts.Summary != "" || len(opts.Tags) > 0 || len(opts.Sources) > 0 || opts.AppendSet {
+			return fmt.Errorf("asset writes cannot use --title, --summary, --tag, --source, or --append")
+		}
+		if op != opAsset {
+			return fmt.Errorf("assets are immutable; refusing to mutate existing asset")
+		}
+		return nil
+	}
+
 	if kind == "wiki" {
 		if len(opts.Sources) == 0 {
 			return fmt.Errorf("wiki writes require at least one --source")

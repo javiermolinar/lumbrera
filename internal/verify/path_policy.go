@@ -68,10 +68,14 @@ func validateContentDir(repo string, root brain.ContentRoot) error {
 			return nil
 		}
 
-		if root.Markdown && strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
+		isMd := strings.EqualFold(filepath.Ext(entry.Name()), ".md")
+		if root.Markdown && isMd {
 			if _, _, err := pathpolicy.NormalizeTargetPath(rel); err != nil {
 				return err
 			}
+		}
+		if !root.Markdown && isMd {
+			return fmt.Errorf("path %s: Markdown files are not allowed under %s/", rel, root.Dir)
 		}
 		return nil
 	})

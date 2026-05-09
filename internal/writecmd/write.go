@@ -27,6 +27,7 @@ type options struct {
 	Sources   []string
 	Append    string
 	AppendSet bool
+	File      string
 	Delete    bool
 	Help      bool
 }
@@ -38,6 +39,7 @@ const (
 	opCreate operation = "create"
 	opUpdate operation = "update"
 	opAppend operation = "append"
+	opAsset  operation = "asset"
 	opDelete operation = "delete"
 )
 
@@ -111,7 +113,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 	}
 
 	var input []byte
-	if op != opDelete {
+	if op != opDelete && op != opAsset {
 		input, err = io.ReadAll(stdin)
 		if err != nil {
 			return err

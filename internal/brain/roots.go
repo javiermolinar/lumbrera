@@ -16,6 +16,7 @@ type ContentRoot struct {
 var ContentRoots = []ContentRoot{
 	{Dir: "sources", Kind: "source", Markdown: true, Required: true},
 	{Dir: "wiki", Kind: "wiki", Markdown: true, Required: true},
+	{Dir: "assets", Kind: "asset", Markdown: false, Required: true},
 }
 
 // RootForPath returns the ContentRoot whose directory prefix matches the given

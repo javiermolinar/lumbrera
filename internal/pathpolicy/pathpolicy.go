@@ -37,8 +37,12 @@ func NormalizeTargetPath(raw string) (string, string, error) {
 	if !ok {
 		return "", "", fmt.Errorf("target path %q must be under %s", raw, brain.ContentDirList())
 	}
-	if root.Markdown && !strings.HasSuffix(strings.ToLower(clean), ".md") {
+	isMd := strings.HasSuffix(strings.ToLower(clean), ".md")
+	if root.Markdown && !isMd {
 		return "", "", fmt.Errorf("target path %q must be a Markdown file", raw)
+	}
+	if !root.Markdown && isMd {
+		return "", "", fmt.Errorf("target path %q: Markdown files are not allowed under %s/", raw, root.Dir)
 	}
 	return clean, root.Kind, nil
 }

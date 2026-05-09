@@ -12,7 +12,8 @@ func TestRootForPath(t *testing.T) {
 		{"sources/design/adr.md", "source", true},
 		{"wiki/topic.md", "wiki", true},
 		{"wiki/design/spec.md", "wiki", true},
-		{"assets/diagram.png", "", false},
+		{"assets/diagram.png", "asset", true},
+		{"assets/diagrams/arch.png", "asset", true},
 		{"notes/topic.md", "", false},
 		{"sources", "", false},
 		{"wiki", "", false},
@@ -38,6 +39,9 @@ func TestKindForPath(t *testing.T) {
 	if got := KindForPath("wiki/topic.md"); got != "wiki" {
 		t.Fatalf("KindForPath wiki = %q", got)
 	}
+	if got := KindForPath("assets/diagram.png"); got != "asset" {
+		t.Fatalf("KindForPath assets = %q", got)
+	}
 	if got := KindForPath("notes/other.md"); got != "" {
 		t.Fatalf("KindForPath unknown = %q", got)
 	}
@@ -45,7 +49,7 @@ func TestKindForPath(t *testing.T) {
 
 func TestContentDirList(t *testing.T) {
 	got := ContentDirList()
-	want := "sources/ or wiki/"
+	want := "sources/, wiki/, or assets/"
 	if got != want {
 		t.Fatalf("ContentDirList() = %q, want %q", got, want)
 	}
@@ -53,7 +57,7 @@ func TestContentDirList(t *testing.T) {
 
 func TestContentDirs(t *testing.T) {
 	dirs := ContentDirs()
-	if len(dirs) != 2 || dirs[0] != "sources" || dirs[1] != "wiki" {
+	if len(dirs) != 3 || dirs[0] != "sources" || dirs[1] != "wiki" || dirs[2] != "assets" {
 		t.Fatalf("ContentDirs() = %v", dirs)
 	}
 }
