@@ -51,6 +51,10 @@ func Append(repo string, entry Entry) error {
 	if text != "" && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
+	// Add blank line separator so entries render as distinct paragraphs in Markdown.
+	if text != "" && !strings.HasSuffix(text, "\n\n") {
+		text += "\n"
+	}
 	text += FormatLine(entry) + "\n"
 
 	return os.WriteFile(path, []byte(text), 0o644)
@@ -98,7 +102,10 @@ func Render(entries []Entry) string {
 		b.WriteString("No operations yet.\n")
 		return b.String()
 	}
-	for _, entry := range entries {
+	for i, entry := range entries {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
 		b.WriteString(FormatLine(entry))
 		b.WriteByte('\n')
 	}
@@ -170,7 +177,7 @@ func Validate(entry Entry) error {
 		return fmt.Errorf("operation date %q must use YYYY-MM-DD", entry.Date)
 	}
 	switch entry.Operation {
-	case "source", "create", "append", "update", "asset", "delete", "migrate":
+	case "source", "create", "append", "update", "asset", "delete", "migrate", "move":
 	default:
 		return fmt.Errorf("operation %q is not supported", entry.Operation)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/generate"
+	"github.com/javiermolinar/lumbrera/internal/ops"
 )
 
 type Options struct {
@@ -34,6 +35,11 @@ func Run(repo string, opts Options) error {
 			return err
 		}
 		if err := generate.WriteFiles(repo, files); err != nil {
+			return err
+		}
+	}
+	if opts.Fix {
+		if err := normalizeChangelog(repo); err != nil {
 			return err
 		}
 	}
@@ -90,12 +96,45 @@ func VerifyGeneratedFiles(repo string) error {
 	if err != nil {
 		return fmt.Errorf("%s is missing: %w", brain.ChangelogPath, err)
 	}
-	if string(changelogGot) != changelogWant {
+	// Compare ignoring blank-line differences: both the old compact format
+	// and the new spaced format parse identically, so we only reject
+	// actual content differences.
+	if normalizeBlankLines(string(changelogGot)) != normalizeBlankLines(changelogWant) {
 		diff := staleDiff(changelogWant, string(changelogGot), 5)
 		return fmt.Errorf("%s has been hand-edited and does not match expected format:%s", brain.ChangelogPath, diff)
 	}
 
 	return nil
+}
+
+// normalizeBlankLines collapses runs of blank lines so that the compact
+// (no blank lines) and spaced (blank line between entries) changelog
+// formats compare as equal when their entries match.
+func normalizeBlankLines(s string) string {
+	lines := strings.Split(s, "\n")
+	var out []string
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n") + "\n"
+}
+
+// normalizeChangelog re-renders CHANGELOG.md from its parsed entries
+// to adopt the current formatting convention (e.g. blank line separators).
+func normalizeChangelog(repo string) error {
+	want, err := generate.ChangelogForRepo(repo)
+	if err != nil {
+		return fmt.Errorf("%s is malformed: %w", brain.ChangelogPath, err)
+	}
+	entries, err := ops.Read(repo)
+	if err != nil {
+		return err
+	}
+	_ = entries
+	return os.WriteFile(filepath.Join(repo, filepath.FromSlash(brain.ChangelogPath)), []byte(want), 0o644)
 }
 
 // staleDiff returns a short summary of the first line-level differences
