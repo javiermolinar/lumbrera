@@ -170,7 +170,7 @@ func Validate(entry Entry) error {
 		return fmt.Errorf("operation date %q must use YYYY-MM-DD", entry.Date)
 	}
 	switch entry.Operation {
-	case "source", "create", "append", "update", "asset", "delete", "migrate":
+	case "source", "create", "append", "update", "asset", "delete", "move", "migrate":
 	default:
 		return fmt.Errorf("operation %q is not supported", entry.Operation)
 	}
