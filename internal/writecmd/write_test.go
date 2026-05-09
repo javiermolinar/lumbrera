@@ -21,7 +21,7 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 	if frontmatter.StartsWithFrontmatter([]byte(testfs.ReadFile(t, repo, "sources/2026/05/04/raw.md"))) {
 		t.Fatal("source writes should preserve raw source content without generated frontmatter")
 	}
-	assertFileContains(t, repo, "INDEX.md", "[Raw source](sources/2026/05/04/raw.md)")
+	assertFileContains(t, repo, "SOURCES.md", "[Raw source](sources/2026/05/04/raw.md)")
 	runWrite(t, repo, "# Related\n\nCompanion page.\n", "wiki/related.md", "--title", "Related", "--summary", "Related companion page.", "--tag", "related", "--source", "sources/2026/05/04/raw.md", "--reason", "Create related", "--actor", "test")
 	runWrite(t, repo, "# Topic\n\nSee [Related](./related.md).\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--source", "sources/2026/05/04/raw.md", "--reason", "Create topic", "--actor", "test", "--tag", "design")
 
@@ -55,7 +55,7 @@ func TestWriteSourceAndWikiCreateGeneratedFiles(t *testing.T) {
 		t.Fatalf("expected generated Sources section, got:\n%s", body)
 	}
 
-	assertFileContains(t, repo, "INDEX.md", "[Raw source](sources/2026/05/04/raw.md)")
+	assertFileContains(t, repo, "SOURCES.md", "[Raw source](sources/2026/05/04/raw.md)")
 	assertFileContains(t, repo, "INDEX.md", "[Topic](wiki/topic.md)")
 	assertFileNotContains(t, repo, "BRAIN.sum", "sources/2026/05/04/raw.md sha256:")
 	assertFileContains(t, repo, "BRAIN.sum", "wiki/topic.md sha256:")
@@ -371,5 +371,113 @@ func assertMissing(t *testing.T, repo, rel string) {
 	t.Helper()
 	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(rel))); !os.IsNotExist(err) {
 		t.Fatalf("expected %s to be missing, got err=%v", rel, err)
+	}
+}
+
+func TestWriteAssetCreatesFile(t *testing.T) {
+	repo := initBrain(t)
+
+	// Create a temp file to use as --file source.
+	tmpFile := filepath.Join(t.TempDir(), "diagram.png")
+	if err := os.WriteFile(tmpFile, []byte("fake-png-content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	args := []string{"assets/diagrams/arch.png", "--brain", repo, "--file", tmpFile, "--reason", "Add architecture diagram", "--actor", "test"}
+	if err := Run(args, strings.NewReader("")); err != nil {
+		t.Fatalf("asset write failed: %v", err)
+	}
+
+	// Asset file should exist with correct content.
+	got := testfs.ReadFile(t, repo, "assets/diagrams/arch.png")
+	if got != "fake-png-content" {
+		t.Fatalf("unexpected asset content: %q", got)
+	}
+
+	// ASSETS.md should list the asset.
+	assertFileContains(t, repo, "ASSETS.md", "arch.png")
+
+	// CHANGELOG should record the operation.
+	assertFileContains(t, repo, "CHANGELOG.md", "[asset] [test]: Add architecture diagram")
+}
+
+func TestWriteAssetRejectsExisting(t *testing.T) {
+	repo := initBrain(t)
+
+	tmpFile := filepath.Join(t.TempDir(), "diagram.png")
+	if err := os.WriteFile(tmpFile, []byte("content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// First write succeeds.
+	args := []string{"assets/diagram.png", "--brain", repo, "--file", tmpFile, "--reason", "Add diagram", "--actor", "test"}
+	if err := Run(args, strings.NewReader("")); err != nil {
+		t.Fatalf("first asset write failed: %v", err)
+	}
+
+	// Second write to same path should fail (immutable).
+	if err := Run(args, strings.NewReader("")); err == nil {
+		t.Fatal("expected asset write to reject existing file")
+	}
+}
+
+func TestWriteAssetRejectsWithoutFile(t *testing.T) {
+	repo := initBrain(t)
+	args := []string{"assets/diagram.png", "--brain", repo, "--reason", "Add diagram", "--actor", "test"}
+	if err := Run(args, strings.NewReader("")); err == nil {
+		t.Fatal("expected asset write without --file to fail")
+	}
+}
+
+func TestWriteAssetRejectsMarkdownFile(t *testing.T) {
+	repo := initBrain(t)
+	tmpFile := filepath.Join(t.TempDir(), "notes.md")
+	if err := os.WriteFile(tmpFile, []byte("# Notes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"assets/notes.md", "--brain", repo, "--file", tmpFile, "--reason", "Bad", "--actor", "test"}
+	if err := Run(args, strings.NewReader("")); err == nil {
+		t.Fatal("expected .md under assets/ to be rejected")
+	}
+}
+
+func TestWriteWikiWithAssetLink(t *testing.T) {
+	repo := initBrain(t)
+
+	// Write a source first.
+	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")
+
+	// Write an asset.
+	tmpFile := filepath.Join(t.TempDir(), "arch.png")
+	if err := os.WriteFile(tmpFile, []byte("fake-png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"assets/diagrams/arch.png", "--brain", repo, "--file", tmpFile, "--reason", "Add diagram", "--actor", "test"}
+	if err := Run(args, strings.NewReader("")); err != nil {
+		t.Fatalf("asset write failed: %v", err)
+	}
+
+	// Write a wiki page that links to the asset.
+	runWrite(t, repo, "# Overview\n\n![Architecture](assets/diagrams/arch.png)\n", "wiki/overview.md",
+		"--title", "Overview", "--summary", "Architecture overview.",
+		"--tag", "architecture", "--source", "sources/raw.md",
+		"--reason", "Create overview", "--actor", "test")
+
+	// Verify passes — asset link resolves.
+	assertFileContains(t, repo, "wiki/overview.md", "![Architecture](assets/diagrams/arch.png)")
+}
+
+func TestWriteAssetRejectsMetadataFlags(t *testing.T) {
+	repo := initBrain(t)
+	tmpFile := filepath.Join(t.TempDir(), "diagram.png")
+	if err := os.WriteFile(tmpFile, []byte("content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, extra := range []string{"--title=X", "--summary=X", "--tag=x", "--source=sources/raw.md"} {
+		args := []string{"assets/diagram.png", "--brain", repo, "--file", tmpFile, "--reason", "Add", "--actor", "test", extra}
+		if err := Run(args, strings.NewReader("")); err == nil {
+			t.Fatalf("expected asset write with %s to fail", extra)
+		}
 	}
 }

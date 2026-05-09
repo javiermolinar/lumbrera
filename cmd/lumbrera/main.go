@@ -9,6 +9,7 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/healthcmd"
 	"github.com/javiermolinar/lumbrera/internal/indexcmd"
 	initcmd "github.com/javiermolinar/lumbrera/internal/initcmd"
+	"github.com/javiermolinar/lumbrera/internal/migratecmd"
 	"github.com/javiermolinar/lumbrera/internal/searchcmd"
 	"github.com/javiermolinar/lumbrera/internal/verifycmd"
 	"github.com/javiermolinar/lumbrera/internal/writecmd"
@@ -31,6 +32,8 @@ func run(args []string) error {
 	switch command {
 	case "init":
 		return initcmd.Run(rest)
+	case "migrate":
+		return migratecmd.Run(rest)
 	case "index":
 		return indexcmd.Run(rest)
 	case "health":
@@ -71,6 +74,7 @@ Usage:
 
 Commands:
   init <repo>              Initialize a Lumbrera brain repo
+  migrate [options]        Upgrade a v1 brain to v2
   index [options]          Manage the local SQLite search index
   health [options]         Return deterministic health/consolidation candidates
   search <query> [options] Search the local SQLite index with JSON output

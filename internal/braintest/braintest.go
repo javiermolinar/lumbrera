@@ -27,6 +27,14 @@ func RunWrite(t testing.TB, repo, stdin, target string, args ...string) {
 	}
 }
 
+func RunAssetWrite(t testing.TB, repo, target, filePath string, args ...string) {
+	t.Helper()
+	fullArgs := append([]string{target, "--brain", repo, "--file", filePath}, args...)
+	if err := writecmd.Run(fullArgs, strings.NewReader("")); err != nil {
+		t.Fatalf("asset write %v failed: %v", fullArgs, err)
+	}
+}
+
 func ReadFile(t testing.TB, repo, rel string) string {
 	t.Helper()
 	return testfs.ReadFile(t, repo, rel)

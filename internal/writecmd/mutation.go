@@ -27,6 +27,12 @@ func inferOperation(kind string, exists bool, opts options) (operation, error) {
 		}
 		return opSource, nil
 	}
+	if kind == "asset" {
+		if exists {
+			return "", fmt.Errorf("assets are immutable; refusing to update existing asset")
+		}
+		return opAsset, nil
+	}
 	if exists {
 		return opUpdate, nil
 	}
@@ -40,6 +46,12 @@ func applyMutation(repo, target, kind string, op operation, opts options, input 
 		return os.Remove(absTarget)
 	case opSource:
 		return writeRawFile(absTarget, input)
+	case opAsset:
+		content, err := os.ReadFile(opts.File)
+		if err != nil {
+			return fmt.Errorf("read --file %q: %w", opts.File, err)
+		}
+		return writeRawFile(absTarget, content)
 	case opCreate:
 		body := normalizeBody(input)
 		sources, err := mergeSourceCitations(target, body, normalizeSources(opts.Sources))

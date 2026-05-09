@@ -81,6 +81,12 @@ func parseArgs(args []string) (options, error) {
 			}
 			opts.Append = v
 			opts.AppendSet = true
+		case "--file":
+			v, err := nextValue()
+			if err != nil {
+				return options{}, err
+			}
+			opts.File = v
 		case "--delete":
 			if hasValue {
 				return options{}, fmt.Errorf("--delete does not accept a value")
@@ -109,7 +115,7 @@ func printHelp() {
 Performs one Lumbrera write transaction and regenerates local metadata.
 
 Required:
-  <path>              repo-relative Markdown path under sources/ or wiki/
+  <path>              repo-relative path under sources/, wiki/, or assets/
   --reason <reason>   single-line changelog reason
 
 Options:
@@ -121,11 +127,14 @@ Options:
   --tag <tag>         required generated wiki frontmatter tag for new wiki files, repeatable up to 5
   --source <path>     provenance source for wiki writes, repeatable
   --append <section>  append stdin content to a named section in an existing wiki page
+  --file <path>       local file to copy into assets/ (required for asset writes)
   --delete            delete an existing wiki page
 
 Rules:
   - source writes preserve stdin as raw Markdown
   - wiki stdin must contain Markdown body only; Lumbrera generates wiki document IDs and frontmatter
+  - asset writes require --file and copy the local file into the target path
+  - assets are immutable after creation; .md files are not allowed under assets/
   - new wiki pages require single-line --summary, 1-5 lowercase slug --tag values, and at most 400 body lines
   - source files are immutable after creation
   - wiki writes require at least one --source

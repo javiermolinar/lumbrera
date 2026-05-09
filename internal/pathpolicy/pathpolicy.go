@@ -7,6 +7,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 func NormalizeTargetPath(raw string) (string, string, error) {
@@ -31,16 +33,18 @@ func NormalizeTargetPath(raw string) (string, string, error) {
 	if strings.Contains(clean, "\\") {
 		return "", "", fmt.Errorf("target path %q must use repo-relative POSIX separators", raw)
 	}
-	if !strings.HasSuffix(strings.ToLower(clean), ".md") {
+	root, ok := brain.RootForPath(clean)
+	if !ok {
+		return "", "", fmt.Errorf("target path %q must be under %s", raw, brain.ContentDirList())
+	}
+	isMd := strings.HasSuffix(strings.ToLower(clean), ".md")
+	if root.Markdown && !isMd {
 		return "", "", fmt.Errorf("target path %q must be a Markdown file", raw)
 	}
-	if strings.HasPrefix(clean, "sources/") && clean != "sources" {
-		return clean, "source", nil
+	if !root.Markdown && isMd {
+		return "", "", fmt.Errorf("target path %q: Markdown files are not allowed under %s/", raw, root.Dir)
 	}
-	if strings.HasPrefix(clean, "wiki/") && clean != "wiki" {
-		return clean, "wiki", nil
-	}
-	return "", "", fmt.Errorf("target path %q must be under sources/ or wiki/", raw)
+	return clean, root.Kind, nil
 }
 
 func EnsureSafeFilesystemTarget(repo, target string) error {

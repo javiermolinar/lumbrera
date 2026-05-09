@@ -41,10 +41,10 @@ func TestVerifyFixRegeneratesStaleIndex(t *testing.T) {
 		t.Fatalf("verify should pass after fix: %v", err)
 	}
 
-	// INDEX.md should include the manually-added source.
-	index := braintest.ReadFile(t, repo, "INDEX.md")
-	if !strings.Contains(index, "sources/extra.md") {
-		t.Fatalf("expected INDEX.md to include extra.md, got:\n%s", index)
+	// SOURCES.md should include the manually-added source.
+	sources := braintest.ReadFile(t, repo, "SOURCES.md")
+	if !strings.Contains(sources, "sources/extra.md") {
+		t.Fatalf("expected SOURCES.md to include extra.md, got:\n%s", sources)
 	}
 }
 

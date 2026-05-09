@@ -49,5 +49,5 @@ This file is the active tracker for consolidated v2+ backlog ideas. Completed im
 
 - Existing Markdown repository import/adoption.
 - Configurable directories, branches, lint policy, and source immutability policy.
-- PDF/web/image/voice ingestion adapters that convert to Markdown before `lumbrera write`.
+- PDF/web/voice ingestion adapters that convert to Markdown before `lumbrera write` (image ingestion now covered by assets).
 - Desktop/browser UI for browsing, capture, sync status, and review.

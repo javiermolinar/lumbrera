@@ -63,9 +63,11 @@ func VerifyGeneratedFiles(repo string) error {
 		return err
 	}
 	checks := map[string]string{
-		brain.IndexPath:    files.Index,
-		brain.BrainSumPath: files.BrainSum,
-		brain.TagsPath:     files.Tags,
+		brain.IndexPath:        files.Index,
+		brain.SourcesIndexPath: files.SourcesIndex,
+		brain.AssetsIndexPath:  files.AssetsIndex,
+		brain.BrainSumPath:     files.BrainSum,
+		brain.TagsPath:         files.Tags,
 	}
 	for rel, want := range checks {
 		got, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))

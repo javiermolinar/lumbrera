@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	brainVersion        = "lumbrera-brain-v1"
+	brainVersion        = "lumbrera-brain-v2"
 	markerPath          = "VERSION"
 	agentsPath          = "AGENTS.md"
 	claudePath          = "CLAUDE.md"
@@ -25,6 +25,7 @@ var scaffoldDirs = []string{
 	"sources/reference",
 	"wiki",
 	"wiki/design",
+	"assets",
 	".agents/skills/lumbrera-ingest",
 	".agents/skills/lumbrera-query",
 	".agents/skills/lumbrera-health",
@@ -32,12 +33,14 @@ var scaffoldDirs = []string{
 }
 
 var scaffoldFiles = map[string]string{
-	markerPath:     brainVersion + "\n",
-	"INDEX.md":     indexContent,
-	"CHANGELOG.md": changelogContent,
-	"BRAIN.sum":    brainSumContent,
-	"tags.md":      tagsContent,
-	agentsPath:     agentsContent,
+	markerPath:      brainVersion + "\n",
+	"INDEX.md":      indexContent,
+	"SOURCES.md":    sourcesIndexContent,
+	"ASSETS.md":     assetsIndexContent,
+	"CHANGELOG.md":  changelogContent,
+	"BRAIN.sum":     brainSumContent,
+	"tags.md":       tagsContent,
+	agentsPath:      agentsContent,
 	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
 	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,
 	".agents/skills/lumbrera-health/SKILL.md": healthSkillContent,

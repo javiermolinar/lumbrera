@@ -81,7 +81,7 @@ func printHelp() {
 Deletes a source or wiki file and cascades cleanup through referencing pages.
 
 Required:
-  <path>              repo-relative Markdown path under sources/ or wiki/
+  <path>              repo-relative path under sources/, wiki/, or assets/
   --reason <reason>   single-line changelog reason
 
 Options:

@@ -6,16 +6,17 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 )
 
 // ValidatePathPolicy checks that the Lumbrera content directories exist and
-// that files inside sources/ and wiki/ obey path policy. Everything outside
-// those directories is ignored — the brain repo may contain arbitrary
-// non-Lumbrera files such as .github/, README.md, CI configs, etc.
+// that files inside them obey path policy. Everything outside content
+// directories is ignored — the brain repo may contain arbitrary non-Lumbrera
+// files such as .github/, README.md, CI configs, etc.
 func ValidatePathPolicy(repo string) error {
-	for _, dir := range []string{"sources", "wiki"} {
-		if err := validateContentDir(repo, dir); err != nil {
+	for _, root := range brain.ContentRoots {
+		if err := validateContentDir(repo, root); err != nil {
 			return err
 		}
 	}
@@ -24,20 +25,23 @@ func ValidatePathPolicy(repo string) error {
 
 // validateContentDir checks that a content directory exists as a real
 // directory (not a symlink) and that all files inside obey path policy.
-func validateContentDir(repo, root string) error {
-	absRoot := filepath.Join(repo, root)
+func validateContentDir(repo string, root brain.ContentRoot) error {
+	absRoot := filepath.Join(repo, root.Dir)
 	info, err := os.Lstat(absRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("required directory %s/ is missing", root)
+			if root.Required {
+				return fmt.Errorf("required directory %s/ is missing", root.Dir)
+			}
+			return nil
 		}
 		return err
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("%s must be a real directory, not a symlink", root)
+		return fmt.Errorf("%s must be a real directory, not a symlink", root.Dir)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("%s must be a directory", root)
+		return fmt.Errorf("%s must be a directory", root.Dir)
 	}
 
 	return filepath.WalkDir(absRoot, func(absPath string, entry os.DirEntry, err error) error {
@@ -64,10 +68,14 @@ func validateContentDir(repo, root string) error {
 			return nil
 		}
 
-		if strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
+		isMd := strings.EqualFold(filepath.Ext(entry.Name()), ".md")
+		if root.Markdown && isMd {
 			if _, _, err := pathpolicy.NormalizeTargetPath(rel); err != nil {
 				return err
 			}
+		}
+		if !root.Markdown && isMd {
+			return fmt.Errorf("path %s: Markdown files are not allowed under %s/", rel, root.Dir)
 		}
 		return nil
 	})

@@ -1,11 +1,11 @@
 ---
 name: lumbrera-delete
-description: Delete a source or wiki page from a Lumbrera brain, cascading cleanup through all referencing wiki pages, and removing orphaned pages left with no sources.
+description: Delete a source, wiki page, or asset from a Lumbrera brain, cascading cleanup through all referencing wiki pages, and removing orphaned pages left with no sources.
 ---
 
 # Lumbrera Delete
 
-Use when asked to remove a source, delete a wiki page, or clean up a bad/superseded source and its downstream effects.
+Use when asked to remove a source, delete a wiki page, remove an asset, or clean up a bad/superseded source and its downstream effects.
 
 ## Purpose
 
@@ -15,6 +15,7 @@ Safely remove a source or wiki page from the brain while keeping every remaining
 
 - A source is incorrect, outdated, superseded, or "poisoned" and all wiki knowledge derived from it must be cleaned up.
 - A wiki page is no longer needed and pages linking to it should have their links removed.
+- An asset (diagram, image, PDF) is outdated and should be removed along with its wiki references.
 - Health review identified a page that should be deleted after its content was consolidated elsewhere.
 
 ## Contract
@@ -44,6 +45,16 @@ Deleting a wiki page:
 2. **Update frontmatter**: `lumbrera.links` is updated in referencing pages.
 
 Wiki-to-wiki link cleanup does **not** trigger further wiki deletions.
+
+### Asset deletion
+
+Deleting an asset:
+
+1. **Scrub image embeds**: `![alt](assets/path)` is removed entirely from wiki page bodies.
+2. **Scrub links**: `[text](assets/path)` is removed entirely from wiki page bodies.
+3. **No cascade deletion**: wiki pages are never deleted when an asset is removed.
+
+After asset deletion, the LLM should review affected wiki pages and rewrite surrounding prose if it reads awkwardly without the image/link.
 
 ## Workflow
 
@@ -79,6 +90,9 @@ lumbrera delete sources/<path>.md --reason "<reason>"
 
 # Delete a wiki page and clean links in referencing pages.
 lumbrera delete wiki/<path>.md --reason "<reason>"
+
+# Delete an asset and scrub references from wiki pages.
+lumbrera delete assets/<path> --reason "<reason>"
 
 # Specify actor and brain directory.
 lumbrera delete <path> --reason "<reason>" --actor "<actor>" --brain <dir>

@@ -62,6 +62,51 @@ func cleanWikiLinkFromWiki(ref wikiRef, wikiPath string) (wikiRef, error) {
 	return updated, nil
 }
 
+// cleanAssetFromWiki removes all markdown image embeds and links pointing to
+// assetPath from the ref's body. Image embeds ![alt](path) are removed entirely.
+// Regular links [text](path) are also removed entirely (bare asset filenames
+// have no value as prose). The LLM decides whether surrounding prose needs
+// rewriting afterward.
+func cleanAssetFromWiki(ref wikiRef, assetPath string) (wikiRef, error) {
+	body := stripAssetReferences(ref.body, ref.relPath, assetPath)
+
+	// Re-analyze to get updated links.
+	analysis, err := md.AnalyzeWithOptions(ref.relPath, body, md.AnalyzeOptions{SourceCitations: true})
+	if err != nil {
+		return ref, err
+	}
+
+	links := filterWikiLinks(analysis.Links)
+
+	updated := ref
+	updated.body = body
+	updated.meta.Lumbrera.Links = links
+	updated.meta.Lumbrera.ModifiedDate = time.Now().Format("2006-01-02")
+	return updated, nil
+}
+
+// stripAssetReferences removes ![alt](asset-path) and [text](asset-path) from body.
+func stripAssetReferences(body, fromPath, assetPath string) string {
+	relLink := md.RelativeLink(fromPath, assetPath)
+	candidates := []string{relLink, assetPath}
+
+	for _, candidate := range candidates {
+		escaped := regexp.QuoteMeta(candidate)
+		// Remove image embeds: ![alt](path) or ![alt](path#anchor)
+		imgPattern := fmt.Sprintf(`!\[[^\]]*\]\(%s(?:#[^\)]*)?\.?\)`, escaped)
+		imgRe := regexp.MustCompile(imgPattern)
+		body = imgRe.ReplaceAllString(body, "")
+
+		// Remove regular links: [text](path) or [text](path#anchor)
+		linkPattern := fmt.Sprintf(`\[[^\]]*\]\(%s(?:#[^\)]*)?\.?\)`, escaped)
+		linkRe := regexp.MustCompile(linkPattern)
+		body = linkRe.ReplaceAllString(body, "")
+	}
+
+	body = collapseSpaces(body)
+	return body
+}
+
 // stripSourceCitations removes [source: <relative-path-to-sourcePath>] and
 // [source: <relative-path-to-sourcePath>#anchor] from body text.
 // It matches all relative path forms that resolve to sourcePath from the

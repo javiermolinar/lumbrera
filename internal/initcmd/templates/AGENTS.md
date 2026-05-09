@@ -9,14 +9,16 @@ This is a Lumbrera brain: a managed Markdown knowledge base for humans and LLM a
 - Treat recommended_sections as the primary read plan. Read those path#anchor targets first, then the top wiki pages from recommended_read_order only if more context is needed.
 - Check coverage on comparison/entity questions; if a named entity is missing, say so or refine the search before answering.
 - Do not scan the whole repo, run broad find/rg, or read every INDEX.md entry unless search is insufficient.
-- Use INDEX.md and tags.md for fallback navigation, not as source evidence.
+- Use INDEX.md, SOURCES.md, ASSETS.md, and tags.md for fallback navigation, not as source evidence.
 
 ## Write
 
 - Do not create, edit, move, delete, or overwrite files directly.
-- All mutations to sources/ and wiki/ must use lumbrera write.
+- All mutations to sources/, wiki/, and assets/ must use lumbrera write or lumbrera delete.
 - Do not modify existing files under sources/; sources are immutable.
-- Do not edit generated files: INDEX.md, CHANGELOG.md, BRAIN.sum, or tags.md.
+- Do not modify existing files under assets/; assets are immutable. To replace an asset, delete it and re-add it.
+- Asset writes require --file to copy a local file: lumbrera write assets/<path> --file <local-path> --reason "..."
+- Do not edit generated files: INDEX.md, SOURCES.md, ASSETS.md, CHANGELOG.md, BRAIN.sum, or tags.md.
 - Do not edit Lumbrera internals under .brain/, .agents/, or .claude.
 - .brain/search.sqlite is a disposable generated cache; rebuild it with lumbrera index, do not edit or cite it.
 
@@ -67,8 +69,11 @@ lumbrera index --rebuild --brain .
 lumbrera verify --brain .
 lumbrera write sources/<path>.md --reason "Preserve source" < source.md
 lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --source sources/<path>.md --reason "Distill source" < page.md
+lumbrera write assets/<path> --file <local-path> --reason "Add diagram"
 lumbrera delete sources/<path>.md --reason "Remove bad source"
 lumbrera delete wiki/<path>.md --reason "Remove obsolete page"
+lumbrera delete assets/<path> --reason "Remove outdated asset"
+lumbrera migrate --brain . # upgrade v1 brain to v2
 ~~~
 
 ## Team Git/GitHub errors
@@ -86,4 +91,4 @@ lumbrera delete wiki/<path>.md --reason "Remove obsolete page"
 - Ingest sources into wiki pages: .agents/skills/lumbrera-ingest/SKILL.md
 - Answer questions from the brain: .agents/skills/lumbrera-query/SKILL.md
 - Check semantic health: .agents/skills/lumbrera-health/SKILL.md
-- Delete sources or wiki pages: .agents/skills/lumbrera-delete/SKILL.md
+- Delete sources, wiki pages, or assets: .agents/skills/lumbrera-delete/SKILL.md

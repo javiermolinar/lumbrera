@@ -19,7 +19,10 @@ func TestNormalizeTargetPath(t *testing.T) {
 		{name: "source", raw: "sources/raw.md", wantPath: "sources/raw.md", wantKind: "source"},
 		{name: "absolute", raw: filepath.Join(string(filepath.Separator), "wiki", "topic.md"), wantErr: "absolute"},
 		{name: "parent", raw: "wiki/../sources/raw.md", wantErr: ".."},
-		{name: "wrong root", raw: "notes/topic.md", wantErr: "sources/ or wiki/"},
+		{name: "asset", raw: "assets/diagram.png", wantPath: "assets/diagram.png", wantKind: "asset"},
+		{name: "asset nested", raw: "assets/diagrams/arch.png", wantPath: "assets/diagrams/arch.png", wantKind: "asset"},
+		{name: "asset md rejected", raw: "assets/notes.md", wantErr: "Markdown files are not allowed"},
+		{name: "wrong root", raw: "notes/topic.md", wantErr: "sources/, wiki/, or assets/"},
 		{name: "not markdown", raw: "wiki/topic.txt", wantErr: "Markdown"},
 	}
 
