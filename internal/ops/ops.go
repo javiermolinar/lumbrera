@@ -51,10 +51,6 @@ func Append(repo string, entry Entry) error {
 	if text != "" && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
-	// Add blank line separator so entries render as distinct paragraphs in Markdown.
-	if text != "" && !strings.HasSuffix(text, "\n\n") {
-		text += "\n"
-	}
 	text += FormatLine(entry) + "\n"
 
 	return os.WriteFile(path, []byte(text), 0o644)
@@ -102,10 +98,7 @@ func Render(entries []Entry) string {
 		b.WriteString("No operations yet.\n")
 		return b.String()
 	}
-	for i, entry := range entries {
-		if i > 0 {
-			b.WriteByte('\n')
-		}
+	for _, entry := range entries {
 		b.WriteString(FormatLine(entry))
 		b.WriteByte('\n')
 	}
@@ -114,7 +107,7 @@ func Render(entries []Entry) string {
 
 // FormatLine renders a single changelog entry line.
 func FormatLine(entry Entry) string {
-	return fmt.Sprintf("%s [%s] [%s]: %s", entry.Date, entry.Operation, entry.Actor, entry.Reason)
+	return fmt.Sprintf("- %s [%s] [%s]: %s", entry.Date, entry.Operation, entry.Actor, entry.Reason)
 }
 
 // ParseLine parses a single changelog entry line.
@@ -123,6 +116,11 @@ func ParseLine(line string) (Entry, error) {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return Entry{}, fmt.Errorf("empty changelog line")
+	}
+
+	// Strip optional leading list marker.
+	if strings.HasPrefix(line, "- ") {
+		line = line[2:]
 	}
 
 	// Date: first 10 chars.

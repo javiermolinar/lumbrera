@@ -99,7 +99,7 @@ func VerifyGeneratedFiles(repo string) error {
 	// Compare ignoring blank-line differences: both the old compact format
 	// and the new spaced format parse identically, so we only reject
 	// actual content differences.
-	if normalizeBlankLines(string(changelogGot)) != normalizeBlankLines(changelogWant) {
+	if normalizeChangelogText(string(changelogGot)) != normalizeChangelogText(changelogWant) {
 		diff := staleDiff(changelogWant, string(changelogGot), 5)
 		return fmt.Errorf("%s has been hand-edited and does not match expected format:%s", brain.ChangelogPath, diff)
 	}
@@ -107,17 +107,17 @@ func VerifyGeneratedFiles(repo string) error {
 	return nil
 }
 
-// normalizeBlankLines collapses runs of blank lines so that the compact
-// (no blank lines) and spaced (blank line between entries) changelog
-// formats compare as equal when their entries match.
-func normalizeBlankLines(s string) string {
+// normalizeChangelogText strips formatting differences (blank lines,
+// leading "- " list markers) so the verify round-trip comparison only
+// rejects actual content differences.
+func normalizeChangelogText(s string) string {
 	lines := strings.Split(s, "\n")
 	var out []string
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
-		out = append(out, line)
+		out = append(out, strings.TrimPrefix(line, "- "))
 	}
 	return strings.Join(out, "\n") + "\n"
 }

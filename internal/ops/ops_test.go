@@ -27,7 +27,7 @@ func TestAppendReadAndFormatLine(t *testing.T) {
 	if entries[0] != entry {
 		t.Fatalf("got %+v want %+v", entries[0], entry)
 	}
-	if got, want := FormatLine(entries[0]), "2026-05-04 [create] [agent]: Create topic"; got != want {
+	if got, want := FormatLine(entries[0]), "- 2026-05-04 [create] [agent]: Create topic"; got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
