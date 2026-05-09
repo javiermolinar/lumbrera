@@ -6,6 +6,7 @@ import (
 
 	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
+	md "github.com/javiermolinar/lumbrera/internal/markdown"
 )
 
 // wikiRef holds a parsed wiki document with its path, frontmatter, and body.
@@ -88,6 +89,19 @@ func isDeletedPath(deleted map[string]struct{}, path string) bool {
 	return ok
 }
 
+// wikiRefsLinkingToAsset returns wiki refs whose body contains image/link
+// references to the given asset path.
+func wikiRefsLinkingToAsset(refs []wikiRef, assetPath string) []wikiRef {
+	var out []wikiRef
+	for _, ref := range refs {
+		relLink := md.RelativeLink(ref.relPath, assetPath)
+		if strings.Contains(ref.body, assetPath) || strings.Contains(ref.body, relLink) {
+			out = append(out, ref)
+		}
+	}
+	return out
+}
+
 // sourcePathsFromBody extracts source paths from a wiki body's ## Sources section links.
 func sourcePathsFromBody(refs []wikiRef, relPath string) []string {
 	for _, ref := range refs {
@@ -106,6 +120,26 @@ func planCascade(repo string, targetPath, targetKind string, allRefs []wikiRef) 
 	filesToDelete = []string{targetPath}
 	wikiUpdates = make(map[string]wikiRef)
 	deleted := map[string]struct{}{targetPath: {}}
+
+	if targetKind == "asset" {
+		// Find all wiki pages referencing this asset in their body.
+		affected := wikiRefsLinkingToAsset(allRefs, targetPath)
+		for _, ref := range affected {
+			if isDeletedPath(deleted, ref.relPath) {
+				continue
+			}
+			base := ref
+			if prev, ok := wikiUpdates[ref.relPath]; ok {
+				base = prev
+			}
+			updated, err := cleanAssetFromWiki(base, targetPath)
+			if err != nil {
+				return nil, nil, err
+			}
+			wikiUpdates[updated.relPath] = updated
+		}
+		// Assets never cascade-delete wiki pages.
+	}
 
 	if targetKind == "source" {
 		// Find all wiki pages referencing this source.

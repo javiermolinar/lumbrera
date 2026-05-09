@@ -230,6 +230,64 @@ func TestWriteDeleteReturnsDeprecationError(t *testing.T) {
 	assertExists(t, repo, "wiki/topic.md")
 }
 
+func TestDeleteAssetScrubsImageReferencesFromWiki(t *testing.T) {
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Source\n\nFacts.\n", "sources/raw.md", "--reason", "Add source", "--actor", "test")
+
+	// Write an asset.
+	tmpFile := filepath.Join(t.TempDir(), "arch.png")
+	if err := os.WriteFile(tmpFile, []byte("fake-png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	braintest.RunAssetWrite(t, repo, "assets/diagrams/arch.png", tmpFile, "--reason", "Add diagram", "--actor", "test")
+
+	// Write a wiki page that embeds the asset.
+	braintest.RunWrite(t, repo, "# Overview\n\n![Architecture](assets/diagrams/arch.png)\n\nMore text.\n", "wiki/overview.md",
+		"--title", "Overview", "--summary", "Architecture overview.",
+		"--tag", "architecture", "--source", "sources/raw.md",
+		"--reason", "Create overview", "--actor", "test")
+
+	// Delete the asset.
+	runDelete(t, repo, "assets/diagrams/arch.png", "--reason", "Remove outdated diagram", "--actor", "test")
+
+	assertMissing(t, repo, "assets/diagrams/arch.png")
+	assertExists(t, repo, "wiki/overview.md")
+
+	// Wiki page should have image reference scrubbed.
+	wiki := testfs.ReadFile(t, repo, "wiki/overview.md")
+	if strings.Contains(wiki, "arch.png") {
+		t.Fatalf("wiki still references deleted asset:\n%s", wiki)
+	}
+	if !strings.Contains(wiki, "More text.") {
+		t.Fatalf("wiki lost non-asset content:\n%s", wiki)
+	}
+
+	assertFileContains(t, repo, "CHANGELOG.md", "[delete] [test]: Remove outdated diagram")
+	assertVerify(t, repo)
+}
+
+func TestDeleteAssetNeverCascadeDeletesWiki(t *testing.T) {
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Source\n\nFacts.\n", "sources/raw.md", "--reason", "Add source", "--actor", "test")
+
+	tmpFile := filepath.Join(t.TempDir(), "diagram.png")
+	if err := os.WriteFile(tmpFile, []byte("content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	braintest.RunAssetWrite(t, repo, "assets/diagram.png", tmpFile, "--reason", "Add diagram", "--actor", "test")
+
+	braintest.RunWrite(t, repo, "# Page\n\n![Diagram](assets/diagram.png)\n", "wiki/page.md",
+		"--title", "Page", "--summary", "Page summary.",
+		"--tag", "page", "--source", "sources/raw.md",
+		"--reason", "Create page", "--actor", "test")
+
+	runDelete(t, repo, "assets/diagram.png", "--reason", "Remove diagram", "--actor", "test")
+
+	// Wiki page must survive (asset delete never cascade-deletes wiki).
+	assertExists(t, repo, "wiki/page.md")
+	assertVerify(t, repo)
+}
+
 // --- helpers ---
 
 func runDelete(t *testing.T, repo, target string, args ...string) {
