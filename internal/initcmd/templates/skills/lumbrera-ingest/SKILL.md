@@ -14,7 +14,8 @@ Preserve raw source material and distill it into small, source-grounded wiki pag
 ## Expected output
 
 - One or more created or updated wiki pages, or an explicit skip decision when the source is already covered.
-- A final report listing overlap searches performed, existing pages reviewed, created/updated/skipped pages, covered source sections, skipped source sections, uncertainties, and follow-up work.
+- Any asset files (diagrams, images) written via `lumbrera write assets/... --file ...`.
+- A final report listing overlap searches performed, existing pages reviewed, created/updated/skipped pages, created assets, covered source sections, skipped source sections, uncertainties, and follow-up work.
 - All mutations performed only through `lumbrera write`, followed by `lumbrera verify`.
 
 ## Contract
@@ -37,8 +38,20 @@ Preserve raw source material and distill it into small, source-grounded wiki pag
 
 4. Read `recommended_sections` first, then top wiki pages from `recommended_read_order` only if needed.
 5. Decide per candidate: update existing page, create new page, create linked page, or skip.
-6. Write with `lumbrera write`, then run `lumbrera verify`.
-7. Report overlap decisions, pages changed, source coverage, skipped material, uncertainties, and follow-up work.
+6. If source material includes diagrams or images, write them as assets first:
+
+   ~~~sh
+   lumbrera write assets/<path>.png --file <local-path> --reason "Add diagram from source"
+   ~~~
+
+7. Write wiki pages with `lumbrera write`. Embed assets using standard Markdown image syntax:
+
+   ~~~md
+   ![Architecture overview](assets/diagrams/arch.png)
+   ~~~
+
+8. Run `lumbrera verify`.
+9. Report overlap decisions, pages changed, assets created, source coverage, skipped material, uncertainties, and follow-up work.
 
 ## Write command
 
