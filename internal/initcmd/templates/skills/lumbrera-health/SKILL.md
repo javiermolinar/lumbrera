@@ -11,14 +11,15 @@ Use when the user asks for a semantic health check, consolidation review, link-h
 
 Use deterministic `lumbrera health` candidates to decide what an LLM should review next. The goal is not to prove semantic drift automatically. The goal is to narrow review to likely maintenance opportunities, then read the relevant wiki pages and preserved sources before classifying any action.
 
-`lumbrera health` returns review candidates, not conclusions. Treat `possible_duplicate`, `missing_link`, `orphan_page`, `underlinked_page`, and `uncited_source` as prompts for investigation.
+`lumbrera health` returns review candidates, not conclusions. Treat `possible_duplicate`, `missing_link`, `orphan_page`, `underlinked_page`, `uncited_source`, `source_coverage_gap`, `stub_page`, and `tag_anomaly` as prompts for investigation.
 
 Lumbrera handles deterministic consistency for managed wiki content: wiki document IDs, frontmatter, tag registry, index, changelog, checksums, source sections, broken links, heading anchors, path policy, and generated files. Do not spend LLM health-review effort on those.
 
 ## Workflow
 
-1. Run `lumbrera health --json` before broad repository exploration.
-2. Review the top candidate first. Do not scan the repo unless candidates are insufficient.
+1. Run `lumbrera health --json` before broad repository exploration. The default `--kind all` mixes candidate types to guarantee a diverse review queue.
+2. To focus on a specific category, use `--kind` with one of: `duplicates`, `links`, `sources`, `orphans`, `stubs`, `tags`.
+3. Review the top candidate first. Do not scan the repo unless candidates are insufficient.
 3. Use the candidate's `suggested_queries` with `lumbrera search "<query>" --json` when evidence is insufficient.
 4. When a candidate reason names a tag or source, optionally inspect that local neighborhood with exact filters:
 
@@ -45,7 +46,10 @@ Lumbrera handles deterministic consistency for managed wiki content: wiki docume
 - Related pages that should link contextually or include a short Related pages section.
 - Pages that cite similar sources but make stale or inconsistent claims.
 - Uncited source files that contain concepts missing from the wiki.
+- Source coverage gaps: sources that are cited but have H2/H3 sections no wiki page references. Use `--kind sources` to focus.
 - Orphan or weakly connected pages that should be linked, merged, or intentionally left standalone.
+- Stub pages with very little body content that may need expansion or merging. Use `--kind stubs` to focus.
+- Tag anomalies: singleton tags that add no search value, or broad tags applied to most pages that fail to discriminate. Use `--kind tags` to focus.
 - Identify high-risk claims that need claim-level citations: limits, breaking changes, destructive procedures, security/auth behavior, and internal operational workflows.
 - Internal-only knowledge that should be clearly marked and not presented as public documentation.
 

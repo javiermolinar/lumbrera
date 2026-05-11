@@ -95,7 +95,7 @@ func parseArgs(args []string) (options, error) {
 
 func isValidCandidateKind(kind string) bool {
 	switch kind {
-	case "", searchindex.CandidateKindAll, searchindex.CandidateKindDuplicates, searchindex.CandidateKindLinks, searchindex.CandidateKindSources, searchindex.CandidateKindOrphans:
+	case "", searchindex.CandidateKindAll, searchindex.CandidateKindDuplicates, searchindex.CandidateKindLinks, searchindex.CandidateKindSources, searchindex.CandidateKindOrphans, searchindex.CandidateKindStubs, searchindex.CandidateKindTags:
 		return true
 	default:
 		return false

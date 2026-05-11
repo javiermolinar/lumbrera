@@ -151,6 +151,9 @@ func buildCandidateTerms(ctx context.Context, db *sql.DB, docs map[string]*candi
 		}
 		writeCandidateTermText(b, heading)
 		writeCandidateTermText(b, body)
+		if doc := byID[documentID]; doc != nil {
+			doc.BodyLines += countBodyLines(body)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate candidate section text: %w", err)
@@ -233,6 +236,14 @@ func candidateSourceDocumentFrequency(docs []*candidateDocument) map[string]int 
 		}
 	}
 	return out
+}
+
+func countBodyLines(body string) int {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return 0
+	}
+	return strings.Count(body, "\n") + 1
 }
 
 var candidateStopwords = map[string]bool{

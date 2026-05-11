@@ -16,12 +16,17 @@ const (
 	CandidateKindLinks      = "links"
 	CandidateKindSources    = "sources"
 	CandidateKindOrphans    = "orphans"
+	CandidateKindStubs      = "stubs"
+	CandidateKindTags       = "tags"
 
 	CandidateTypePossibleDuplicate = "possible_duplicate"
 	CandidateTypeMissingLink       = "missing_link"
 	CandidateTypeOrphanPage        = "orphan_page"
 	CandidateTypeUnderlinkedPage   = "underlinked_page"
 	CandidateTypeUncitedSource     = "uncited_source"
+	CandidateTypeStubPage          = "stub_page"
+	CandidateTypeTagAnomaly        = "tag_anomaly"
+	CandidateTypeSourceCoverageGap = "source_coverage_gap"
 
 	CandidateConfidenceHigh   = "high"
 	CandidateConfidenceMedium = "medium"
@@ -35,12 +40,21 @@ const (
 	ReasonUnderlinkedPage   = "underlinked_page"
 	ReasonUncitedSource     = "uncited_source"
 	ReasonOlderRelevantPage = "older_relevant_page"
+	ReasonStubPage          = "stub_page"
+	ReasonTagTooSpecific    = "tag_too_specific"
+	ReasonTagTooBroad       = "tag_too_broad"
+	ReasonUncitedSection    = "uncited_section"
 
 	candidateLexicalReasonThreshold = 0.08
 	candidateLexicalPairThreshold   = 0.10
 	candidateMinimumPairScore       = 0.18
 	candidateOlderRelevanceTopPairs = 100
 	staleRiskMinimumDays            = 30
+
+	stubPageMaxBodyLines         = 15
+	tagAnomalyMinWikiPages       = 3
+	tagAnomalyBroadRatio         = 0.40
+	sourceCoverageGapMaxReasons  = 5
 )
 
 // CandidateOptions controls deterministic health/consolidation candidate
@@ -89,6 +103,7 @@ type candidateDocument struct {
 	Outgoing     map[string]struct{}
 	Incoming     map[string]struct{}
 	Terms        map[string]int
+	BodyLines    int
 }
 
 type lexicalOverlapResult struct {
@@ -142,11 +157,24 @@ func HealthCandidates(ctx context.Context, db *sql.DB, opts CandidateOptions) (C
 	}
 	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindSources {
 		candidates = append(candidates, sourceCoverageCandidates(sourceDocs, docsByPath)...)
+		gapCandidates, err := sourceCoverageGapCandidates(ctx, db, sourceDocs)
+		if err != nil {
+			return CandidateResponse{}, err
+		}
+		candidates = append(candidates, gapCandidates...)
+	}
+	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindStubs {
+		candidates = append(candidates, stubPageCandidates(wikiDocs)...)
+	}
+	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindTags {
+		candidates = append(candidates, tagAnomalyCandidates(wikiDocs, tagDF)...)
 	}
 
 	candidates = filterCandidates(candidates, normalized)
 	sortCandidates(candidates)
-	if len(candidates) > normalized.Limit {
+	if normalized.Kind == CandidateKindAll {
+		candidates = diversifyCandidates(candidates, normalized.Limit)
+	} else if len(candidates) > normalized.Limit {
 		candidates = append([]Candidate(nil), candidates[:normalized.Limit]...)
 	}
 	return CandidateResponse{
@@ -166,7 +194,7 @@ func normalizeCandidateOptions(opts CandidateOptions) (CandidateOptions, error) 
 		opts.Kind = CandidateKindAll
 	}
 	switch opts.Kind {
-	case CandidateKindAll, CandidateKindDuplicates, CandidateKindLinks, CandidateKindSources, CandidateKindOrphans:
+	case CandidateKindAll, CandidateKindDuplicates, CandidateKindLinks, CandidateKindSources, CandidateKindOrphans, CandidateKindStubs, CandidateKindTags:
 	default:
 		return CandidateOptions{}, fmt.Errorf("invalid candidate kind %q", opts.Kind)
 	}

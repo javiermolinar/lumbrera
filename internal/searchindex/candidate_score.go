@@ -13,7 +13,9 @@ func sharedTagScore(tags []string, df map[string]int, totalDocs int) float64 {
 			freq = 1
 		}
 		rarity := 1 - float64(freq-1)/math.Max(1, float64(totalDocs-1))
-		score += 0.08 + 0.10*rarity
+		// Quadratic rarity: saturated tags (>50% of pages) contribute near-zero.
+		// Rare tags still contribute up to 0.18 per tag (0.02 + 0.16).
+		score += 0.02 + 0.16*rarity*rarity
 	}
 	return math.Min(0.42, score)
 }

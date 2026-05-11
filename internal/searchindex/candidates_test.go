@@ -187,6 +187,232 @@ func TestHealthCandidatesFiltersByPathPrefix(t *testing.T) {
 	}
 }
 
+func TestHealthCandidatesFindsStubPages(t *testing.T) {
+	db := openTestDB(t)
+	// stub: 1 body line; non-stub: 20 body lines
+	docs := []Document{
+		candidateWikiDoc("doc_stub", "wiki/stub.md", "Stub page", "Tiny page.", `["stub"]`, `[]`, `[]`, "2026-05-06"),
+		candidateWikiDoc("doc_full", "wiki/full.md", "Full page", "Full page.", `["full"]`, `[]`, `[]`, "2026-05-06"),
+	}
+	var fullBody string
+	for i := 0; i < 20; i++ {
+		if i > 0 {
+			fullBody += "\n"
+		}
+		fullBody += "Full content line for a non-stub page."
+	}
+	sections := []Section{
+		{DocumentID: "doc_stub", Ordinal: 1, Heading: "Stub page", Anchor: "stub-page", Level: 1, Body: "Tiny body."},
+		{DocumentID: "doc_full", Ordinal: 1, Heading: "Full page", Anchor: "full-page", Level: 1, Body: fullBody},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "candidate-stubs"}); err != nil {
+		t.Fatalf("rebuild candidate fixture: %v", err)
+	}
+
+	response, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindStubs, Limit: 10})
+	if err != nil {
+		t.Fatalf("health candidates: %v", err)
+	}
+	if len(response.Candidates) != 1 {
+		t.Fatalf("candidate count = %d, want 1: %#v", len(response.Candidates), response.Candidates)
+	}
+	candidate := response.Candidates[0]
+	if candidate.Type != CandidateTypeStubPage {
+		t.Fatalf("candidate type = %q, want %q", candidate.Type, CandidateTypeStubPage)
+	}
+	assertCandidatePages(t, candidate, []string{"wiki/stub.md"})
+	assertCandidateReasonCode(t, candidate, ReasonStubPage)
+}
+
+func TestHealthCandidatesFindsStubPagesMultipleSections(t *testing.T) {
+	db := openTestDB(t)
+	// Page with 3 sections of 4 lines each = 12 body lines → still a stub (< 15)
+	docs := []Document{
+		candidateWikiDoc("doc_multi", "wiki/multi.md", "Multi section", "Multi.", `["multi"]`, `[]`, `[]`, "2026-05-06"),
+	}
+	sections := []Section{
+		{DocumentID: "doc_multi", Ordinal: 1, Heading: "Section one", Anchor: "s1", Level: 1, Body: "Line one.\nLine two.\nLine three.\nLine four."},
+		{DocumentID: "doc_multi", Ordinal: 2, Heading: "Section two", Anchor: "s2", Level: 2, Body: "Line one.\nLine two.\nLine three.\nLine four."},
+		{DocumentID: "doc_multi", Ordinal: 3, Heading: "Section three", Anchor: "s3", Level: 2, Body: "Line one.\nLine two.\nLine three.\nLine four."},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "candidate-stubs-multi"}); err != nil {
+		t.Fatalf("rebuild candidate fixture: %v", err)
+	}
+
+	response, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindStubs, Limit: 10})
+	if err != nil {
+		t.Fatalf("health candidates: %v", err)
+	}
+	if len(response.Candidates) != 1 {
+		t.Fatalf("candidate count = %d, want 1: %#v", len(response.Candidates), response.Candidates)
+	}
+	if response.Candidates[0].Type != CandidateTypeStubPage {
+		t.Fatalf("candidate type = %q, want %q", response.Candidates[0].Type, CandidateTypeStubPage)
+	}
+}
+
+func TestHealthCandidatesFindsTagAnomalies(t *testing.T) {
+	db := openTestDB(t)
+	// 5 wiki pages. "singleton" used by 1 page, "broad" used by 4/5 (80% > 40%), "normal" used by 2.
+	docs := []Document{
+		candidateWikiDoc("doc_a", "wiki/a.md", "Page A", "A.", `["broad","normal"]`, `[]`, `[]`, "2026-05-06"),
+		candidateWikiDoc("doc_b", "wiki/b.md", "Page B", "B.", `["broad","normal"]`, `[]`, `[]`, "2026-05-06"),
+		candidateWikiDoc("doc_c", "wiki/c.md", "Page C", "C.", `["broad"]`, `[]`, `[]`, "2026-05-06"),
+		candidateWikiDoc("doc_d", "wiki/d.md", "Page D", "D.", `["broad"]`, `[]`, `[]`, "2026-05-06"),
+		candidateWikiDoc("doc_e", "wiki/e.md", "Page E", "E.", `["singleton"]`, `[]`, `[]`, "2026-05-06"),
+	}
+	sections := []Section{
+		{DocumentID: "doc_a", Ordinal: 1, Heading: "A", Anchor: "a", Level: 1, Body: "Page A content."},
+		{DocumentID: "doc_b", Ordinal: 1, Heading: "B", Anchor: "b", Level: 1, Body: "Page B content."},
+		{DocumentID: "doc_c", Ordinal: 1, Heading: "C", Anchor: "c", Level: 1, Body: "Page C content."},
+		{DocumentID: "doc_d", Ordinal: 1, Heading: "D", Anchor: "d", Level: 1, Body: "Page D content."},
+		{DocumentID: "doc_e", Ordinal: 1, Heading: "E", Anchor: "e", Level: 1, Body: "Page E content."},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "candidate-tags"}); err != nil {
+		t.Fatalf("rebuild candidate fixture: %v", err)
+	}
+
+	response, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindTags, Limit: 10})
+	if err != nil {
+		t.Fatalf("health candidates: %v", err)
+	}
+	if len(response.Candidates) != 2 {
+		t.Fatalf("candidate count = %d, want 2: %#v", len(response.Candidates), response.Candidates)
+	}
+	// Broad tag (score 0.38) should rank above singleton (score 0.28).
+	broad := response.Candidates[0]
+	if broad.Type != CandidateTypeTagAnomaly {
+		t.Fatalf("broad candidate type = %q, want %q", broad.Type, CandidateTypeTagAnomaly)
+	}
+	assertCandidateReasonCode(t, broad, ReasonTagTooBroad)
+
+	singleton := response.Candidates[1]
+	if singleton.Type != CandidateTypeTagAnomaly {
+		t.Fatalf("singleton candidate type = %q, want %q", singleton.Type, CandidateTypeTagAnomaly)
+	}
+	assertCandidateReasonCode(t, singleton, ReasonTagTooSpecific)
+	assertCandidatePages(t, singleton, []string{"wiki/e.md"})
+}
+
+func TestHealthCandidatesFindsSourceCoverageGaps(t *testing.T) {
+	db := openTestDB(t)
+	docs := []Document{
+		candidateSourceDoc("source_a", "sources/a.md", "Source A"),
+		candidateWikiDoc("doc_w1", "wiki/w1.md", "Wiki one", "W1.", `["tag"]`, `["sources/a.md"]`, `[]`, "2026-05-06"),
+	}
+	sections := []Section{
+		// Source has 3 H2 sections.
+		{DocumentID: "source_a", Ordinal: 1, Heading: "Section one", Anchor: "section-one", Level: 2, Body: "Content one."},
+		{DocumentID: "source_a", Ordinal: 2, Heading: "Section two", Anchor: "section-two", Level: 2, Body: "Content two."},
+		{DocumentID: "source_a", Ordinal: 3, Heading: "Section three", Anchor: "section-three", Level: 2, Body: "Content three."},
+		{DocumentID: "doc_w1", Ordinal: 1, Heading: "Wiki one", Anchor: "wiki-one", Level: 1, Body: "Cites section one."},
+	}
+	// Only section-one is cited inline; section-two and section-three are gaps.
+	citations := []DocumentCitation{
+		{DocumentID: "doc_w1", WikiPath: "wiki/w1.md", SourcePath: "sources/a.md", CitationKind: "frontmatter_source", CitationText: "sources/a.md"},
+		{DocumentID: "doc_w1", WikiPath: "wiki/w1.md", SourcePath: "sources/a.md", SourceAnchor: "section-one", CitationKind: "inline_source", CitationText: "Source A \u00a7 Section one", SectionID: "doc_w1#section-0001"},
+	}
+	tags := []DocumentTag{
+		{DocumentID: "doc_w1", Path: "wiki/w1.md", Tag: "tag"},
+	}
+	if err := RebuildRecordsWithFacts(context.Background(), db, docs, sections, nil, citations, tags, map[string]string{"manifest_hash": "candidate-gap"}); err != nil {
+		t.Fatalf("rebuild candidate fixture: %v", err)
+	}
+
+	response, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindSources, Limit: 10})
+	if err != nil {
+		t.Fatalf("health candidates: %v", err)
+	}
+	// uncited_source should NOT fire (source is cited). source_coverage_gap should fire.
+	var gapCandidates []Candidate
+	for _, c := range response.Candidates {
+		if c.Type == CandidateTypeSourceCoverageGap {
+			gapCandidates = append(gapCandidates, c)
+		}
+		if c.Type == CandidateTypeUncitedSource {
+			t.Fatalf("source_a should not be flagged as uncited: %#v", c)
+		}
+	}
+	if len(gapCandidates) != 1 {
+		t.Fatalf("source_coverage_gap count = %d, want 1: %#v", len(gapCandidates), response.Candidates)
+	}
+	candidate := gapCandidates[0]
+	assertCandidateSources(t, candidate, []string{"sources/a.md"})
+	// Should have 2 uncited sections: section-two and section-three.
+	uncitedCount := 0
+	for _, reason := range candidate.Reasons {
+		if reason.Code == ReasonUncitedSection {
+			uncitedCount++
+		}
+	}
+	if uncitedCount != 2 {
+		t.Fatalf("uncited_section reason count = %d, want 2: %#v", uncitedCount, candidate.Reasons)
+	}
+	assertCandidateReason(t, candidate, ReasonUncitedSection, "Section two")
+	assertCandidateReason(t, candidate, ReasonUncitedSection, "Section three")
+}
+
+func TestHealthCandidatesSourceCoverageGapSkipsUncitedSources(t *testing.T) {
+	db := openTestDB(t)
+	// Source with sections but no citations at all — should only trigger uncited_source, not coverage_gap.
+	docs := []Document{
+		candidateSourceDoc("source_b", "sources/b.md", "Source B"),
+		candidateWikiDoc("doc_w2", "wiki/w2.md", "Wiki two", "W2.", `["tag"]`, `[]`, `[]`, "2026-05-06"),
+	}
+	sections := []Section{
+		{DocumentID: "source_b", Ordinal: 1, Heading: "Heading B1", Anchor: "heading-b1", Level: 2, Body: "B1 content."},
+		{DocumentID: "source_b", Ordinal: 2, Heading: "Heading B2", Anchor: "heading-b2", Level: 2, Body: "B2 content."},
+		{DocumentID: "doc_w2", Ordinal: 1, Heading: "Wiki two", Anchor: "wiki-two", Level: 1, Body: "Unrelated."},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "candidate-gap-skip"}); err != nil {
+		t.Fatalf("rebuild candidate fixture: %v", err)
+	}
+
+	response, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindSources, Limit: 10})
+	if err != nil {
+		t.Fatalf("health candidates: %v", err)
+	}
+	for _, c := range response.Candidates {
+		if c.Type == CandidateTypeSourceCoverageGap {
+			t.Fatalf("uncited source should not produce coverage_gap: %#v", c)
+		}
+	}
+	// Should have uncited_source instead.
+	found := false
+	for _, c := range response.Candidates {
+		if c.Type == CandidateTypeUncitedSource {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected uncited_source candidate for sources/b.md: %#v", response.Candidates)
+	}
+}
+
+func TestHealthCandidatesTagAnomalySkipsSmallBrains(t *testing.T) {
+	db := openTestDB(t)
+	// Only 2 wiki pages — below the minimum threshold of 3.
+	docs := []Document{
+		candidateWikiDoc("doc_x", "wiki/x.md", "X", "X.", `["only"]`, `[]`, `[]`, "2026-05-06"),
+		candidateWikiDoc("doc_y", "wiki/y.md", "Y", "Y.", `["other"]`, `[]`, `[]`, "2026-05-06"),
+	}
+	sections := []Section{
+		{DocumentID: "doc_x", Ordinal: 1, Heading: "X", Anchor: "x", Level: 1, Body: "X content."},
+		{DocumentID: "doc_y", Ordinal: 1, Heading: "Y", Anchor: "y", Level: 1, Body: "Y content."},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "candidate-tags-small"}); err != nil {
+		t.Fatalf("rebuild candidate fixture: %v", err)
+	}
+
+	response, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindTags, Limit: 10})
+	if err != nil {
+		t.Fatalf("health candidates: %v", err)
+	}
+	if len(response.Candidates) != 0 {
+		t.Fatalf("expected no tag anomaly candidates for small brain, got %d: %#v", len(response.Candidates), response.Candidates)
+	}
+}
+
 func candidateWikiDoc(id, pathValue, title, summary, tagsJSON, sourcesJSON, linksJSON, modifiedDate string) Document {
 	return Document{
 		ID:           id,
