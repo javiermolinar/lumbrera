@@ -33,19 +33,21 @@ To let the brain scale beyond what fits in a single context window, Lumbrera mai
 
 ## Install
 
-Download a prebuilt binary from the [latest release](https://github.com/javiermolinar/lumbrera/releases/latest), or install from source:
+Install the latest macOS/Linux prebuilt binary with one line, no Go required:
 
 ```sh
-go install github.com/javiermolinar/lumbrera/cmd/lumbrera@main
+curl -fsSL https://raw.githubusercontent.com/javiermolinar/lumbrera/main/scripts/install.sh | sh
+```
+
+Or install from source with Go:
+
+```sh
+go install github.com/javiermolinar/lumbrera/cmd/lumbrera@latest
 ```
 
 The module root is not an installable command package; use `/cmd/lumbrera`.
 
-Check the installed version with:
-
-```sh
-lumbrera version
-```
+Check the installed version with `lumbrera version`.
 
 
 ## How to use it
