@@ -33,11 +33,19 @@ To let the brain scale beyond what fits in a single context window, Lumbrera mai
 
 ## Install
 
+Download a prebuilt binary from the [latest release](https://github.com/javiermolinar/lumbrera/releases/latest), or install from source:
+
 ```sh
 go install github.com/javiermolinar/lumbrera/cmd/lumbrera@main
 ```
 
 The module root is not an installable command package; use `/cmd/lumbrera`.
+
+Check the installed version with:
+
+```sh
+lumbrera version
+```
 
 
 ## How to use it

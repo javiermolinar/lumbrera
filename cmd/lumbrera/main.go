@@ -15,6 +15,12 @@ import (
 	"github.com/javiermolinar/lumbrera/internal/writecmd"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -44,6 +50,9 @@ func run(args []string) error {
 		return verifycmd.Run(rest)
 	case "delete":
 		return deletecmd.Run(rest)
+	case "version", "--version":
+		printVersion()
+		return nil
 	case "write":
 		// Deprecation: intercept --delete and delegate to delete command.
 		if writeHasDelete(rest) {
@@ -81,6 +90,7 @@ Commands:
   verify [--brain <path>]  Check deterministic brain integrity
   write <path> [options]   Perform one atomic knowledge mutation
   delete <path> [options]  Delete a source or wiki page with cascade cleanup
+  version                  Print version information
 
 Run:
   lumbrera <command> --help
@@ -93,6 +103,10 @@ Examples:
   lumbrera search "tempo downscale" --brain ./brain --json
   lumbrera write wiki/topic.md --title "Topic" --summary "Durable summary" --tag topic --source sources/input.md --reason "Create topic page" < topic.md
   lumbrera delete sources/bad.md --reason "Remove poison source"`)
+}
+
+func printVersion() {
+	fmt.Printf("lumbrera %s\ncommit: %s\ndate: %s\n", version, commit, date)
 }
 
 // writeHasDelete returns true if the write args contain --delete.
