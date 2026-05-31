@@ -5,7 +5,7 @@ This is a Lumbrera brain: a managed Markdown knowledge base for humans and LLM a
 ## Read
 
 - Use .agents/skills/lumbrera-query/SKILL.md when answering questions.
-- Run lumbrera search "<question>" --json before reading files.
+- Run one intent-preserving `lumbrera search` before reading files; rewrite conversational questions into stable searchable concepts instead of blindly using exact wording.
 - Treat recommended_sections as the primary read plan. Read those path#anchor targets first, then the top wiki pages from recommended_read_order only if more context is needed.
 - Check coverage on comparison/entity questions; if a named entity is missing, say so or refine the search before answering.
 - Do not scan the whole repo, run broad find/rg, or read every INDEX.md entry unless search is insufficient.

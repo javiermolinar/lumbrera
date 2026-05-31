@@ -9,10 +9,15 @@ Use when the user asks a question about knowledge in the brain.
 
 ## Search-first workflow
 
-1. Run one broad lexical search from the user question:
+1. Run one broad intent-preserving search from the user question. Do not blindly pass exact user wording when it contains conversational phrasing, filler, or vague meta terms.
+
+   - Keep named entities, technical nouns, tags, file/source names, and domain terms.
+   - Rewrite soft questions into searchable concepts.
+   - Add obvious synonyms only when they improve recall.
+   - If the user asks for your experience using the brain/tool rather than repository knowledge, answer from the current interaction; search only for documented policy/history.
 
    ~~~sh
-   lumbrera search "<question>" --json
+   lumbrera search "<intent-preserving query>" --json
    ~~~
 
 2. Treat recommended_sections as the primary product contract and read those path#anchor targets first.
@@ -20,8 +25,8 @@ Use when the user asks a question about knowledge in the brain.
 4. Use exact filters when the user names a known tag or provenance source:
 
    ~~~sh
-   lumbrera search "<question>" --tag <tag> --json
-   lumbrera search "<question>" --source sources/<source>.md --json
+   lumbrera search "<intent-preserving query>" --tag <tag> --json
+   lumbrera search "<intent-preserving query>" --source sources/<source>.md --json
    ~~~
 
 5. If recommended_sections are insufficient, read only the top 3 wiki pages from recommended_read_order.
