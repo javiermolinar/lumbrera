@@ -15,8 +15,8 @@ import (
 // directories is ignored — the brain repo may contain arbitrary non-Lumbrera
 // files such as .github/, README.md, CI configs, etc.
 func ValidatePathPolicy(repo string) error {
-	for _, root := range brain.ContentRoots {
-		if err := validateContentDir(repo, root); err != nil {
+	for _, policy := range brain.Policies() {
+		if err := validateContentDir(repo, policy); err != nil {
 			return err
 		}
 	}
@@ -25,23 +25,23 @@ func ValidatePathPolicy(repo string) error {
 
 // validateContentDir checks that a content directory exists as a real
 // directory (not a symlink) and that all files inside obey path policy.
-func validateContentDir(repo string, root brain.ContentRoot) error {
-	absRoot := filepath.Join(repo, root.Dir)
+func validateContentDir(repo string, policy brain.ContentPolicy) error {
+	absRoot := filepath.Join(repo, policy.Root)
 	info, err := os.Lstat(absRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if root.Required {
-				return fmt.Errorf("required directory %s/ is missing", root.Dir)
+			if policy.RequiredRoot {
+				return fmt.Errorf("required directory %s/ is missing", policy.Root)
 			}
 			return nil
 		}
 		return err
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("%s must be a real directory, not a symlink", root.Dir)
+		return fmt.Errorf("%s must be a real directory, not a symlink", policy.Root)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("%s must be a directory", root.Dir)
+		return fmt.Errorf("%s must be a directory", policy.Root)
 	}
 
 	return filepath.WalkDir(absRoot, func(absPath string, entry os.DirEntry, err error) error {
@@ -69,13 +69,13 @@ func validateContentDir(repo string, root brain.ContentRoot) error {
 		}
 
 		isMd := strings.EqualFold(filepath.Ext(entry.Name()), ".md")
-		if root.Markdown && isMd {
+		if policy.IsMarkdown() && isMd {
 			if _, _, err := pathpolicy.NormalizeTargetPath(rel); err != nil {
 				return err
 			}
 		}
-		if !root.Markdown && isMd {
-			return fmt.Errorf("path %s: Markdown files are not allowed under %s/", rel, root.Dir)
+		if !policy.IsMarkdown() && isMd {
+			return fmt.Errorf("path %s: Markdown files are not allowed under %s/", rel, policy.Root)
 		}
 		return nil
 	})
@@ -88,20 +88,14 @@ func validateContentDir(repo string, root brain.ContentRoot) error {
 // like tier typos (e.g. "desing") are allowed because they default to
 // canonical tier — the enforcement is on known tier names only.
 func validateTierDirectory(rel string) error {
-	var root, rest string
-	if strings.HasPrefix(rel, "sources/") {
-		root = "sources"
-		rest = strings.TrimPrefix(rel, "sources/")
-	} else if strings.HasPrefix(rel, "wiki/") {
-		root = "wiki"
-		rest = strings.TrimPrefix(rel, "wiki/")
-	} else {
+	policy, ok := brain.PolicyForPath(rel)
+	if !ok || !policy.IsMarkdown() {
 		return nil
 	}
+	rest := strings.TrimPrefix(rel, policy.Root+"/")
 	// Only check first-level directories under root
 	if strings.Contains(rest, "/") {
 		return nil
 	}
-	_ = root
 	return nil
 }

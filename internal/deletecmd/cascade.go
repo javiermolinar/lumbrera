@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
@@ -19,7 +20,7 @@ type wikiRef struct {
 // loadWikiRefs loads all wiki documents with valid frontmatter.
 func loadWikiRefs(repo string) ([]wikiRef, error) {
 	var refs []wikiRef
-	err := brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+	err := brainfs.WalkMarkdown(repo, brain.ManagedRoots(), func(file brainfs.MarkdownFile) error {
 		content, err := os.ReadFile(file.AbsPath)
 		if err != nil {
 			return err
@@ -164,7 +165,7 @@ func planCascade(repo string, targetPath, targetKind string, allRefs []wikiRef) 
 
 	// For every deleted wiki page, clean links from other wiki pages.
 	for _, path := range filesToDelete {
-		if !strings.HasPrefix(path, "wiki/") {
+		if !brain.IsManagedKind(brain.Kind(brain.KindForPath(path))) {
 			continue
 		}
 		linkers := wikiRefsLinkingTo(allRefs, path)

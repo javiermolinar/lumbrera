@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 )
 
@@ -102,7 +103,7 @@ func validateSourcePaths(repo string, sources []string) error {
 		if err != nil {
 			return fmt.Errorf("invalid --source %q: %w", source, err)
 		}
-		if kind != "source" {
+		if !brain.CanUseAsEvidence(brain.KindWiki, brain.Kind(kind)) {
 			return fmt.Errorf("--source %q must be under sources/", source)
 		}
 		if err := ensureSafeFilesystemTarget(repo, normalized); err != nil {

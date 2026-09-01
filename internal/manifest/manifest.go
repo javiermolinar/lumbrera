@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 )
@@ -43,7 +44,7 @@ func Generate(entries []Entry) (string, error) {
 }
 
 func EntriesForRepo(repo string) ([]Entry, error) {
-	files, err := brainfs.ReadMarkdownFiles(repo, []string{"wiki"})
+	files, err := brainfs.ReadMarkdownFiles(repo, brain.ManagedRoots())
 	if err != nil {
 		return nil, err
 	}

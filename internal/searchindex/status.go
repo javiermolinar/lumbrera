@@ -129,7 +129,7 @@ func validateBrainForStatus(repo string) error {
 }
 
 func indexedFilesForRepo(repo string) ([]indexedFile, error) {
-	markdownFiles, err := brainfs.ReadMarkdownFiles(repo, []string{"sources", "wiki"})
+	markdownFiles, err := brainfs.ReadMarkdownFiles(repo, brain.SearchRoots())
 	if err != nil {
 		return nil, err
 	}

@@ -4,12 +4,17 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 )
 
 func walkWikiMetadata(repo string, visit func(rel string, meta frontmatter.Document) error) error {
-	return brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+	policy, ok := brain.PolicyForKind(brain.KindWiki)
+	if !ok {
+		return fmt.Errorf("missing wiki content policy")
+	}
+	return brainfs.WalkMarkdown(repo, []string{policy.Root}, func(file brainfs.MarkdownFile) error {
 		content, err := os.ReadFile(file.AbsPath)
 		if err != nil {
 			return err

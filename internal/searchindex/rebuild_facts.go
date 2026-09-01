@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 func relationshipFactsFromDocuments(documents []Document) ([]DocumentLink, []DocumentCitation, []DocumentTag, error) {
@@ -159,14 +161,11 @@ func normalizeDocumentTags(input []DocumentTag, docsByID map[string]Document) ([
 }
 
 func kindForLinkedPath(path string) string {
-	switch {
-	case strings.HasPrefix(path, "wiki/"):
-		return KindWiki
-	case strings.HasPrefix(path, "sources/"):
-		return KindSource
-	default:
+	policy, ok := brain.PolicyForPath(path)
+	if !ok || !policy.IsMarkdown() {
 		return "external"
 	}
+	return string(policy.Kind)
 }
 
 func documentLinkLess(left, right DocumentLink) bool {

@@ -17,7 +17,7 @@ import (
 
 func ValidateDocuments(repo string) error {
 	seenIDs := map[string]string{}
-	return brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+	return brainfs.WalkMarkdown(repo, brain.ManagedRoots(), func(file brainfs.MarkdownFile) error {
 		id, err := validateWikiDocument(repo, file.AbsPath, file.RelPath)
 		if err != nil {
 			return err
@@ -139,8 +139,9 @@ func documentAnchors(repo, relPath string) (map[string]struct{}, error) {
 		return nil, err
 	}
 	body := string(content)
-	analyzeOpts := md.AnalyzeOptions{IgnoreLinks: strings.HasPrefix(relPath, "sources/")}
-	if strings.HasPrefix(relPath, "wiki/") {
+	policy, ok := brain.PolicyForPath(relPath)
+	analyzeOpts := md.AnalyzeOptions{IgnoreLinks: ok && policy.Storage == brain.StorageRawMarkdown}
+	if ok && policy.Storage == brain.StorageManagedMarkdown {
 		_, splitBody, has, err := frontmatter.Split(content)
 		if err != nil {
 			return nil, fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)

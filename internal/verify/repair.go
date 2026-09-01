@@ -5,13 +5,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/brainfs"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 )
 
 func RepairMissingIDs(repo string) (bool, error) {
 	repaired := false
-	err := brainfs.WalkMarkdown(repo, []string{"wiki"}, func(file brainfs.MarkdownFile) error {
+	err := brainfs.WalkMarkdown(repo, brain.ManagedRoots(), func(file brainfs.MarkdownFile) error {
 		content, err := os.ReadFile(file.AbsPath)
 		if err != nil {
 			return err

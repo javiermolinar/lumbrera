@@ -97,7 +97,7 @@ func RecordsForRepo(repo string) ([]Document, []Section, map[string]string, erro
 // facts, and manifest metadata from all indexed Markdown files in a Lumbrera
 // brain repository.
 func RecordsForRepoWithFacts(repo string) ([]Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, map[string]string, error) {
-	markdownFiles, err := brainfs.ReadMarkdownFiles(repo, []string{"sources", "wiki"})
+	markdownFiles, err := brainfs.ReadMarkdownFiles(repo, brain.SearchRoots())
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err
 	}
@@ -125,7 +125,7 @@ func RecordsForRepoWithFacts(repo string) ([]Document, []Section, []DocumentLink
 }
 
 func indexedMarkdownPaths(repo string) ([]string, error) {
-	return brainfs.MarkdownPaths(repo, []string{"sources", "wiki"})
+	return brainfs.MarkdownPaths(repo, brain.SearchRoots())
 }
 
 func manifestMetadata(files []indexedFile) map[string]string {

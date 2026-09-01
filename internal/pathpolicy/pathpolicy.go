@@ -33,18 +33,18 @@ func NormalizeTargetPath(raw string) (string, string, error) {
 	if strings.Contains(clean, "\\") {
 		return "", "", fmt.Errorf("target path %q must use repo-relative POSIX separators", raw)
 	}
-	root, ok := brain.RootForPath(clean)
+	policy, ok := brain.PolicyForPath(clean)
 	if !ok {
 		return "", "", fmt.Errorf("target path %q must be under %s", raw, brain.ContentDirList())
 	}
 	isMd := strings.HasSuffix(strings.ToLower(clean), ".md")
-	if root.Markdown && !isMd {
+	if policy.IsMarkdown() && !isMd {
 		return "", "", fmt.Errorf("target path %q must be a Markdown file", raw)
 	}
-	if !root.Markdown && isMd {
-		return "", "", fmt.Errorf("target path %q: Markdown files are not allowed under %s/", raw, root.Dir)
+	if !policy.IsMarkdown() && isMd {
+		return "", "", fmt.Errorf("target path %q: Markdown files are not allowed under %s/", raw, policy.Root)
 	}
-	return clean, root.Kind, nil
+	return clean, string(policy.Kind), nil
 }
 
 func EnsureSafeFilesystemTarget(repo, target string) error {
