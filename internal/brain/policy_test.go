@@ -111,7 +111,24 @@ func TestManagedAndSearchRoots(t *testing.T) {
 	}
 }
 
-func TestWikiEvidencePolicy(t *testing.T) {
+func TestEvidencePolicy(t *testing.T) {
+	for _, tt := range []struct {
+		kind Kind
+		want bool
+	}{
+		{KindSource, false},
+		{KindWiki, true},
+		{KindAsset, false},
+	} {
+		policy, ok := PolicyForKind(tt.kind)
+		if !ok {
+			t.Fatalf("missing %q policy", tt.kind)
+		}
+		if policy.RequiresEvidence != tt.want {
+			t.Errorf("PolicyForKind(%q).RequiresEvidence = %v, want %v", tt.kind, policy.RequiresEvidence, tt.want)
+		}
+	}
+
 	if !CanUseAsEvidence(KindWiki, KindSource) {
 		t.Fatal("wiki should accept source evidence")
 	}

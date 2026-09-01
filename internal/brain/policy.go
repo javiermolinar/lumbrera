@@ -25,7 +25,7 @@ type ContentPolicy struct {
 	Storage          StorageMode
 	RequiredRoot     bool
 	Mutable          bool
-	MinEvidence      int
+	RequiresEvidence bool
 	EvidenceKinds    []Kind
 	ProvidesEvidence bool
 	CatalogPath      string
@@ -38,7 +38,7 @@ var contentPolicies = []ContentPolicy{
 		Storage:          StorageRawMarkdown,
 		RequiredRoot:     true,
 		Mutable:          false,
-		MinEvidence:      0,
+		RequiresEvidence: false,
 		ProvidesEvidence: true,
 		CatalogPath:      SourcesIndexPath,
 	},
@@ -48,7 +48,7 @@ var contentPolicies = []ContentPolicy{
 		Storage:          StorageManagedMarkdown,
 		RequiredRoot:     true,
 		Mutable:          true,
-		MinEvidence:      1,
+		RequiresEvidence: true,
 		EvidenceKinds:    []Kind{KindSource},
 		ProvidesEvidence: false,
 		CatalogPath:      IndexPath,
@@ -59,7 +59,7 @@ var contentPolicies = []ContentPolicy{
 		Storage:          StorageBinary,
 		RequiredRoot:     true,
 		Mutable:          false,
-		MinEvidence:      0,
+		RequiresEvidence: false,
 		ProvidesEvidence: false,
 		CatalogPath:      AssetsIndexPath,
 	},
