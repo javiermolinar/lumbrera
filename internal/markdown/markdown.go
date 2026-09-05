@@ -20,14 +20,15 @@ type Heading struct {
 }
 
 type Analysis struct {
-	FirstH1          string
-	Sources          []string
-	Links            []string
-	Headings         []Heading
-	Anchors          []string
-	LinkReferences   []Reference
-	SourceReferences []Reference
-	SourceCitations  []Reference
+	FirstH1           string
+	HasSourcesSection bool
+	Sources           []string
+	Links             []string
+	Headings          []Heading
+	Anchors           []string
+	LinkReferences    []Reference
+	SourceReferences  []Reference
+	SourceCitations   []Reference
 }
 
 type AnalyzeOptions struct {
@@ -61,6 +62,9 @@ func AnalyzeWithOptions(repoRelativePath, body string, opts AnalyzeOptions) (Ana
 			}
 			if n.Level <= 2 {
 				inSources = n.Level == 2 && strings.EqualFold(text, "Sources")
+				if inSources {
+					analysis.HasSourcesSection = true
+				}
 			}
 		case *ast.Link:
 			if !entering {

@@ -18,7 +18,11 @@ import (
 func ValidateDocuments(repo string) error {
 	seenIDs := map[string]string{}
 	return brainfs.WalkMarkdown(repo, brain.ManagedRoots(), func(file brainfs.MarkdownFile) error {
-		id, err := validateWikiDocument(repo, file.AbsPath, file.RelPath)
+		policy, ok := brain.PolicyForPath(file.RelPath)
+		if !ok || policy.Storage != brain.StorageManagedMarkdown {
+			return fmt.Errorf("%s does not resolve to a managed content policy", file.RelPath)
+		}
+		id, err := validateManagedDocument(repo, file.AbsPath, file.RelPath, policy)
 		if err != nil {
 			return err
 		}
@@ -30,25 +34,22 @@ func ValidateDocuments(repo string) error {
 	})
 }
 
-func validateWikiDocument(repo, absPath, relPath string) (string, error) {
+func validateManagedDocument(repo, absPath, relPath string, policy brain.ContentPolicy) (string, error) {
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return "", err
 	}
-	meta, body, has, err := frontmatter.Split(content)
+	meta, body, has, err := frontmatter.SplitForPolicy(content, policy)
 	if err != nil {
 		return "", fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
 	}
 	if !has {
 		return "", fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
 	}
-	if meta.Lumbrera.Kind != "wiki" {
-		return "", fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, "wiki")
+	if lines := markdownLineCount(body); lines > brain.MaxManagedDocumentBodyLines {
+		return "", fmt.Errorf("%s exceeds max %s page length: %d lines, max %d. Split it into smaller topic/task pages", relPath, policy.Kind, lines, brain.MaxManagedDocumentBodyLines)
 	}
-	if lines := markdownLineCount(body); lines > brain.MaxWikiBodyLines {
-		return "", fmt.Errorf("%s exceeds max wiki page length: %d lines, max %d. Split it into smaller topic/task pages", relPath, lines, brain.MaxWikiBodyLines)
-	}
-	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: true})
+	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(policy.Kind)})
 	if err != nil {
 		return "", fmt.Errorf("%s has invalid Markdown links: %w", relPath, err)
 	}
@@ -58,28 +59,60 @@ func validateWikiDocument(repo, absPath, relPath string) (string, error) {
 	if err := validateInternalReferencesExist(repo, relPath, analysis.LinkReferences); err != nil {
 		return "", err
 	}
-	if err := validateSourceCitations(repo, relPath, analysis.SourceCitations); err != nil {
-		return "", err
-	}
-	if !sameStrings(meta.Lumbrera.Links, filterWikiLinks(analysis.Links)) {
+	if !sameStrings(meta.Lumbrera.Links, filterManagedLinks(analysis.Links)) {
 		return "", fmt.Errorf("%s frontmatter links are stale; regenerate through lumbrera write", relPath)
 	}
-	if len(analysis.Sources) == 0 {
-		return "", fmt.Errorf("%s is missing a ## Sources section with source links", relPath)
-	}
-	for _, source := range analysis.Sources {
-		if !strings.HasPrefix(source, "sources/") {
-			return "", fmt.Errorf("%s Sources section must link only to sources/, got %s", relPath, source)
-		}
-	}
-	if err := validateInternalReferencesExist(repo, relPath, analysis.SourceReferences); err != nil {
+	if err := validateDocumentEvidence(repo, relPath, policy, meta, analysis); err != nil {
 		return "", err
 	}
-	expectedSources := mergePaths(analysis.Sources, referencePaths(analysis.SourceCitations))
-	if !sameStrings(meta.Lumbrera.Sources, expectedSources) {
-		return "", fmt.Errorf("%s frontmatter sources are stale; regenerate through lumbrera write", relPath)
-	}
 	return meta.Lumbrera.ID, nil
+}
+
+func validateDocumentEvidence(repo, relPath string, policy brain.ContentPolicy, meta frontmatter.Document, analysis md.Analysis) error {
+	if !brain.AcceptsEvidence(policy.Kind) {
+		if len(meta.Lumbrera.Sources) > 0 {
+			return fmt.Errorf("%s kind %q must not contain evidence metadata", relPath, policy.Kind)
+		}
+		if analysis.HasSourcesSection {
+			return fmt.Errorf("%s kind %q must not contain a ## Sources section", relPath, policy.Kind)
+		}
+		return nil
+	}
+
+	if err := validateEvidenceReferences(repo, relPath, policy, "Sources section", analysis.SourceReferences); err != nil {
+		return err
+	}
+	if err := validateEvidenceReferences(repo, relPath, policy, "source citation", analysis.SourceCitations); err != nil {
+		return err
+	}
+
+	expectedEvidence := mergePaths(analysis.Sources, referencePaths(analysis.SourceCitations))
+	if policy.RequiresEvidence && len(expectedEvidence) == 0 {
+		return fmt.Errorf("%s is missing a ## Sources section with evidence links", relPath)
+	}
+	if len(expectedEvidence) > 0 && !analysis.HasSourcesSection {
+		return fmt.Errorf("%s is missing a generated ## Sources section", relPath)
+	}
+	if !sameStrings(meta.Lumbrera.Sources, analysis.Sources) {
+		return fmt.Errorf("%s generated Sources section is stale; regenerate through lumbrera write", relPath)
+	}
+	if !sameStrings(meta.Lumbrera.Sources, expectedEvidence) {
+		return fmt.Errorf("%s frontmatter sources are stale; regenerate through lumbrera write", relPath)
+	}
+	return nil
+}
+
+func validateEvidenceReferences(repo, relPath string, documentPolicy brain.ContentPolicy, relationship string, refs []md.Reference) error {
+	for _, ref := range refs {
+		if ref.Path == relPath {
+			return fmt.Errorf("%s %s must not reference the document itself: %s", relPath, relationship, ref.String())
+		}
+		evidencePolicy, ok := brain.PolicyForPath(ref.Path)
+		if !ok || !brain.CanUseAsEvidence(documentPolicy.Kind, evidencePolicy.Kind) {
+			return fmt.Errorf("%s %s cannot use %s as evidence for kind %q", relPath, relationship, ref.String(), documentPolicy.Kind)
+		}
+	}
+	return validateInternalReferencesExist(repo, relPath, refs)
 }
 
 func markdownLineCount(body string) int {
@@ -89,15 +122,6 @@ func markdownLineCount(body string) int {
 		return 0
 	}
 	return strings.Count(body, "\n") + 1
-}
-
-func validateSourceCitations(repo, relPath string, citations []md.Reference) error {
-	for _, citation := range citations {
-		if !strings.HasPrefix(citation.Path, "sources/") {
-			return fmt.Errorf("%s source citation must link only to sources/, got %s", relPath, citation.String())
-		}
-	}
-	return validateInternalReferencesExist(repo, relPath, citations)
 }
 
 func validateInternalReferencesExist(repo, relPath string, refs []md.Reference) error {
@@ -142,7 +166,7 @@ func documentAnchors(repo, relPath string) (map[string]struct{}, error) {
 	policy, ok := brain.PolicyForPath(relPath)
 	analyzeOpts := md.AnalyzeOptions{IgnoreLinks: ok && policy.Storage == brain.StorageRawMarkdown}
 	if ok && policy.Storage == brain.StorageManagedMarkdown {
-		_, splitBody, has, err := frontmatter.Split(content)
+		_, splitBody, has, err := frontmatter.SplitForPolicy(content, policy)
 		if err != nil {
 			return nil, fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
 		}
@@ -173,10 +197,10 @@ func referencePaths(refs []md.Reference) []string {
 	return mergePaths(paths)
 }
 
-func filterWikiLinks(links []string) []string {
+func filterManagedLinks(links []string) []string {
 	var out []string
 	for _, link := range links {
-		if strings.HasPrefix(link, "wiki/") {
+		if brain.IsManagedPath(link) {
 			out = append(out, link)
 		}
 	}

@@ -214,7 +214,8 @@ Rules:
 - wiki evidence paths may resolve to `source` or `note`;
 - direct self-reference is rejected;
 - creation requires at least one evidence path;
-- updates and appends may retain existing evidence without repeating `--source`;
+- evidence retention is cumulative by design: updates, appends, and full-body replacements retain every existing evidence path without repeating `--source`, even when the new body no longer cites it;
+- body replacement is not evidence removal; the write workflow has no evidence-removal operation in this phase;
 - supplying `--source` adds normalized evidence to the existing set;
 - the final document, rather than the argument list, is validated against the policy's evidence requirement;
 - `## Sources` is generated from the resulting evidence set.
@@ -420,7 +421,7 @@ Guardrails:
 
 This phase must land independently. It proves the policy describes existing behavior before adding notes.
 
-### Phase 2: Generic managed documents and evidence
+### Phase 2: Generic managed documents and evidence — Implemented
 
 - Parameterize frontmatter validation by policy.
 - Replace wiki-only document verification with managed-document verification.

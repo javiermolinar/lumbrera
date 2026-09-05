@@ -146,12 +146,21 @@ func TestEvidencePolicy(t *testing.T) {
 	}
 }
 
-func TestIsManagedKind(t *testing.T) {
-	if !IsManagedKind(KindWiki) {
+func TestManagedAndEvidenceHelpers(t *testing.T) {
+	if !IsManagedKind(KindWiki) || !IsManagedPath("wiki/topic.md") {
 		t.Fatal("wiki should be managed")
 	}
 	if IsManagedKind(KindSource) || IsManagedKind(KindAsset) || IsManagedKind("note") {
 		t.Fatal("only wiki should be managed")
+	}
+	if IsManagedPath("sources/raw.md") || IsManagedPath("assets/diagram.png") || IsManagedPath("notes/topic.md") {
+		t.Fatal("non-managed paths must fail IsManagedPath")
+	}
+	if !AcceptsEvidence(KindWiki) {
+		t.Fatal("wiki should accept evidence")
+	}
+	if AcceptsEvidence(KindSource) || AcceptsEvidence(KindAsset) || AcceptsEvidence("note") {
+		t.Fatal("only wiki should accept evidence")
 	}
 }
 

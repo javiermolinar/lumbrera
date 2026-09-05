@@ -72,16 +72,18 @@ func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--title", "Raw source", "--reason", "Preserve raw source", "--actor", "test")
 	runWrite(t, repo, "# Topic\n\n## Notes\n\nInitial.\n", "wiki/topic.md", "--title", "Topic", "--summary", "Topic summary.", "--tag", "topic", "--source", "sources/raw.md", "--reason", "Create topic", "--actor", "test")
 
-	runWrite(t, repo, "Appended note.\n", "wiki/topic.md", "--append", "Notes", "--source", "sources/raw.md", "--reason", "Append note", "--actor", "test")
+	runWrite(t, repo, "Appended note.\n", "wiki/topic.md", "--append", "Notes", "--reason", "Append note", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Initial.\n\nAppended note.")
+	assertFileContains(t, repo, "wiki/topic.md", "sources/raw.md")
 	assertFileContains(t, repo, "CHANGELOG.md", "[append] [test]: Append note")
 
 	beforeUpdateMeta, _, _, err := frontmatter.Split([]byte(testfs.ReadFile(t, repo, "wiki/topic.md")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	runWrite(t, repo, "# Topic\n\nReplacement.\n", "wiki/topic.md", "--source", "sources/raw.md", "--reason", "Replace topic", "--actor", "test")
+	runWrite(t, repo, "# Topic\n\nReplacement.\n", "wiki/topic.md", "--reason", "Replace topic", "--actor", "test")
 	assertFileContains(t, repo, "wiki/topic.md", "Replacement.")
+	assertFileContains(t, repo, "wiki/topic.md", "sources/raw.md")
 	afterUpdateMeta, _, _, err := frontmatter.Split([]byte(testfs.ReadFile(t, repo, "wiki/topic.md")))
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +97,43 @@ func TestWriteAppendUpdateAndDeleteWiki(t *testing.T) {
 	// directly through writecmd.Run. The CLI dispatcher in main.go
 	// intercepts it and delegates to deletecmd.Run.
 	assertWriteError(t, repo, "", "wiki/topic.md", "--delete", "--reason", "Remove topic", "--actor", "test")
+}
+
+func TestWriteValidatesResultingEvidenceInsteadOfSourceFlags(t *testing.T) {
+	repo := initBrain(t)
+	runWrite(t, repo, "# Source A\n\n## Evidence\n\nA.\n", "sources/a.md", "--reason", "Preserve source A", "--actor", "test")
+	runWrite(t, repo, "# Source B\n\nB.\n", "sources/b.md", "--reason", "Preserve source B", "--actor", "test")
+
+	// An inline citation is evidence, so create does not mechanically require
+	// a --source flag.
+	runWrite(t, repo, "# Topic\n\nClaim. [source: ../sources/a.md#evidence]\n", "wiki/topic.md",
+		"--title", "Topic", "--summary", "Topic summary.", "--tag", "topic",
+		"--reason", "Create from inline evidence", "--actor", "test")
+
+	meta, _, _, err := frontmatter.Split([]byte(testfs.ReadFile(t, repo, "wiki/topic.md")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meta.Lumbrera.Sources) != 1 || meta.Lumbrera.Sources[0] != "sources/a.md" {
+		t.Fatalf("inline evidence was not retained: %#v", meta.Lumbrera.Sources)
+	}
+
+	// A full-body replacement intentionally retains source A after removing its
+	// inline citation, while the supplied source B is added to that cumulative set.
+	runWrite(t, repo, "# Topic\n\nReplacement.\n", "wiki/topic.md",
+		"--source", "sources/b.md", "--reason", "Add source B", "--actor", "test")
+	meta, _, _, err = frontmatter.Split([]byte(testfs.ReadFile(t, repo, "wiki/topic.md")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meta.Lumbrera.Sources) != 2 || meta.Lumbrera.Sources[0] != "sources/a.md" || meta.Lumbrera.Sources[1] != "sources/b.md" {
+		t.Fatalf("updated evidence set = %#v, want sources A and B", meta.Lumbrera.Sources)
+	}
+
+	assertWriteError(t, repo, "# Unsupported\n\nNo evidence.\n", "wiki/unsupported.md",
+		"--title", "Unsupported", "--summary", "Unsupported summary.", "--tag", "unsupported",
+		"--reason", "Create without evidence", "--actor", "test")
+	assertMissing(t, repo, "wiki/unsupported.md")
 }
 
 func TestWriteRejectsEmptyAppendFlag(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/textutil"
 	"gopkg.in/yaml.v3"
 )
@@ -87,7 +88,15 @@ func newIDBestEffort() string {
 }
 
 func Render(doc Document) (string, error) {
-	if err := Validate(doc); err != nil {
+	policy, err := policyForDocument(doc)
+	if err != nil {
+		return "", err
+	}
+	return RenderForPolicy(doc, policy)
+}
+
+func RenderForPolicy(doc Document, policy brain.ContentPolicy) (string, error) {
+	if err := ValidateForPolicy(doc, policy); err != nil {
 		return "", err
 	}
 	doc.Tags = sortedUnique(doc.Tags)
@@ -102,7 +111,15 @@ func Render(doc Document) (string, error) {
 }
 
 func Attach(doc Document, markdownBody string) (string, error) {
-	fm, err := Render(doc)
+	policy, err := policyForDocument(doc)
+	if err != nil {
+		return "", err
+	}
+	return AttachForPolicy(doc, policy, markdownBody)
+}
+
+func AttachForPolicy(doc Document, policy brain.ContentPolicy, markdownBody string) (string, error) {
+	fm, err := RenderForPolicy(doc, policy)
 	if err != nil {
 		return "", err
 	}
@@ -113,7 +130,19 @@ func Split(content []byte) (Document, string, bool, error) {
 	return SplitWithOptions(content, SplitOptions{})
 }
 
+func SplitForPolicy(content []byte, policy brain.ContentPolicy) (Document, string, bool, error) {
+	return SplitForPolicyWithOptions(content, policy, SplitOptions{})
+}
+
 func SplitWithOptions(content []byte, opts SplitOptions) (Document, string, bool, error) {
+	return split(content, nil, opts)
+}
+
+func SplitForPolicyWithOptions(content []byte, policy brain.ContentPolicy, opts SplitOptions) (Document, string, bool, error) {
+	return split(content, &policy, opts)
+}
+
+func split(content []byte, policy *brain.ContentPolicy, opts SplitOptions) (Document, string, bool, error) {
 	if !StartsWithFrontmatter(content) {
 		return Document{}, string(content), false, nil
 	}
@@ -138,7 +167,14 @@ func SplitWithOptions(content []byte, opts SplitOptions) (Document, string, bool
 	if err := yaml.Unmarshal(frontmatterBytes, &doc); err != nil {
 		return Document{}, "", true, fmt.Errorf("malformed frontmatter: %w", err)
 	}
-	if err := ValidateWithOptions(doc, ValidateOptions{AllowMissingID: opts.AllowMissingID}); err != nil {
+	validateOpts := ValidateOptions{AllowMissingID: opts.AllowMissingID}
+	var err error
+	if policy == nil {
+		err = ValidateWithOptions(doc, validateOpts)
+	} else {
+		err = ValidateForPolicyWithOptions(doc, *policy, validateOpts)
+	}
+	if err != nil {
 		return Document{}, "", true, err
 	}
 
@@ -162,6 +198,26 @@ func Validate(doc Document) error {
 }
 
 func ValidateWithOptions(doc Document, opts ValidateOptions) error {
+	policy, err := policyForDocument(doc)
+	if err != nil {
+		return err
+	}
+	return ValidateForPolicyWithOptions(doc, policy, opts)
+}
+
+func ValidateForPolicy(doc Document, policy brain.ContentPolicy) error {
+	return ValidateForPolicyWithOptions(doc, policy, ValidateOptions{})
+}
+
+func ValidateForPolicyWithOptions(doc Document, policy brain.ContentPolicy, opts ValidateOptions) error {
+	registered, ok := brain.PolicyForKind(policy.Kind)
+	if !ok || !registered.IsMarkdown() {
+		return fmt.Errorf("frontmatter policy kind %q is not a Markdown content kind", policy.Kind)
+	}
+	policy = registered
+	if brain.Kind(doc.Lumbrera.Kind) != policy.Kind {
+		return fmt.Errorf("frontmatter lumbrera.kind is %q; expected %q", doc.Lumbrera.Kind, policy.Kind)
+	}
 	if strings.TrimSpace(doc.Title) == "" {
 		return fmt.Errorf("frontmatter title is required")
 	}
@@ -181,18 +237,15 @@ func ValidateWithOptions(doc Document, opts ValidateOptions) error {
 			return fmt.Errorf("frontmatter lumbrera.modified_date %q must use YYYY-MM-DD", modifiedDate)
 		}
 	}
-	if doc.Lumbrera.Kind != "source" && doc.Lumbrera.Kind != "wiki" {
-		return fmt.Errorf("frontmatter lumbrera.kind must be source or wiki")
-	}
-	if doc.Lumbrera.Kind == "wiki" {
+	if policy.Storage == brain.StorageManagedMarkdown {
 		summary := strings.TrimSpace(doc.Summary)
 		if summary == "" {
-			return fmt.Errorf("frontmatter summary is required for wiki documents")
+			return fmt.Errorf("frontmatter summary is required for %s documents", policy.Kind)
 		}
 		if strings.ContainsAny(summary, "\r\n") {
 			return fmt.Errorf("frontmatter summary must be a single line")
 		}
-		if err := ValidateTags(doc.Tags); err != nil {
+		if err := ValidateTagsForPolicy(doc.Tags, policy); err != nil {
 			return err
 		}
 	}
@@ -200,9 +253,17 @@ func ValidateWithOptions(doc Document, opts ValidateOptions) error {
 }
 
 func ValidateTags(tags []string) error {
+	policy, ok := brain.PolicyForKind(brain.KindWiki)
+	if !ok {
+		return fmt.Errorf("missing wiki content policy")
+	}
+	return ValidateTagsForPolicy(tags, policy)
+}
+
+func ValidateTagsForPolicy(tags []string, policy brain.ContentPolicy) error {
 	normalized := sortedUnique(tags)
 	if len(normalized) == 0 {
-		return fmt.Errorf("frontmatter tags are required for wiki documents")
+		return fmt.Errorf("frontmatter tags are required for %s documents", policy.Kind)
 	}
 	if len(normalized) > MaxTags {
 		return fmt.Errorf("frontmatter tags exceed maximum of %d", MaxTags)
@@ -213,6 +274,14 @@ func ValidateTags(tags []string) error {
 		}
 	}
 	return nil
+}
+
+func policyForDocument(doc Document) (brain.ContentPolicy, error) {
+	policy, ok := brain.PolicyForKind(brain.Kind(doc.Lumbrera.Kind))
+	if !ok || !policy.IsMarkdown() {
+		return brain.ContentPolicy{}, fmt.Errorf("frontmatter lumbrera.kind %q is not a recognized Markdown content kind", doc.Lumbrera.Kind)
+	}
+	return policy, nil
 }
 
 func sortedUnique(values []string) []string {

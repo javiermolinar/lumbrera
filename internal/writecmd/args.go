@@ -125,7 +125,7 @@ Options:
   --title <title>     required when creating a new wiki file
   --summary <text>    required single-line generated wiki frontmatter summary for new wiki files
   --tag <tag>         required generated wiki frontmatter tag for new wiki files, repeatable up to 5
-  --source <path>     provenance source for wiki writes, repeatable
+  --source <path>     provenance source for wiki writes, repeatable; optional on update/append
   --append <section>  append stdin content to a named section in an existing wiki page
   --file <path>       local file to copy into assets/ (required for asset writes)
   --delete            delete an existing wiki page
@@ -137,7 +137,8 @@ Rules:
   - assets are immutable after creation; .md files are not allowed under assets/
   - new wiki pages require single-line --summary, 1-5 lowercase slug --tag values, and at most 400 body lines
   - source files are immutable after creation
-  - wiki writes require at least one --source
+  - a new wiki page requires final source evidence from --source or an inline citation
+  - wiki updates and appends retain existing source evidence when --source is omitted
   - local Markdown links and heading anchors must resolve
   - optional inline claim citations use [source: ../sources/path.md#heading-anchor]
   - successful writes update INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md

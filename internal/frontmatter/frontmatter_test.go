@@ -3,6 +3,8 @@ package frontmatter
 import (
 	"strings"
 	"testing"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 func TestRenderAndSplitGeneratedFrontmatter(t *testing.T) {
@@ -36,6 +38,25 @@ func TestRenderAndSplitGeneratedFrontmatter(t *testing.T) {
 	}
 	if body != "# Write command\n\nBody.\n" {
 		t.Fatalf("unexpected body %q", body)
+	}
+}
+
+func TestPolicyParameterizedValidationRejectsKindMismatch(t *testing.T) {
+	wikiPolicy, ok := brain.PolicyForKind(brain.KindWiki)
+	if !ok {
+		t.Fatal("missing wiki policy")
+	}
+	doc := New("source", "Wrong kind", "", nil, nil, nil)
+	if _, err := RenderForPolicy(doc, wikiPolicy); err == nil {
+		t.Fatal("expected policy and frontmatter kind mismatch to be rejected")
+	}
+
+	content, err := Attach(doc, "# Wrong kind\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, has, err := SplitForPolicy([]byte(content), wikiPolicy); !has || err == nil {
+		t.Fatalf("SplitForPolicy mismatch = has %v, err %v; want detected frontmatter error", has, err)
 	}
 }
 

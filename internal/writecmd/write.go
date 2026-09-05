@@ -90,9 +90,13 @@ func Run(args []string, stdin io.Reader) (err error) {
 		return err
 	}
 
-	target, kind, err := normalizeTargetPath(opts.Target)
+	target, _, err := normalizeTargetPath(opts.Target)
 	if err != nil {
 		return err
+	}
+	policy, ok := brain.PolicyForPath(target)
+	if !ok {
+		return fmt.Errorf("target path %s does not resolve to a content policy", target)
 	}
 	if err := ensureSafeFilesystemTarget(brainDir, target); err != nil {
 		return err
@@ -104,11 +108,11 @@ func Run(args []string, stdin io.Reader) (err error) {
 		return err
 	}
 
-	op, err := inferOperation(kind, exists, opts)
+	op, err := inferOperation(policy, exists, opts)
 	if err != nil {
 		return err
 	}
-	if err := validateOptionsForOperation(brainDir, target, kind, exists, op, opts); err != nil {
+	if err := validateOptionsForOperation(brainDir, target, policy, exists, op, opts); err != nil {
 		return err
 	}
 
@@ -121,11 +125,11 @@ func Run(args []string, stdin io.Reader) (err error) {
 		if len(input) == 0 {
 			return fmt.Errorf("write requires Markdown content on stdin")
 		}
-		if kind == "wiki" && frontmatter.StartsWithFrontmatter(input) {
+		if policy.Storage == brain.StorageManagedMarkdown && frontmatter.StartsWithFrontmatter(input) {
 			return fmt.Errorf("stdin must contain Markdown body only; Lumbrera generates frontmatter")
 		}
-		if kind == "wiki" && hasSourcesSection(string(input)) {
-			return fmt.Errorf("stdin must not contain a ## Sources section; Lumbrera generates it")
+		if policy.Storage == brain.StorageManagedMarkdown && hasSourcesSection(string(input)) {
+			return fmt.Errorf("stdin must not contain a ## Sources section; Lumbrera manages it")
 		}
 	}
 
@@ -149,7 +153,7 @@ func Run(args []string, stdin io.Reader) (err error) {
 	}
 
 	mutated = true
-	if err := applyMutation(brainDir, target, kind, op, opts, input); err != nil {
+	if err := applyMutation(brainDir, target, policy, op, opts, input); err != nil {
 		return fail(err)
 	}
 	if err := ops.Append(brainDir, operationEntry); err != nil {

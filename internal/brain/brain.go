@@ -8,16 +8,16 @@ import (
 )
 
 const (
-	Version          = "lumbrera-brain-v2"
-	VersionV1        = "lumbrera-brain-v1"
-	MarkerPath       = "VERSION"
-	IndexPath        = "INDEX.md"
-	SourcesIndexPath = "SOURCES.md"
-	AssetsIndexPath  = "ASSETS.md"
-	ChangelogPath    = "CHANGELOG.md"
-	BrainSumPath     = "BRAIN.sum"
-	TagsPath         = "tags.md"
-	MaxWikiBodyLines = 400
+	Version                     = "lumbrera-brain-v2"
+	VersionV1                   = "lumbrera-brain-v1"
+	MarkerPath                  = "VERSION"
+	IndexPath                   = "INDEX.md"
+	SourcesIndexPath            = "SOURCES.md"
+	AssetsIndexPath             = "ASSETS.md"
+	ChangelogPath               = "CHANGELOG.md"
+	BrainSumPath                = "BRAIN.sum"
+	TagsPath                    = "tags.md"
+	MaxManagedDocumentBodyLines = 400
 )
 
 func GeneratedFilePaths() []string {

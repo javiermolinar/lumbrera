@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 )
 
-func inferOperation(kind string, exists bool, opts options) (operation, error) {
+func inferOperation(policy brain.ContentPolicy, exists bool, opts options) (operation, error) {
 	if opts.AppendSet && opts.Delete {
 		return "", fmt.Errorf("--append and --delete cannot be combined")
 	}
@@ -21,25 +22,32 @@ func inferOperation(kind string, exists bool, opts options) (operation, error) {
 	if opts.AppendSet {
 		return opAppend, nil
 	}
-	if kind == "source" {
+
+	switch policy.Storage {
+	case brain.StorageRawMarkdown:
 		if exists {
-			return "", fmt.Errorf("sources are immutable; refusing to update existing source")
+			return "", fmt.Errorf("%s documents are immutable; refusing to update existing document", policy.Kind)
 		}
 		return opSource, nil
-	}
-	if kind == "asset" {
+	case brain.StorageBinary:
 		if exists {
-			return "", fmt.Errorf("assets are immutable; refusing to update existing asset")
+			return "", fmt.Errorf("%s documents are immutable; refusing to update existing document", policy.Kind)
 		}
 		return opAsset, nil
+	case brain.StorageManagedMarkdown:
+		if !policy.Mutable {
+			return "", fmt.Errorf("%s documents are not mutable", policy.Kind)
+		}
+		if exists {
+			return opUpdate, nil
+		}
+		return opCreate, nil
+	default:
+		return "", fmt.Errorf("unsupported storage policy for kind %q", policy.Kind)
 	}
-	if exists {
-		return opUpdate, nil
-	}
-	return opCreate, nil
 }
 
-func applyMutation(repo, target, kind string, op operation, opts options, input []byte) error {
+func applyMutation(repo, target string, policy brain.ContentPolicy, op operation, opts options, input []byte) error {
 	absTarget := filepath.Join(repo, filepath.FromSlash(target))
 	switch op {
 	case opDelete:
@@ -52,54 +60,103 @@ func applyMutation(repo, target, kind string, op operation, opts options, input 
 			return fmt.Errorf("read --file %q: %w", opts.File, err)
 		}
 		return writeRawFile(absTarget, content)
-	case opCreate:
-		body := normalizeBody(input)
-		sources, err := mergeSourceCitations(target, body, normalizeSources(opts.Sources))
-		if err != nil {
-			return err
+	case opCreate, opUpdate, opAppend:
+		if policy.Storage != brain.StorageManagedMarkdown {
+			return fmt.Errorf("operation %q requires a managed Markdown policy, got %q", op, policy.Kind)
 		}
-		body = md.AppendSourcesSection(body, target, sources)
-		return writeDocument(absTarget, target, kind, "", opts.Title, opts.Summary, opts.Tags, sources, body)
-	case opUpdate:
-		existingMeta, _, err := readExistingDocument(absTarget)
-		if err != nil {
-			return err
-		}
-		title := existingMeta.Title
-		if strings.TrimSpace(opts.Title) != "" {
-			title = opts.Title
-		}
-		summary := existingMeta.Summary
-		if strings.TrimSpace(opts.Summary) != "" {
-			summary = opts.Summary
-		}
-		tags := existingMeta.Tags
-		if len(opts.Tags) > 0 {
-			tags = opts.Tags
-		}
-		body := normalizeBody(input)
-		sources, err := mergeSourceCitations(target, body, mergePaths(existingMeta.Lumbrera.Sources, normalizeSources(opts.Sources)))
-		if err != nil {
-			return err
-		}
-		body = md.AppendSourcesSection(body, target, sources)
-		return writeDocument(absTarget, target, kind, existingMeta.Lumbrera.ID, title, summary, tags, sources, body)
-	case opAppend:
-		existingMeta, existingBody, err := readExistingDocument(absTarget)
-		if err != nil {
-			return err
-		}
-		body := md.RemoveSourcesSection(existingBody)
-		body = md.AppendToSection(body, opts.Append, string(input))
-		sources, err := mergeSourceCitations(target, body, mergePaths(existingMeta.Lumbrera.Sources, normalizeSources(opts.Sources)))
-		if err != nil {
-			return err
-		}
-		body = md.AppendSourcesSection(body, target, sources)
-		return writeDocument(absTarget, target, kind, existingMeta.Lumbrera.ID, existingMeta.Title, existingMeta.Summary, existingMeta.Tags, sources, body)
+		return applyManagedMutation(repo, absTarget, target, policy, op, opts, input)
 	default:
 		return fmt.Errorf("unsupported operation %q", op)
 	}
+}
+
+func applyManagedMutation(repo, absTarget, target string, policy brain.ContentPolicy, op operation, opts options, input []byte) error {
+	var (
+		id               string
+		title            string
+		summary          string
+		tags             []string
+		body             string
+		existingEvidence []string
+	)
+
+	switch op {
+	case opCreate:
+		title = opts.Title
+		summary = opts.Summary
+		tags = opts.Tags
+		body = normalizeBody(input)
+	case opUpdate:
+		existingMeta, _, err := readExistingManagedDocument(absTarget, policy)
+		if err != nil {
+			return err
+		}
+		id = existingMeta.Lumbrera.ID
+		title = existingMeta.Title
+		if strings.TrimSpace(opts.Title) != "" {
+			title = opts.Title
+		}
+		summary = existingMeta.Summary
+		if strings.TrimSpace(opts.Summary) != "" {
+			summary = opts.Summary
+		}
+		tags = existingMeta.Tags
+		if len(opts.Tags) > 0 {
+			tags = opts.Tags
+		}
+		existingEvidence = existingMeta.Lumbrera.Sources
+		body = normalizeBody(input)
+	case opAppend:
+		existingMeta, existingBody, err := readExistingManagedDocument(absTarget, policy)
+		if err != nil {
+			return err
+		}
+		id = existingMeta.Lumbrera.ID
+		title = existingMeta.Title
+		summary = existingMeta.Summary
+		tags = existingMeta.Tags
+		existingEvidence = existingMeta.Lumbrera.Sources
+		body = md.RemoveSourcesSection(existingBody)
+		body = md.AppendToSection(body, opts.Append, string(input))
+	default:
+		return fmt.Errorf("unsupported managed document operation %q", op)
+	}
+
+	existingEvidence, err := normalizeAndValidateEvidencePaths(repo, target, policy, existingEvidence, "existing evidence")
+	if err != nil {
+		return err
+	}
+	suppliedEvidence, err := normalizeAndValidateEvidencePaths(repo, target, policy, opts.Sources, "--source")
+	if err != nil {
+		return err
+	}
+
+	analysis, err := md.AnalyzeWithOptions(target, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(policy.Kind)})
+	if err != nil {
+		return err
+	}
+	citationEvidence := referencePaths(analysis.SourceCitations)
+	citationEvidence, err = normalizeAndValidateEvidencePaths(repo, target, policy, citationEvidence, "source citation")
+	if err != nil {
+		return err
+	}
+
+	// Evidence is cumulative by design. Replacing body content does not imply
+	// removing document-level provenance; removal requires an explicit graph mutation.
+	evidence := mergePaths(existingEvidence, suppliedEvidence, citationEvidence)
+	if !brain.AcceptsEvidence(policy.Kind) && len(evidence) > 0 {
+		return fmt.Errorf("%s documents must not contain evidence", policy.Kind)
+	}
+	if policy.RequiresEvidence && len(evidence) == 0 {
+		return fmt.Errorf("%s documents require at least one evidence reference", policy.Kind)
+	}
+	if len(evidence) > 0 {
+		body = md.AppendSourcesSection(body, target, evidence)
+	} else {
+		body = strings.TrimRight(md.RemoveSourcesSection(body), "\n") + "\n"
+	}
+
+	return writeManagedDocument(absTarget, target, policy, id, title, summary, tags, evidence, body)
 }
 
 func writeRawFile(absTarget string, content []byte) error {
@@ -109,26 +166,21 @@ func writeRawFile(absTarget string, content []byte) error {
 	return os.WriteFile(absTarget, content, 0o644)
 }
 
-func writeDocument(absTarget, target, kind, id, title, summary string, tags, sources []string, body string) error {
-	analysis, err := md.AnalyzeWithOptions(target, body, md.AnalyzeOptions{SourceCitations: kind == "wiki"})
+func writeManagedDocument(absTarget, target string, policy brain.ContentPolicy, id, title, summary string, tags, evidence []string, body string) error {
+	analysis, err := md.AnalyzeWithOptions(target, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(policy.Kind)})
 	if err != nil {
 		return err
 	}
 	if analysis.FirstH1 != "" && strings.TrimSpace(title) != "" && analysis.FirstH1 != strings.TrimSpace(title) {
 		return fmt.Errorf("first H1 %q must match --title %q", analysis.FirstH1, strings.TrimSpace(title))
 	}
-	links := filterWikiLinks(analysis.Links)
-	if kind == "source" {
-		sources = nil
-	}
-	meta := frontmatter.New(kind, title, summary, tags, sources, links)
+	links := filterManagedLinks(analysis.Links)
+	meta := frontmatter.New(string(policy.Kind), title, summary, tags, evidence, links)
 	if strings.TrimSpace(id) != "" {
-		meta = frontmatter.NewWithID(id, kind, title, summary, tags, sources, links)
+		meta = frontmatter.NewWithID(id, string(policy.Kind), title, summary, tags, evidence, links)
 	}
-	if kind == "wiki" {
-		meta.Lumbrera.ModifiedDate = time.Now().Format("2006-01-02")
-	}
-	content, err := frontmatter.Attach(meta, body)
+	meta.Lumbrera.ModifiedDate = time.Now().Format("2006-01-02")
+	content, err := frontmatter.AttachForPolicy(meta, policy, body)
 	if err != nil {
 		return err
 	}
@@ -138,12 +190,12 @@ func writeDocument(absTarget, target, kind, id, title, summary string, tags, sou
 	return os.WriteFile(absTarget, []byte(content), 0o644)
 }
 
-func readExistingDocument(absPath string) (frontmatter.Document, string, error) {
+func readExistingManagedDocument(absPath string, policy brain.ContentPolicy) (frontmatter.Document, string, error) {
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return frontmatter.Document{}, "", err
 	}
-	meta, body, has, err := frontmatter.Split(content)
+	meta, body, has, err := frontmatter.SplitForPolicy(content, policy)
 	if err != nil {
 		return frontmatter.Document{}, "", err
 	}
@@ -151,30 +203,6 @@ func readExistingDocument(absPath string) (frontmatter.Document, string, error) 
 		return frontmatter.Document{}, "", fmt.Errorf("existing document %s has no Lumbrera-generated frontmatter", absPath)
 	}
 	return meta, body, nil
-}
-
-func mergeSourceCitations(target, body string, sources []string) ([]string, error) {
-	analysis, err := md.Analyze(target, body)
-	if err != nil {
-		return nil, err
-	}
-	for _, citation := range analysis.SourceCitations {
-		if !strings.HasPrefix(citation.Path, "sources/") {
-			return nil, fmt.Errorf("%s source citation must link only to sources/, got %s", target, citation.String())
-		}
-	}
-	return mergePaths(sources, referencePaths(analysis.SourceCitations)), nil
-}
-
-func normalizeSources(sources []string) []string {
-	out := make([]string, 0, len(sources))
-	for _, source := range sources {
-		normalized, _, err := normalizeTargetPath(source)
-		if err == nil {
-			out = append(out, normalized)
-		}
-	}
-	return mergePaths(out, nil)
 }
 
 func normalizeBody(input []byte) string {

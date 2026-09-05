@@ -1,8 +1,7 @@
 package writecmd
 
 import (
-	"strings"
-
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 	"github.com/javiermolinar/lumbrera/internal/textutil"
@@ -32,16 +31,12 @@ func referencePaths(refs []md.Reference) []string {
 	return mergePaths(paths)
 }
 
-func filterWikiLinks(links []string) []string {
+func filterManagedLinks(links []string) []string {
 	var out []string
 	for _, link := range links {
-		if strings.HasPrefix(link, "wiki/") {
+		if brain.IsManagedPath(link) {
 			out = append(out, link)
 		}
 	}
 	return mergePaths(out)
-}
-
-func sameStrings(a, b []string) bool {
-	return textutil.SameStringSet(a, b)
 }

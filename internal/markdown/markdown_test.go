@@ -21,6 +21,9 @@ See [Related](./related.md) and [absolute external](https://example.com).
 	if len(analysis.Links) != 1 || analysis.Links[0] != "wiki/design/related.md" {
 		t.Fatalf("unexpected links %#v", analysis.Links)
 	}
+	if !analysis.HasSourcesSection {
+		t.Fatal("expected Sources section to be detected")
+	}
 	if len(analysis.Sources) != 1 || analysis.Sources[0] != "sources/2026/05/04/raw.md" {
 		t.Fatalf("unexpected sources %#v", analysis.Sources)
 	}

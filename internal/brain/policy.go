@@ -130,12 +130,26 @@ func IsManagedKind(kind Kind) bool {
 	return ok && policy.Storage == StorageManagedMarkdown
 }
 
+func IsManagedPath(path string) bool {
+	policy, ok := PolicyForPath(path)
+	return ok && policy.Storage == StorageManagedMarkdown
+}
+
+func AcceptsEvidence(kind Kind) bool {
+	policy, ok := PolicyForKind(kind)
+	return ok && len(policy.EvidenceKinds) > 0
+}
+
 func CanUseAsEvidence(documentKind, evidenceKind Kind) bool {
-	policy, ok := PolicyForKind(documentKind)
+	documentPolicy, ok := PolicyForKind(documentKind)
 	if !ok {
 		return false
 	}
-	for _, kind := range policy.EvidenceKinds {
+	evidencePolicy, ok := PolicyForKind(evidenceKind)
+	if !ok || !evidencePolicy.ProvidesEvidence {
+		return false
+	}
+	for _, kind := range documentPolicy.EvidenceKinds {
 		if kind == evidenceKind {
 			return true
 		}
