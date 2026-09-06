@@ -65,7 +65,7 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "--source sources/<source>.md")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "update existing page, create new page")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-note/SKILL.md", "name: lumbrera-note")
-	assertFileContains(t, repo, ".agents/skills/lumbrera-note/SKILL.md", "Do not pass `--source`")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-note/SKILL.md", "--kind note --json")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "name: lumbrera-query")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "intent-preserving search")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "Do not blindly pass exact user wording")
