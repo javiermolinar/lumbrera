@@ -142,3 +142,72 @@ func TestDeleteAssetScrubsReferencesFromNote(t *testing.T) {
 	}
 	assertVerify(t, repo)
 }
+
+func TestDeleteNotePreservesUnrelatedMarkdownFormatting(t *testing.T) {
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw\n\nRaw evidence.\n", "sources/raw.md", "--reason", "Preserve raw", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Observation\n\nObserved behavior.\n", "notes/observation.md",
+		"--title", "Observation", "--summary", "An observed behavior.", "--tag", "operations",
+		"--reason", "Record observation", "--actor", "test")
+	body := "# Guidance\n\n" +
+		"Claim. [source: ../notes/observation.md]\n\n" +
+		"Literal: `[source: ../notes/observation.md]`.\n\n" +
+		"```python\nif ready:\n    run_task()\n```\n\n" +
+		"Indented code:\n\n    run_task()\n\n" +
+		"Text  with  intentional  spacing.  \nNext line.\n"
+	braintest.RunWrite(t, repo, body, "wiki/guidance.md",
+		"--title", "Guidance", "--summary", "Guidance with mixed evidence.", "--tag", "operations",
+		"--source", "sources/raw.md", "--source", "notes/observation.md",
+		"--reason", "Create guidance", "--actor", "test")
+
+	runDelete(t, repo, "notes/observation.md", "--reason", "Remove observation", "--actor", "test")
+
+	content := testfs.ReadFile(t, repo, "wiki/guidance.md")
+	for _, want := range []string{
+		"Literal: `[source: ../notes/observation.md]`.",
+		"```python\nif ready:\n    run_task()\n```",
+		"Indented code:\n\n    run_task()",
+		"Text  with  intentional  spacing.  \nNext line.",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("wiki formatting did not preserve %q:\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "Claim. [source:") {
+		t.Fatalf("active note citation survived deletion:\n%s", content)
+	}
+	assertVerify(t, repo)
+}
+
+func TestDeleteWikiCleansTitledAndReferenceLinksFromNote(t *testing.T) {
+	repo := braintest.InitBrain(t)
+	braintest.RunWrite(t, repo, "# Raw\n\nRaw evidence.\n", "sources/raw.md", "--reason", "Preserve raw", "--actor", "test")
+	braintest.RunWrite(t, repo, "# Guidance\n\nGuidance.\n", "wiki/guidance.md",
+		"--title", "Guidance", "--summary", "Canonical guidance.", "--tag", "operations", "--source", "sources/raw.md",
+		"--reason", "Create guidance", "--actor", "test")
+	body := "# Observation\n\n" +
+		"See [Guidance](../wiki/guidance.md \"canonical\").\n\n" +
+		"See [reference guidance][guidance].\n\n" +
+		"[guidance]: ../wiki/guidance.md \"canonical\"\n\n" +
+		"Literal: `[Guidance](../wiki/guidance.md)`.\n"
+	braintest.RunWrite(t, repo, body, "notes/observation.md",
+		"--title", "Observation", "--summary", "An observation linking to guidance.", "--tag", "operations",
+		"--reason", "Record observation", "--actor", "test")
+
+	runDelete(t, repo, "wiki/guidance.md", "--reason", "Remove guidance", "--actor", "test")
+
+	content := testfs.ReadFile(t, repo, "notes/observation.md")
+	for _, want := range []string{
+		"See Guidance.",
+		"See reference guidance.",
+		"Literal: `[Guidance](../wiki/guidance.md)`.",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("note link cleanup did not preserve %q:\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "[guidance]:") {
+		t.Fatalf("note retained deleted wiki reference definition:\n%s", content)
+	}
+	assertVerify(t, repo)
+}
