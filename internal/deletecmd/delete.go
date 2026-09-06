@@ -35,7 +35,7 @@ func Run(args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := brain.RequireV2(brainDir); err != nil {
+	if err := brain.RequireCurrent(brainDir); err != nil {
 		return err
 	}
 

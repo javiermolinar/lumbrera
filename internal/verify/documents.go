@@ -16,13 +16,30 @@ import (
 )
 
 func ValidateDocuments(repo string) error {
+	return validateDocumentsForPolicies(repo, brain.ManagedPolicies(), true)
+}
+
+func validateDocumentsForPolicies(repo string, policies []brain.ContentPolicy, requireModifiedDate bool) error {
+	roots := make([]string, 0, len(policies))
+	byKind := make(map[brain.Kind]brain.ContentPolicy, len(policies))
+	for _, policy := range policies {
+		if policy.Storage != brain.StorageManagedMarkdown {
+			continue
+		}
+		roots = append(roots, policy.Root)
+		byKind[policy.Kind] = policy
+	}
 	seenIDs := map[string]string{}
-	return brainfs.WalkMarkdown(repo, brain.ManagedRoots(), func(file brainfs.MarkdownFile) error {
-		policy, ok := brain.PolicyForPath(file.RelPath)
-		if !ok || policy.Storage != brain.StorageManagedMarkdown {
+	return brainfs.WalkMarkdown(repo, roots, func(file brainfs.MarkdownFile) error {
+		pathPolicy, ok := brain.PolicyForPath(file.RelPath)
+		if !ok || pathPolicy.Storage != brain.StorageManagedMarkdown {
 			return fmt.Errorf("%s does not resolve to a managed content policy", file.RelPath)
 		}
-		id, err := validateManagedDocument(repo, file.AbsPath, file.RelPath, policy)
+		policy, ok := byKind[pathPolicy.Kind]
+		if !ok || policy.Root != pathPolicy.Root {
+			return fmt.Errorf("%s is not valid for this brain version", file.RelPath)
+		}
+		id, err := validateManagedDocument(repo, file.AbsPath, file.RelPath, policy, requireModifiedDate)
 		if err != nil {
 			return err
 		}
@@ -34,7 +51,7 @@ func ValidateDocuments(repo string) error {
 	})
 }
 
-func validateManagedDocument(repo, absPath, relPath string, policy brain.ContentPolicy) (string, error) {
+func validateManagedDocument(repo, absPath, relPath string, policy brain.ContentPolicy, requireModifiedDate bool) (string, error) {
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return "", err
@@ -46,10 +63,23 @@ func validateManagedDocument(repo, absPath, relPath string, policy brain.Content
 	if !has {
 		return "", fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
 	}
+	if requireModifiedDate && strings.TrimSpace(meta.Lumbrera.ModifiedDate) == "" {
+		return "", fmt.Errorf("%s is missing generated lumbrera.modified_date", relPath)
+	}
 	if lines := markdownLineCount(body); lines > brain.MaxManagedDocumentBodyLines {
 		return "", fmt.Errorf("%s exceeds max %s page length: %d lines, max %d. Split it into smaller topic/task pages", relPath, policy.Kind, lines, brain.MaxManagedDocumentBodyLines)
 	}
-	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(policy.Kind)})
+	acceptsEvidence := brain.AcceptsEvidence(policy.Kind)
+	if !acceptsEvidence {
+		citationAnalysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: true})
+		if err != nil {
+			return "", fmt.Errorf("%s must not contain source citations: %w", relPath, err)
+		}
+		if citationAnalysis.HasSourceCitationSyntax {
+			return "", fmt.Errorf("%s must not contain source citations", relPath)
+		}
+	}
+	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: acceptsEvidence})
 	if err != nil {
 		return "", fmt.Errorf("%s has invalid Markdown links: %w", relPath, err)
 	}
@@ -108,11 +138,20 @@ func validateEvidenceReferences(repo, relPath string, documentPolicy brain.Conte
 			return fmt.Errorf("%s %s must not reference the document itself: %s", relPath, relationship, ref.String())
 		}
 		evidencePolicy, ok := brain.PolicyForPath(ref.Path)
-		if !ok || !brain.CanUseAsEvidence(documentPolicy.Kind, evidencePolicy.Kind) {
+		if !ok || !brain.CanUseAsEvidence(documentPolicy.Kind, evidencePolicy.Kind) || !policyAllowsEvidenceKind(documentPolicy, evidencePolicy.Kind) {
 			return fmt.Errorf("%s %s cannot use %s as evidence for kind %q", relPath, relationship, ref.String(), documentPolicy.Kind)
 		}
 	}
 	return validateInternalReferencesExist(repo, relPath, refs)
+}
+
+func policyAllowsEvidenceKind(policy brain.ContentPolicy, evidenceKind brain.Kind) bool {
+	for _, allowed := range policy.EvidenceKinds {
+		if allowed == evidenceKind {
+			return true
+		}
+	}
+	return false
 }
 
 func markdownLineCount(body string) int {

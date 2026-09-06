@@ -14,7 +14,7 @@ import (
 )
 
 func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
-	const noteKind brain.Kind = "note"
+	const noteKind brain.Kind = "memo"
 
 	policies := brain.Policies()
 	wikiFound := false
@@ -29,14 +29,14 @@ func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
 		t.Fatal("missing wiki policy")
 	}
 	policies = append(policies, brain.ContentPolicy{
-		Root:             "notes",
+		Root:             "memos",
 		Kind:             noteKind,
 		Storage:          brain.StorageManagedMarkdown,
 		RequiredRoot:     true,
 		Mutable:          true,
 		RequiresEvidence: false,
 		ProvidesEvidence: true,
-		CatalogPath:      "NOTES.md",
+		CatalogPath:      "MEMOS.md",
 	})
 	brain.InstallPoliciesForTest(t, policies)
 
@@ -44,11 +44,11 @@ func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
 	if err := initcmd.Run([]string{repo}); err != nil {
 		t.Fatalf("init failed: %v", err)
 	}
-	if err := os.Mkdir(filepath.Join(repo, "notes"), 0o755); err != nil {
-		t.Fatalf("create notes root: %v", err)
+	if info, err := os.Stat(filepath.Join(repo, "memos")); err != nil || !info.IsDir() {
+		t.Fatalf("required memo root was not scaffolded: info=%v err=%v", info, err)
 	}
 
-	runPolicyWrite(t, repo, "# Observation\n\nInitial detail.\n", "notes/observation.md",
+	runPolicyWrite(t, repo, "# Observation\n\nInitial detail.\n", "memos/observation.md",
 		"--title", "Observation", "--summary", "A first-party observation.", "--tag", "operations",
 		"--reason", "Record observation", "--actor", "test")
 
@@ -56,7 +56,7 @@ func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
 	if !ok {
 		t.Fatal("test note policy was not registered")
 	}
-	noteMeta, noteBody := readManagedDocument(t, repo, "notes/observation.md", notePolicy)
+	noteMeta, noteBody := readManagedDocument(t, repo, "memos/observation.md", notePolicy)
 	originalID := noteMeta.Lumbrera.ID
 	if originalID == "" || noteMeta.Lumbrera.Kind != string(noteKind) {
 		t.Fatalf("unexpected note identity: %+v", noteMeta.Lumbrera)
@@ -69,26 +69,26 @@ func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
 	// same write and verification path.
 	runPolicyWrite(t, repo, "# Topic\n\nSynthesized from the observation.\n", "wiki/topic.md",
 		"--title", "Topic", "--summary", "A synthesized topic.", "--tag", "topic",
-		"--source", "notes/observation.md", "--reason", "Create topic", "--actor", "test")
+		"--source", "memos/observation.md", "--reason", "Create topic", "--actor", "test")
 	wikiPolicy, ok := brain.PolicyForKind(brain.KindWiki)
 	if !ok {
 		t.Fatal("missing wiki policy")
 	}
 	wikiMeta, wikiBody := readManagedDocument(t, repo, "wiki/topic.md", wikiPolicy)
-	if len(wikiMeta.Lumbrera.Sources) != 1 || wikiMeta.Lumbrera.Sources[0] != "notes/observation.md" {
+	if len(wikiMeta.Lumbrera.Sources) != 1 || wikiMeta.Lumbrera.Sources[0] != "memos/observation.md" {
 		t.Fatalf("wiki evidence = %v, want note path", wikiMeta.Lumbrera.Sources)
 	}
-	if !strings.Contains(wikiBody, "- [Observation](../notes/observation.md)") {
+	if !strings.Contains(wikiBody, "- [Observation](../memos/observation.md)") {
 		t.Fatalf("wiki is missing generated note evidence:\n%s", wikiBody)
 	}
 
 	// Replacement and append both use the managed mutation path, preserve the ID,
 	// and regenerate managed-link metadata without adding a Sources section.
-	runPolicyWrite(t, repo, "# Observation\n\nSee [Topic](../wiki/topic.md).\n", "notes/observation.md",
+	runPolicyWrite(t, repo, "# Observation\n\nSee [Topic](../wiki/topic.md).\n", "memos/observation.md",
 		"--reason", "Connect observation", "--actor", "test")
-	runPolicyWrite(t, repo, "Appended detail.\n", "notes/observation.md",
+	runPolicyWrite(t, repo, "Appended detail.\n", "memos/observation.md",
 		"--append", "Details", "--reason", "Extend observation", "--actor", "test")
-	noteMeta, noteBody = readManagedDocument(t, repo, "notes/observation.md", notePolicy)
+	noteMeta, noteBody = readManagedDocument(t, repo, "memos/observation.md", notePolicy)
 	if noteMeta.Lumbrera.ID != originalID {
 		t.Fatalf("managed updates changed ID: got %q, want %q", noteMeta.Lumbrera.ID, originalID)
 	}
@@ -101,7 +101,7 @@ func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
 
 	// The shared repair pass must discover the alternate managed root, restore a
 	// missing ID, regenerate derived files, and leave the repository verifiable.
-	notePath := filepath.Join(repo, "notes", "observation.md")
+	notePath := filepath.Join(repo, "memos", "observation.md")
 	content, err := os.ReadFile(notePath)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
 	if err := verify.Run(repo, verify.Options{}); err != nil {
 		t.Fatalf("repair and verify alternate managed kind: %v", err)
 	}
-	repairedMeta, _ := readManagedDocument(t, repo, "notes/observation.md", notePolicy)
+	repairedMeta, _ := readManagedDocument(t, repo, "memos/observation.md", notePolicy)
 	if repairedMeta.Lumbrera.ID == "" {
 		t.Fatal("repair did not restore the note ID")
 	}
@@ -127,7 +127,7 @@ func TestSecondManagedKindUsesWriteParseRepairAndVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(manifest), "notes/observation.md sha256:") {
+	if !strings.Contains(string(manifest), "memos/observation.md sha256:") {
 		t.Fatalf("managed note is missing from %s:\n%s", brain.BrainSumPath, manifest)
 	}
 }

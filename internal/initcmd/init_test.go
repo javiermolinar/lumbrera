@@ -17,6 +17,7 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFile(t, repo, "VERSION", brainVersion)
 	assertFileExact(t, repo, "INDEX.md", indexContent)
 	assertFileExact(t, repo, "SOURCES.md", sourcesIndexContent)
+	assertFileExact(t, repo, "NOTES.md", notesIndexContent)
 	assertFileExact(t, repo, "ASSETS.md", assetsIndexContent)
 	assertFileExact(t, repo, "CHANGELOG.md", changelogContent)
 	assertFileExact(t, repo, "BRAIN.sum", brainSumContent)
@@ -24,15 +25,19 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFileExact(t, repo, "AGENTS.md", agentsContent)
 	assertFileExact(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", ingestSkillContent)
 	assertFileExact(t, repo, ".agents/skills/lumbrera-query/SKILL.md", querySkillContent)
+	assertFileExact(t, repo, ".agents/skills/lumbrera-note/SKILL.md", noteSkillContent)
 	assertFileExact(t, repo, ".agents/skills/lumbrera-health/SKILL.md", healthSkillContent)
+	assertFileExact(t, repo, ".agents/skills/lumbrera-delete/SKILL.md", deleteSkillContent)
 	assertExists(t, repo, "sources")
 	assertExists(t, repo, "sources/design")
 	assertExists(t, repo, "sources/reference")
+	assertExists(t, repo, "notes")
 	assertExists(t, repo, "wiki")
 	assertExists(t, repo, "wiki/design")
 	assertExists(t, repo, "assets")
 	assertExists(t, repo, "INDEX.md")
 	assertExists(t, repo, "SOURCES.md")
+	assertExists(t, repo, "NOTES.md")
 	assertExists(t, repo, "ASSETS.md")
 	assertExists(t, repo, "CHANGELOG.md")
 	assertExists(t, repo, "BRAIN.sum")
@@ -50,7 +55,7 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertSymlink(t, repo, "CLAUDE.md", "AGENTS.md")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "name: lumbrera-ingest")
 	assertFileContains(t, repo, "AGENTS.md", "symptom → cause → fix")
-	assertFileContains(t, repo, "AGENTS.md", "Inline source citations")
+	assertFileContains(t, repo, "AGENTS.md", "Inline evidence citations")
 
 	assertFileContains(t, repo, "AGENTS.md", "inline citations complement it")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "pass --title")
@@ -59,6 +64,8 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "Search for overlap before writing")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "--source sources/<source>.md")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-ingest/SKILL.md", "update existing page, create new page")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-note/SKILL.md", "name: lumbrera-note")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-note/SKILL.md", "Do not pass `--source`")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "name: lumbrera-query")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "intent-preserving search")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-query/SKILL.md", "Do not blindly pass exact user wording")
@@ -78,12 +85,25 @@ func TestInitMissingDirectory(t *testing.T) {
 	assertFileContains(t, repo, ".agents/skills/lumbrera-health/SKILL.md", "Missing-link triage")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-health/SKILL.md", "Duplicate/consolidation helper")
 	assertFileContains(t, repo, ".agents/skills/lumbrera-health/SKILL.md", "high-risk claims")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-delete/SKILL.md", "Note deletion")
+	assertFileContains(t, repo, ".agents/skills/lumbrera-delete/SKILL.md", "surviving notes and wiki pages")
 	assertSymlink(t, repo, ".claude", ".agents")
 	assertMissing(t, repo, ".git")
 	assertMissing(t, repo, ".brain/hooks")
 
 	if err := Run([]string{repo}); err != nil {
 		t.Fatalf("second init should be idempotent: %v", err)
+	}
+}
+
+func TestInitDirectsOlderBrainsToMigrate(t *testing.T) {
+	repo := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repo, "VERSION"), []byte("lumbrera-brain-v2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := Run([]string{repo})
+	if err == nil || !strings.Contains(err.Error(), "lumbrera migrate") {
+		t.Fatalf("init error = %v, want migration instruction", err)
 	}
 }
 

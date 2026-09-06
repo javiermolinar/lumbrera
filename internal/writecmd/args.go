@@ -115,32 +115,33 @@ func printHelp() {
 Performs one Lumbrera write transaction and regenerates local metadata.
 
 Required:
-  <path>              repo-relative path under sources/, wiki/, or assets/
+  <path>              repo-relative path under sources/, notes/, wiki/, or assets/
   --reason <reason>   single-line changelog reason
 
 Options:
   --brain <path>      target brain directory, default current directory
   --repo <path>       deprecated alias for --brain
   --actor <actor>     actor label for changelog, default LUMBRERA_ACTOR, USER, USERNAME, or human
-  --title <title>     required when creating a new wiki file
-  --summary <text>    required single-line generated wiki frontmatter summary for new wiki files
-  --tag <tag>         required generated wiki frontmatter tag for new wiki files, repeatable up to 5
-  --source <path>     provenance source for wiki writes, repeatable; optional on update/append
-  --append <section>  append stdin content to a named section in an existing wiki page
+  --title <title>     required when creating a new wiki or note file
+  --summary <text>    required single-line generated summary for new managed files
+  --tag <tag>         required generated managed-document tag, repeatable up to 5
+  --source <path>     evidence for wiki writes: source or note path; repeatable; optional on update/append
+  --append <section>  append stdin content to a named section in an existing wiki page or note
   --file <path>       local file to copy into assets/ (required for asset writes)
-  --delete            delete an existing wiki page
+  --delete            deprecated; use lumbrera delete
 
 Rules:
   - source writes preserve stdin as raw Markdown
-  - wiki stdin must contain Markdown body only; Lumbrera generates wiki document IDs and frontmatter
+  - wiki and note stdin must contain Markdown body only; Lumbrera generates document IDs and frontmatter
+  - notes reject --source and must not contain a ## Sources section
   - asset writes require --file and copy the local file into the target path
   - assets are immutable after creation; .md files are not allowed under assets/
-  - new wiki pages require single-line --summary, 1-5 lowercase slug --tag values, and at most 400 body lines
+  - new wiki pages and notes require single-line --summary, 1-5 lowercase slug --tag values, and at most 400 body lines
   - source files are immutable after creation
-  - a new wiki page requires final source evidence from --source or an inline citation
-  - wiki updates and appends retain existing source evidence when --source is omitted
+  - a new wiki page requires final source or note evidence from --source or an inline citation
+  - wiki updates and appends retain existing evidence when --source is omitted
   - local Markdown links and heading anchors must resolve
-  - optional inline claim citations use [source: ../sources/path.md#heading-anchor]
-  - successful writes update INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md
+  - optional inline claim citations use [source: ../sources/path.md#heading-anchor] or [source: ../notes/path.md#heading-anchor]
+  - successful writes update INDEX.md, SOURCES.md, NOTES.md, ASSETS.md, CHANGELOG.md, BRAIN.sum, and tags.md
   - Git, cloud sync, backup, and sharing are external to Lumbrera`)
 }

@@ -85,13 +85,13 @@ func autoRebuild(ctx context.Context, brainDir string, state searchindex.StatusS
 }
 
 func rebuildChecked(ctx context.Context, brainDir string, opts RebuildOptions) error {
-	if err := verify.Check(brainDir, verify.Options{}); err != nil {
-		return fmt.Errorf("cannot rebuild search index because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
-	}
 	if opts.RepairMissingModifiedDates {
 		if err := repairMissingModifiedDates(brainDir); err != nil {
 			return err
 		}
+	}
+	if err := verify.Check(brainDir, verify.Options{}); err != nil {
+		return fmt.Errorf("cannot rebuild search index because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
 	}
 	return searchindex.RebuildBrain(ctx, brainDir)
 }
@@ -108,11 +108,5 @@ func repairMissingModifiedDates(brainDir string) error {
 	if err != nil {
 		return err
 	}
-	if err := generate.WriteFiles(brainDir, files); err != nil {
-		return err
-	}
-	if err := verify.Check(brainDir, verify.Options{}); err != nil {
-		return fmt.Errorf("cannot rebuild search index after repairing modified dates because brain verification failed: %w; run lumbrera verify --brain %s", err, brainDir)
-	}
-	return nil
+	return generate.WriteFiles(brainDir, files)
 }

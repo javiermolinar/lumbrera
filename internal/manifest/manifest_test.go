@@ -17,17 +17,18 @@ func TestGenerateSortsEntries(t *testing.T) {
 	}
 }
 
-func TestEntriesForRepoIncludeOnlyWikiMarkdown(t *testing.T) {
+func TestEntriesForRepoIncludeManagedMarkdown(t *testing.T) {
 	repo := t.TempDir()
 	testfs.WriteFile(t, repo, "sources/raw.md", "# Raw\n")
+	testfs.WriteFile(t, repo, "notes/observation.md", "# Observation\n")
 	testfs.WriteFile(t, repo, "wiki/topic.md", "# Topic\n")
 
 	entries, err := EntriesForRepo(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 || entries[0].Path != "wiki/topic.md" {
-		t.Fatalf("expected only wiki entries, got %#v", entries)
+	if len(entries) != 2 || entries[0].Path != "notes/observation.md" || entries[1].Path != "wiki/topic.md" {
+		t.Fatalf("expected note and wiki entries, got %#v", entries)
 	}
 }
 

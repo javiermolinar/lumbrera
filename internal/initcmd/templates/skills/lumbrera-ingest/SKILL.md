@@ -16,11 +16,11 @@ Preserve raw source material and distill it into small, source-grounded wiki pag
 - One or more created or updated wiki pages, or an explicit skip decision when the source is already covered.
 - Any asset files (diagrams, images) written via `lumbrera write assets/... --file ...`.
 - A final report listing overlap searches performed, existing pages reviewed, created/updated/skipped pages, created assets, covered source sections, skipped source sections, uncertainties, and follow-up work.
-- All mutations performed only through `lumbrera write`, followed by `lumbrera verify`.
+- All mutations performed through `lumbrera write` or, for deletion, `lumbrera delete`, followed by `lumbrera verify`.
 
 ## Contract
 
-- Do not edit files directly; write only with `lumbrera write`.
+- Do not edit files directly; use `lumbrera write` and `lumbrera delete`.
 - Preserve raw source material; do not alter existing `sources/` files.
 - Provide wiki body Markdown only. Lumbrera generates document IDs, frontmatter, Sources sections, indexes, changelog, checksums, and tags.
 - Prefer creating a new focused page over mutating an existing page unless search shows a clear same-topic canonical page that should absorb the new source.
@@ -36,7 +36,7 @@ Preserve raw source material and distill it into small, source-grounded wiki pag
    lumbrera search "<candidate key terms>" --tag <candidate-tag> --json
    ~~~
 
-4. Read `recommended_sections` first, then top wiki pages from `recommended_read_order` only if needed.
+4. Read `recommended_sections` first, then top wiki or note paths from `recommended_read_order` only if needed.
 5. Decide per candidate: update existing page, create new page, create linked page, or skip.
 6. If source material includes diagrams or images, write them as assets first:
 
@@ -63,10 +63,10 @@ lumbrera write wiki/<path>.md --title "Title" --summary "Summary" --tag tag --so
 
 ## Delete command
 
-If a source is bad, incorrect, or superseded, use `lumbrera delete` to remove it and cascade-clean all wiki pages that reference it. Wiki pages left with zero sources are automatically deleted.
+If a source is bad, incorrect, or superseded, use `lumbrera delete` to remove it and cascade-clean all wiki pages that reference it. Wiki pages left with zero source or note evidence are automatically deleted.
 
 ~~~sh
 lumbrera delete sources/<path>.md --reason "Remove bad source"
 ~~~
 
-Use the dedicated delete skill (.agents/skills/lumbrera-delete/SKILL.md) when removing sources or wiki pages.
+Use the dedicated delete skill (.agents/skills/lumbrera-delete/SKILL.md) when removing sources, notes, wiki pages, or assets.

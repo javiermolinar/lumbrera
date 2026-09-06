@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/brainlock"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
 	"github.com/javiermolinar/lumbrera/internal/cmdutil"
@@ -29,6 +30,9 @@ func Run(args []string) error {
 	}
 	brainDir, err := cliutil.ResolveBrain(opts.Brain)
 	if err != nil {
+		return err
+	}
+	if err := brain.RequireCurrent(brainDir); err != nil {
 		return err
 	}
 	lock, err := brainlock.Acquire(brainDir, "verify")
@@ -71,19 +75,19 @@ Usage:
   lumbrera verify [--brain <path>] [--fix]
 
 Behavior:
-  - repairs missing wiki frontmatter document IDs for backward compatibility
+  - repairs missing managed-document IDs for backward compatibility
   - then checks deterministic consistency
-  - with --fix, regenerates stale generated files (INDEX.md, CHANGELOG.md,
-    BRAIN.sum, tags.md) before checking
+  - with --fix, regenerates stale generated files (INDEX.md, SOURCES.md,
+    NOTES.md, ASSETS.md, BRAIN.sum, and tags.md) before checking
 
 Checks:
   - VERSION matches the supported brain format
   - content paths obey Lumbrera policy
-  - wiki documents have valid generated frontmatter
-  - wiki pages are at most 400 Markdown body lines
-  - wiki pages have resolving source references
+  - wiki and note documents have valid generated frontmatter
+  - managed documents are at most 400 Markdown body lines
+  - wiki pages have resolving source or note evidence
   - local Markdown links and heading anchors resolve
-  - INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md match regenerated output
+  - generated catalogs, CHANGELOG.md, BRAIN.sum, and tags.md match regenerated output
 
 Options:
   --brain <path>      target brain directory, defaults to the current directory

@@ -9,49 +9,50 @@ Use when the user asks for a semantic health check, consolidation review, link-h
 
 ## Goal
 
-Use deterministic `lumbrera health` candidates to decide what an LLM should review next. The goal is not to prove semantic drift automatically. The goal is to narrow review to likely maintenance opportunities, then read the relevant wiki pages and preserved sources before classifying any action.
+Use deterministic `lumbrera health` candidates to decide what an LLM should review next. The goal is not to prove semantic drift automatically. The goal is to narrow review to likely maintenance opportunities, then read the relevant wiki pages, first-party notes, and preserved sources before classifying any action.
 
 `lumbrera health` returns review candidates, not conclusions. Treat `possible_duplicate`, `missing_link`, `orphan_page`, `underlinked_page`, `uncited_source`, `source_coverage_gap`, `stub_page`, and `tag_anomaly` as prompts for investigation.
 
-Lumbrera handles deterministic consistency for managed wiki content: wiki document IDs, frontmatter, tag registry, index, changelog, checksums, source sections, broken links, heading anchors, path policy, and generated files. Do not spend LLM health-review effort on those.
+Lumbrera handles deterministic consistency for managed wiki and note content: document IDs, frontmatter, tag registry, catalogs, changelog, checksums, Sources sections, broken links, heading anchors, path policy, and generated files. Do not spend LLM health-review effort on those.
 
 ## Workflow
 
 1. Run `lumbrera health --json` before broad repository exploration. The default `--kind all` mixes candidate types to guarantee a diverse review queue.
 2. To focus on a specific category, use `--kind` with one of: `duplicates`, `links`, `sources`, `orphans`, `stubs`, `tags`.
 3. Review the top candidate first. Do not scan the repo unless candidates are insufficient.
-3. Use the candidate's `suggested_queries` with `lumbrera search "<query>" --json` when evidence is insufficient.
-4. When a candidate reason names a tag or source, optionally inspect that local neighborhood with exact filters:
+4. Use the candidate's `suggested_queries` with `lumbrera search "<query>" --json` when evidence is insufficient.
+5. When a candidate reason names a tag or evidence path, optionally inspect that local neighborhood with exact filters:
 
    ~~~sh
    lumbrera search "<query>" --tag <tag> --json
    lumbrera search "<query>" --source sources/<source>.md --json
+   lumbrera search "<query>" --source notes/<note>.md --json
    ~~~
 
-5. Read the candidate pages and cited sources before deciding.
-6. Classify the result as one of:
+6. Read the candidate wiki pages or notes and cited evidence before deciding.
+7. Classify the result as one of:
    - duplicate or consolidation opportunity;
    - overlapping but distinct pages;
    - missing cross-link;
-   - stale-risk requiring source review;
+   - stale-risk requiring evidence review;
    - missing concept or source coverage gap;
    - no action.
-7. Report affected paths, deterministic reasons, evidence read, classification, and suggested next action.
-8. If a mutation is needed, ask for explicit user approval first.
-9. After approval, mutate only with `lumbrera write`, then run `lumbrera verify --brain .`.
+8. Report affected paths, deterministic reasons, evidence read, classification, and suggested next action.
+9. If a mutation is needed, ask for explicit user approval first.
+10. After approval, mutate only with `lumbrera write` or `lumbrera delete`, then run `lumbrera verify --brain .`.
 
 ## What to look for
 
-- Pages that duplicate or fragment one concept and should be merged, clarified, or rewritten as canonical-plus-stub.
+- Wiki pages or notes that duplicate or fragment one concept. An already-canonicalized note may be removable after its unique evidence is preserved.
 - Related pages that should link contextually or include a short Related pages section.
-- Pages that cite similar sources but make stale or inconsistent claims.
+- Pages that cite similar source or note evidence but make stale or inconsistent claims.
 - Uncited source files that contain concepts missing from the wiki.
 - Source coverage gaps: sources that are cited but have H2/H3 sections no wiki page references. Use `--kind sources` to focus.
 - Orphan or weakly connected pages that should be linked, merged, or intentionally left standalone.
 - Stub pages with very little body content that may need expansion or merging. Use `--kind stubs` to focus.
 - Tag anomalies: singleton tags that add no search value, or broad tags applied to most pages that fail to discriminate. Use `--kind tags` to focus.
 - Identify high-risk claims that need claim-level citations: limits, breaking changes, destructive procedures, security/auth behavior, and internal operational workflows.
-- Internal-only knowledge that should be clearly marked and not presented as public documentation.
+- Internal-only notes or knowledge that should be clearly marked and not presented as public documentation.
 
 ## Missing-link triage
 
@@ -91,6 +92,6 @@ If consolidation is approved, prefer updating the canonical page first, then rew
 - Do not present deterministic candidates as proven semantic drift.
 - Do not report lack of links as a problem unless there is a clear semantic relationship.
 - Do not edit files directly or create generated metadata, including tags.md entries.
-- Do not mutate sources; sources are preserved raw material.
+- Do not mutate sources; sources are preserved raw material. Update notes only through `lumbrera write` and remove them only through `lumbrera delete`.
 - Prefer updating a canonical page plus adding a duplicate-page stub before deletion.
 - Use `lumbrera delete` only when content is fully covered elsewhere. The delete command handles cascade cleanup of references and broken links automatically.

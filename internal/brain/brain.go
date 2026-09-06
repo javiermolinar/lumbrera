@@ -8,11 +8,13 @@ import (
 )
 
 const (
-	Version                     = "lumbrera-brain-v2"
+	Version                     = "lumbrera-brain-v3"
+	VersionV2                   = "lumbrera-brain-v2"
 	VersionV1                   = "lumbrera-brain-v1"
 	MarkerPath                  = "VERSION"
 	IndexPath                   = "INDEX.md"
 	SourcesIndexPath            = "SOURCES.md"
+	NotesIndexPath              = "NOTES.md"
 	AssetsIndexPath             = "ASSETS.md"
 	ChangelogPath               = "CHANGELOG.md"
 	BrainSumPath                = "BRAIN.sum"
@@ -21,7 +23,13 @@ const (
 )
 
 func GeneratedFilePaths() []string {
-	return []string{IndexPath, SourcesIndexPath, AssetsIndexPath, BrainSumPath, TagsPath}
+	paths := make([]string, 0, 6)
+	for _, kind := range []Kind{KindWiki, KindSource, KindNote, KindAsset} {
+		if path, ok := CatalogPathForKind(kind); ok {
+			paths = append(paths, path)
+		}
+	}
+	return append(paths, BrainSumPath, TagsPath)
 }
 
 // RepoVersion reads the VERSION marker and returns the version string.
@@ -33,7 +41,7 @@ func RepoVersion(repo string) (string, error) {
 	}
 	marker := strings.TrimSpace(string(content))
 	switch marker {
-	case Version, VersionV1:
+	case Version, VersionV2, VersionV1:
 		return marker, nil
 	default:
 		return "", fmt.Errorf("unsupported Lumbrera brain marker %q", marker)
@@ -46,14 +54,14 @@ func ValidateRepo(repo string) error {
 	return err
 }
 
-// RequireV2 checks that the repo is a v2 brain. Returns a helpful error if v1.
-func RequireV2(repo string) error {
-	v, err := RepoVersion(repo)
+// RequireCurrent checks that the repo uses the current brain contract.
+func RequireCurrent(repo string) error {
+	version, err := RepoVersion(repo)
 	if err != nil {
 		return err
 	}
-	if v == VersionV1 {
-		return fmt.Errorf("brain is %s; run \"lumbrera migrate\" to upgrade to %s", VersionV1, Version)
+	if version != Version {
+		return fmt.Errorf("brain is %s; run \"lumbrera migrate\" to upgrade to %s", version, Version)
 	}
 	return nil
 }
