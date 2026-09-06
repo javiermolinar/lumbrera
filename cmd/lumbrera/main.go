@@ -74,7 +74,9 @@ func printUsage() {
 
 A Lumbrera brain repo stores:
   sources/   preserved raw source material
-  wiki/      distilled knowledge
+  notes/     durable first-party knowledge
+  wiki/      canonical distilled knowledge
+  assets/    immutable supporting files
 
 Agents may read Markdown directly, but all mutations must go through Lumbrera.
 
@@ -83,13 +85,13 @@ Usage:
 
 Commands:
   init <repo>              Initialize a Lumbrera brain repo
-  migrate [options]        Upgrade a v1 brain to v2
+  migrate [options]        Upgrade a v1 or v2 brain to v3
   index [options]          Manage the local SQLite search index
   health [options]         Return deterministic health/consolidation candidates
   search <query> [options] Search the local SQLite index with JSON output
   verify [--brain <path>]  Check deterministic brain integrity
   write <path> [options]   Perform one atomic knowledge mutation
-  delete <path> [options]  Delete a source or wiki page with cascade cleanup
+  delete <path> [options]  Delete content with cascade cleanup
   version                  Print version information
 
 Run:
@@ -101,7 +103,8 @@ Examples:
   lumbrera index --rebuild --brain ./brain
   lumbrera health --brain ./brain --json
   lumbrera search "tempo downscale" --brain ./brain --json
-  lumbrera write wiki/topic.md --title "Topic" --summary "Durable summary" --tag topic --source sources/input.md --reason "Create topic page" < topic.md
+  lumbrera write notes/observation.md --title "Observation" --summary "Durable summary" --tag operations --reason "Record observation" < note.md
+  lumbrera write wiki/topic.md --title "Topic" --summary "Durable summary" --tag topic --source notes/observation.md --reason "Create topic page" < topic.md
   lumbrera delete sources/bad.md --reason "Remove poison source"`)
 }
 

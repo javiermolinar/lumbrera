@@ -4,36 +4,22 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/javiermolinar/lumbrera)](https://goreportcard.com/report/github.com/javiermolinar/lumbrera)
 [![Latest Release](https://img.shields.io/github/v/release/javiermolinar/lumbrera)](https://github.com/javiermolinar/lumbrera/releases)
 
-Lumbrera is a backendless, Markdown-native second brain for humans and LLM agents.
+Lumbrera is a backendless, Markdown-native knowledge brain for humans and LLM agents.
 
-It is inspired by the Karpathy [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): preserve raw source material, distill it into a durable human-readable Markdown wiki, and let agents help maintain that knowledge base over time.
+It follows the Karpathy [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), with a separate place for first-party knowledge:
 
-<img width="1983" height="793" alt="0f75f597-5cc1-432e-a61a-ebc581baed22" src="https://github.com/user-attachments/assets/d7903531-149b-481e-b4c5-68004aa115dd" />
+- `sources/` preserves immutable external evidence.
+- `notes/` stores focused, mutable observations, decisions, failed experiments, and local conventions.
+- `wiki/` stores canonical synthesis backed by sources, notes, or both.
+- `assets/` stores images and other supporting files.
 
+All durable mutations cross the Lumbrera CLI boundary. The CLI validates content, maintains links and evidence, regenerates metadata, records operations, and verifies the result atomically.
 
-## What problem does it solve?
-
-Creating an LLM knowledge base is harder than it seems, especially a shareable one. LLMs are good at summarizing content but over time they start drifting. The Karpathy idea is good but it doesn't scale by itself. After a dozen documents your wiki will start to:
-- drift
-- lose provenance
-- overwrite important context.
-
-Lumbrera provides a small protocol and CLI boundary for maintaining source-grounded Markdown knowledge safely in local files. Git, cloud sync, backups, and sharing are external choices.
-Lumbrera keeps the data as ordinary files and makes the CLI the mutation boundary. Agents may read Markdown directly, but durable changes go through `lumbrera write`, which applies path/provenance rules, regenerates metadata, and updates an internal operation log.
-
-
-## How it works
-
-<a href="lumbrera-brain.png"><img src="lumbrera-brain.png" alt="Lumbrera Knowledge Brain architecture: write path, brain structure, search with FTS5 and BM25, link preservation" /></a>
-
-Lumbrera keeps brain integrity through a deterministic metadata layer. Every `lumbrera write` regenerates `BRAIN.sum` (a sha256 manifest of wiki files), `INDEX.md`, `CHANGELOG.md`, and `tags.md` from the canonical Markdown. `lumbrera verify` recomputes them and rejects drift.
-
-To let the brain scale beyond what fits in a single context window, Lumbrera maintains a local SQLite search index with full-text search and tier-based ranking. The index is a disposable cache — delete it anytime, it rebuilds itself from the Markdown files.
-
+<a href="lumbrera-brain.png"><img src="lumbrera-brain.png" alt="Lumbrera v3 Knowledge Brain architecture: source and note evidence, managed write path, FTS5 search ranking, and link preservation" /></a>
 
 ## Install
 
-Install the latest macOS/Linux prebuilt binary with one line, no Go required:
+Install the latest macOS/Linux binary:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/javiermolinar/lumbrera/main/scripts/install.sh | sh
@@ -45,67 +31,179 @@ Or install from source with Go:
 go install github.com/javiermolinar/lumbrera/cmd/lumbrera@latest
 ```
 
-The module root is not an installable command package; use `/cmd/lumbrera`.
+The module root is not an installable command package; use `/cmd/lumbrera`. Check the installed version with `lumbrera version`.
 
-Check the installed version with `lumbrera version`.
-
-
-## How to use it
-
-Start by initializing a new brain:
+## Initialize a brain
 
 ```sh
 lumbrera init ./brain
+cd ./brain
 ```
 
-Then drop new markdown content into the sources folder. You can convert almost anything to markdown these days.
-Ask your LLM to ingest it using the skill:
+A v3 brain contains:
 
-```
-/skill:lumbrera-ingest @sources/whatever.md
+```text
+sources/          immutable preserved material
+notes/            mutable first-party knowledge
+wiki/             mutable canonical synthesis
+assets/           supporting files
+INDEX.md          generated wiki catalog
+SOURCES.md        generated source catalog
+NOTES.md          generated note catalog
+ASSETS.md         generated asset catalog
+CHANGELOG.md      append-only operation history
+BRAIN.sum         generated note and wiki checksums
+tags.md           generated note and wiki tag registry
+.agents/skills/   bundled ingest, note, query, health, and delete workflows
+.brain/           internal state and disposable search cache
 ```
 
-Start asking questions using the skill:
+Do not edit managed or generated paths directly. Read them freely, but use `lumbrera write` and `lumbrera delete` for changes.
 
-```
-/skill:lumbrera-query how can I do X or Y?
-```
+## Preserve sources
 
-The query skill starts with the local SQLite search index:
+Source files are immutable after creation:
 
 ```sh
-lumbrera search "how can I do X or Y?" --brain ./brain --json
+lumbrera write sources/vendor/limits.md \
+  --reason "Preserve vendor limits" < limits.md
 ```
 
-`lumbrera search` automatically rebuilds a missing or stale local index. To inspect or force the disposable cache explicitly:
+Use the bundled ingest skill to preserve source material and synthesize wiki coverage:
+
+```text
+/skill:lumbrera-ingest @limits.md
+```
+
+## Record first-party notes
+
+A note records one durable first-party fact without pretending that an external source exists:
 
 ```sh
-lumbrera index --status --brain ./brain
-lumbrera index --rebuild --brain ./brain
+lumbrera write notes/compactor-recovery.md \
+  --title "Compactor recovery observation" \
+  --summary "Restarting the compactor cleared the stuck tenant queue." \
+  --tag operations \
+  --tag compactor \
+  --reason "Record recovery observation" < note.md
 ```
 
-From time to time, run the health skill to review semantic maintenance candidates:
+Notes have generated IDs and frontmatter, require a title, summary, and 1–5 tags, and are limited to 400 Markdown body lines. They do not accept `--source` and cannot contain a generated `## Sources` section. Update or append to a note through the same command:
 
+```sh
+lumbrera write notes/compactor-recovery.md \
+  --reason "Clarify the observed sequence" < revised-note.md
+
+lumbrera write notes/compactor-recovery.md \
+  --append "Follow-up" \
+  --reason "Add the recurrence result" < follow-up.md
 ```
+
+The bundled note skill searches first, skips redundant or low-value capture, and writes only focused durable knowledge:
+
+```text
+/skill:lumbrera-note record what we learned from this incident
+```
+
+## Create evidence-backed wiki pages
+
+Every wiki page must retain at least one evidence path. Evidence may come from `sources/`, `notes/`, or both:
+
+```sh
+lumbrera write wiki/compactor-recovery.md \
+  --title "Recover a stuck compactor queue" \
+  --summary "Procedure and evidence for recovering a stuck compactor queue." \
+  --tag operations \
+  --tag compactor \
+  --source notes/compactor-recovery.md \
+  --reason "Synthesize recovery guidance" < page.md
+```
+
+Lumbrera generates the wiki page's frontmatter and `## Sources` section. Inline citations use the same syntax for source and note evidence:
+
+```md
+The queue resumed after restart. [source: ../notes/compactor-recovery.md#result]
+The supported retry limit is five. [source: ../sources/vendor/limits.md#retries]
+```
+
+Citations must resolve to a declared evidence path and an existing heading anchor. Ordinary Markdown links may connect notes and wiki pages or refer to sources and assets.
+
+## Query and search
+
+Use the query skill for evidence-grounded answers:
+
+```text
+/skill:lumbrera-query how do I recover a stuck compactor queue?
+```
+
+The skill starts with deterministic SQLite/FTS5 search:
+
+```sh
+lumbrera search "recover stuck compactor queue" --json
+```
+
+Default search covers wiki pages, notes, and sources, ranking equivalent matches in that order. Filter explicitly when needed:
+
+```sh
+lumbrera search "compactor queue" --kind note --json
+lumbrera search "compactor queue" --source notes/compactor-recovery.md --json
+```
+
+When no wiki page matches, search recommends the best note sections before raw sources. The index at `.brain/search.sqlite` is a disposable cache; note creation, updates, and deletion make it stale just like other indexed content. Search rebuilds it automatically, or you can inspect and rebuild it:
+
+```sh
+lumbrera index --status
+lumbrera index --rebuild
+```
+
+## Verify and review health
+
+```sh
+lumbrera verify
+lumbrera health --json
+```
+
+Verification checks the complete v3 contract: roots and paths, managed frontmatter and IDs, note and wiki line limits, evidence, citations, ordinary links, generated catalogs, tags, checksums, and operation history. `BRAIN.sum` covers both notes and wiki pages.
+
+Health analysis treats notes as managed knowledge for duplicate, orphan, stub, tag-anomaly, and freshness signals. Source coverage remains a wiki-only concept. Use the bundled health skill to classify candidates rather than treating candidates as conclusions:
+
+```text
 /skill:lumbrera-health
 ```
 
+## Delete content safely
+
+```sh
+lumbrera delete notes/compactor-recovery.md --reason "Remove disproven observation"
+lumbrera delete sources/vendor/limits.md --reason "Remove invalid source"
+lumbrera delete wiki/compactor-recovery.md --reason "Remove obsolete guidance"
+lumbrera delete assets/old-diagram.png --reason "Remove obsolete diagram"
+```
+
+Deleting source or note evidence removes it from dependent wiki pages. A wiki page is cascade-deleted only when no source or note evidence remains. Deletion also cleans ordinary links from surviving notes and wiki pages; asset deletion cleans links and image embeds without deleting documents. The complete plan is transactional and verified before commit.
 
 ## Source tiers
 
-Not all sources are equal. Lumbrera infers a tier from the path and uses it to rank search results:
+Lumbrera infers a ranking tier from path:
 
 | Tier | Path prefix | Ranking | Use for |
 |---|---|---|---|
-| canonical | `sources/` `wiki/` | default (1.0) | Current product docs, operations, reference |
-| design | `sources/design/` `wiki/design/` | demoted (0.45 penalty) | Proposals, ADRs, specs not yet implemented |
-| reference | `sources/reference/` | demoted (0.60 penalty) | Historical docs, competition, meeting notes |
-
-Canonical content ranks first in search. Design and reference content is still findable but structurally deprioritized. Use `--tier` to filter:
+| canonical | `sources/`, `notes/`, `wiki/` | default (1.0) | Current evidence, first-party knowledge, operations, reference |
+| design | `sources/design/`, `wiki/design/` | demoted (0.45 penalty) | Proposals, ADRs, specs not yet implemented |
+| reference | `sources/reference/` | demoted (0.60 penalty) | Historical and external reference material |
 
 ```sh
 lumbrera search "querier batching" --tier design --json
 ```
 
-When ingesting a design doc, preserve under `sources/design/` and create wiki pages under `wiki/design/`. The LLM sees the tier label in search results and naturally prefers canonical answers for operational questions.
+Notes are canonical by default. Do not use notes as a replacement for bulk reference material or meeting transcripts.
 
+## Migrate existing brains
+
+The current format marker is `lumbrera-brain-v3`. The CLI recognizes v1 and v2 markers so it can direct those brains to migration; current commands require the v3 contract:
+
+```sh
+lumbrera migrate --brain .
+```
+
+Migration validates the old brain, applies v1→v2→v3 steps in order, creates note artifacts, updates unmodified bundled instructions, invalidates the search cache, regenerates derived files, and verifies the result. Customized agent files are preserved for manual reconciliation. A failed migration restores every touched path.
