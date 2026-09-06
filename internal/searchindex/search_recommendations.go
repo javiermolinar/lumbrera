@@ -43,14 +43,31 @@ func coverageForRecommendations(results []SearchResult, sections []RecommendedSe
 
 func recommendations(results []SearchResult, opts SearchOptions, queryTerms []string) ([]string, []RecommendedSection, string) {
 	if len(results) == 0 {
-		return []string{}, []RecommendedSection{}, "No indexed content matched. Ask for clearer terms or use INDEX.md/tags.md only if fallback navigation is required; do not scan the repo."
+		return []string{}, []RecommendedSection{}, "No indexed content matched. Ask for clearer terms or use INDEX.md, NOTES.md, and tags.md only if fallback navigation is required; do not scan the repo."
 	}
-	if opts.Kind == KindSource || !hasKind(results, KindWiki) {
-		paths := balancedBestPaths(results, KindSource, queryTerms)
-		return paths, recommendedSectionsForPaths(results, paths, KindSource, queryTerms), "Read these source sections/files directly. Do not scan the repo unless they are insufficient."
+	kind := preferredRecommendationKind(results, opts.Kind)
+	paths := balancedBestPaths(results, kind, queryTerms)
+	sections := recommendedSectionsForPaths(results, paths, kind, queryTerms)
+	switch kind {
+	case KindWiki:
+		return paths, sections, "Read recommended_sections from the top wiki pages first. Do not scan the repo unless those are insufficient."
+	case KindNote:
+		return paths, sections, "Read these note sections first. Do not fall back to raw sources or scan the repo unless they are insufficient."
+	default:
+		return paths, sections, "Read these source sections/files directly. Do not scan the repo unless they are insufficient."
 	}
-	paths := balancedBestPaths(results, KindWiki, queryTerms)
-	return paths, recommendedSectionsForPaths(results, paths, KindWiki, queryTerms), "Read recommended_sections from the top wiki pages first. Do not scan the repo unless those are insufficient."
+}
+
+func preferredRecommendationKind(results []SearchResult, requested string) string {
+	if requested != "" && requested != KindAll {
+		return requested
+	}
+	for _, kind := range []string{KindWiki, KindNote, KindSource} {
+		if hasKind(results, kind) {
+			return kind
+		}
+	}
+	return KindSource
 }
 
 func hasKind(results []SearchResult, kind string) bool {

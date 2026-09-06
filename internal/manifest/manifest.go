@@ -44,7 +44,12 @@ func Generate(entries []Entry) (string, error) {
 }
 
 func EntriesForRepo(repo string) ([]Entry, error) {
-	files, err := brainfs.ReadMarkdownFiles(repo, brain.ManagedRoots())
+	return EntriesForRoots(repo, brain.ManagedRoots())
+}
+
+// EntriesForRoots supports verification and migration of older brain formats.
+func EntriesForRoots(repo string, roots []string) ([]Entry, error) {
+	files, err := brainfs.ReadMarkdownFiles(repo, roots)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +62,15 @@ func EntriesForRepo(repo string) ([]Entry, error) {
 
 func ForRepo(repo string) (string, error) {
 	entries, err := EntriesForRepo(repo)
+	if err != nil {
+		return "", err
+	}
+	return Generate(entries)
+}
+
+// ForRoots supports deterministic manifests for older brain formats.
+func ForRoots(repo string, roots []string) (string, error) {
+	entries, err := EntriesForRoots(repo, roots)
 	if err != nil {
 		return "", err
 	}

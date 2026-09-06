@@ -117,6 +117,9 @@ func CheckStatus(ctx context.Context, repo string) (Status, error) {
 }
 
 func ManifestMetadataForRepo(repo string) (map[string]string, error) {
+	if err := brain.RequireCurrent(repo); err != nil {
+		return nil, err
+	}
 	files, err := indexedFilesForRepo(repo)
 	if err != nil {
 		return nil, err
@@ -125,7 +128,7 @@ func ManifestMetadataForRepo(repo string) (map[string]string, error) {
 }
 
 func validateBrainForStatus(repo string) error {
-	return brain.ValidateRepo(repo)
+	return brain.RequireCurrent(repo)
 }
 
 func indexedFilesForRepo(repo string) ([]indexedFile, error) {

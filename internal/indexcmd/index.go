@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
 	"github.com/javiermolinar/lumbrera/internal/cmdutil"
 	"github.com/javiermolinar/lumbrera/internal/indexruntime"
@@ -45,6 +46,9 @@ func Run(args []string) error {
 		return nil
 	}
 
+	if err := brain.RequireCurrent(brainDir); err != nil {
+		return err
+	}
 	if _, err := searchindex.CheckStatus(ctx, brainDir); err != nil {
 		return err
 	}

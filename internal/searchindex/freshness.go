@@ -13,8 +13,8 @@ import (
 
 const modifiedDateLayout = "2006-01-02"
 
-// RepairMissingModifiedDates adds generated wiki modified_date frontmatter to
-// older wiki pages that predate the field. It intentionally repairs only the
+// RepairMissingModifiedDates adds generated managed-document modified_date
+// frontmatter to older pages that predate the field. It intentionally repairs only the
 // missing-field compatibility case; invalid frontmatter or invalid dates remain
 // errors for the caller to surface.
 func RepairMissingModifiedDates(repo, modifiedDate string) (bool, error) {
@@ -28,15 +28,19 @@ func RepairMissingModifiedDates(repo, modifiedDate string) (bool, error) {
 		if err != nil {
 			return err
 		}
-		meta, body, has, err := frontmatter.Split(content)
+		policy, ok := brain.PolicyForPath(file.RelPath)
+		if !ok || policy.Storage != brain.StorageManagedMarkdown {
+			return fmt.Errorf("%s does not resolve to a managed content policy", file.RelPath)
+		}
+		meta, body, has, err := frontmatter.SplitForPolicy(content, policy)
 		if err != nil {
 			return fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", file.RelPath, err)
 		}
-		if !has || meta.Lumbrera.Kind != KindWiki || strings.TrimSpace(meta.Lumbrera.ModifiedDate) != "" {
+		if !has || strings.TrimSpace(meta.Lumbrera.ModifiedDate) != "" {
 			return nil
 		}
 		meta.Lumbrera.ModifiedDate = modifiedDate
-		updated, err := frontmatter.Attach(meta, body)
+		updated, err := frontmatter.AttachForPolicy(meta, policy, body)
 		if err != nil {
 			return err
 		}

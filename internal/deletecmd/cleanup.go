@@ -1,191 +1,105 @@
 package deletecmd
 
 import (
-	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 )
 
-// cleanSourceFromWiki removes a source from a wiki ref:
-// 1. Strips inline [source: ...] citations referencing the source
-// 2. Removes the source from frontmatter sources
-// 3. Regenerates the ## Sources section
-func cleanSourceFromWiki(ref wikiRef, sourcePath string) (wikiRef, error) {
-	body := stripSourceCitations(ref.body, ref.relPath, sourcePath)
-	sources := removeFromSlice(ref.meta.Lumbrera.Sources, sourcePath)
-
+// cleanEvidenceFromManaged removes one evidence path, strips matching inline
+// citations, and regenerates policy-controlled metadata and the Sources section.
+func cleanEvidenceFromManaged(ref managedRef, evidencePath string) (managedRef, error) {
+	body, err := md.RemoveEvidenceCitations(ref.body, ref.relPath, evidencePath)
+	if err != nil {
+		return ref, err
+	}
+	evidence := removeFromSlice(ref.meta.Lumbrera.Sources, evidencePath)
 	body = md.RemoveSourcesSection(body)
-	if len(sources) > 0 {
-		body = md.AppendSourcesSection(body, ref.relPath, sources)
-	}
 
-	// Re-analyze to get updated links.
-	analysis, err := md.AnalyzeWithOptions(ref.relPath, body, md.AnalyzeOptions{SourceCitations: true})
+	analysis, err := md.AnalyzeWithOptions(ref.relPath, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(ref.policy.Kind)})
 	if err != nil {
 		return ref, err
 	}
-
-	// Merge explicit sources with any remaining citations.
-	citationPaths := referencePaths(analysis.SourceCitations)
-	allSources := mergePaths(sources, citationPaths)
-
-	links := filterWikiLinks(analysis.Links)
+	evidence = mergePaths(evidence, referencePaths(analysis.SourceCitations))
+	if len(evidence) > 0 {
+		body = md.AppendSourcesSection(body, ref.relPath, evidence)
+	} else {
+		body = strings.TrimRight(body, "\n") + "\n"
+	}
 
 	updated := ref
 	updated.body = body
-	updated.meta.Lumbrera.Sources = allSources
-	updated.meta.Lumbrera.Links = links
+	updated.meta.Lumbrera.Sources = evidence
+	updated.meta.Lumbrera.Links = filterManagedLinks(analysis.Links)
 	updated.meta.Lumbrera.ModifiedDate = time.Now().Format("2006-01-02")
 	return updated, nil
 }
 
-// cleanWikiLinkFromWiki removes all markdown links pointing to wikiPath from
-// the ref's body, unwrapping [text](link) → text.
-func cleanWikiLinkFromWiki(ref wikiRef, wikiPath string) (wikiRef, error) {
-	body := unwrapLinksToPath(ref.body, ref.relPath, wikiPath)
-
-	// Re-analyze to get updated links.
-	analysis, err := md.AnalyzeWithOptions(ref.relPath, body, md.AnalyzeOptions{SourceCitations: true})
+// cleanOrdinaryLinkFromManaged unwraps ordinary Markdown links to targetPath.
+func cleanOrdinaryLinkFromManaged(ref managedRef, targetPath string) (managedRef, error) {
+	body, err := md.UnwrapLinksToPath(ref.body, ref.relPath, targetPath)
+	if err != nil {
+		return ref, err
+	}
+	analysis, err := md.AnalyzeWithOptions(ref.relPath, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(ref.policy.Kind)})
 	if err != nil {
 		return ref, err
 	}
 
-	links := filterWikiLinks(analysis.Links)
-
 	updated := ref
 	updated.body = body
-	updated.meta.Lumbrera.Links = links
+	updated.meta.Lumbrera.Links = filterManagedLinks(analysis.Links)
 	updated.meta.Lumbrera.ModifiedDate = time.Now().Format("2006-01-02")
 	return updated, nil
 }
 
-// cleanAssetFromWiki removes all markdown image embeds and links pointing to
-// assetPath from the ref's body. Image embeds ![alt](path) are removed entirely.
-// Regular links [text](path) are also removed entirely (bare asset filenames
-// have no value as prose). The LLM decides whether surrounding prose needs
-// rewriting afterward.
-func cleanAssetFromWiki(ref wikiRef, assetPath string) (wikiRef, error) {
-	body := stripAssetReferences(ref.body, ref.relPath, assetPath)
-
-	// Re-analyze to get updated links.
-	analysis, err := md.AnalyzeWithOptions(ref.relPath, body, md.AnalyzeOptions{SourceCitations: true})
+// cleanAssetFromManaged removes image embeds and regular links to an asset.
+// Removing an asset never removes the managed document itself.
+func cleanAssetFromManaged(ref managedRef, assetPath string) (managedRef, error) {
+	body, err := md.RemoveLinksAndImagesToPath(ref.body, ref.relPath, assetPath)
+	if err != nil {
+		return ref, err
+	}
+	analysis, err := md.AnalyzeWithOptions(ref.relPath, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(ref.policy.Kind)})
 	if err != nil {
 		return ref, err
 	}
 
-	links := filterWikiLinks(analysis.Links)
-
 	updated := ref
 	updated.body = body
-	updated.meta.Lumbrera.Links = links
+	updated.meta.Lumbrera.Links = filterManagedLinks(analysis.Links)
 	updated.meta.Lumbrera.ModifiedDate = time.Now().Format("2006-01-02")
 	return updated, nil
 }
 
-// stripAssetReferences removes ![alt](asset-path) and [text](asset-path) from body.
-func stripAssetReferences(body, fromPath, assetPath string) string {
-	relLink := md.RelativeLink(fromPath, assetPath)
-	candidates := []string{relLink, assetPath}
-
-	for _, candidate := range candidates {
-		escaped := regexp.QuoteMeta(candidate)
-		// Remove image embeds: ![alt](path) or ![alt](path#anchor)
-		imgPattern := fmt.Sprintf(`!\[[^\]]*\]\(%s(?:#[^\)]*)?\.?\)`, escaped)
-		imgRe := regexp.MustCompile(imgPattern)
-		body = imgRe.ReplaceAllString(body, "")
-
-		// Remove regular links: [text](path) or [text](path#anchor)
-		linkPattern := fmt.Sprintf(`\[[^\]]*\]\(%s(?:#[^\)]*)?\.?\)`, escaped)
-		linkRe := regexp.MustCompile(linkPattern)
-		body = linkRe.ReplaceAllString(body, "")
-	}
-
-	body = collapseSpaces(body)
-	return body
-}
-
-// stripSourceCitations removes [source: <relative-path-to-sourcePath>] and
-// [source: <relative-path-to-sourcePath>#anchor] from body text.
-// It matches all relative path forms that resolve to sourcePath from the
-// wiki document's location.
-func stripSourceCitations(body, fromPath, sourcePath string) string {
-	// Build possible relative paths from the wiki doc to the source.
-	relLink := md.RelativeLink(fromPath, sourcePath)
-	candidates := []string{relLink, sourcePath}
-
-	for _, candidate := range candidates {
-		// Escape for regex and build pattern matching the citation with optional anchor.
-		escaped := regexp.QuoteMeta(candidate)
-		// Match [source: <path>] and [source: <path>#anchor]
-		pattern := fmt.Sprintf(`\[source:\s*%s(?:#[^\]]*?)?\]`, escaped)
-		re := regexp.MustCompile("(?i)" + pattern)
-		body = re.ReplaceAllString(body, "")
-	}
-
-	// Clean up leftover double spaces from removed citations.
-	body = collapseSpaces(body)
-	return body
-}
-
-// unwrapLinksToPath replaces [text](relative-link-to-wikiPath) with just text.
-func unwrapLinksToPath(body, fromPath, wikiPath string) string {
-	relLink := md.RelativeLink(fromPath, wikiPath)
-	candidates := []string{relLink, wikiPath}
-
-	for _, candidate := range candidates {
-		escaped := regexp.QuoteMeta(candidate)
-		// Match [text](path) and [text](path#anchor)
-		pattern := fmt.Sprintf(`\[([^\]]*)\]\(%s(?:#[^\)]*)?\)`, escaped)
-		re := regexp.MustCompile(pattern)
-		body = re.ReplaceAllString(body, "$1")
-	}
-
-	return body
-}
-
-// collapseSpaces replaces runs of multiple spaces with a single space, and
-// trims trailing whitespace on each line.
-func collapseSpaces(body string) string {
-	lines := strings.Split(body, "\n")
-	multiSpace := regexp.MustCompile(`  +`)
-	for i, line := range lines {
-		lines[i] = strings.TrimRight(multiSpace.ReplaceAllString(line, " "), " ")
-	}
-	return strings.Join(lines, "\n")
-}
-
-// filterWikiLinks returns only paths starting with "wiki/".
-func filterWikiLinks(links []string) []string {
+func filterManagedLinks(links []string) []string {
 	var out []string
 	for _, link := range links {
-		if strings.HasPrefix(link, "wiki/") {
+		if brain.IsManagedPath(link) {
 			out = append(out, link)
 		}
 	}
 	return mergePaths(out)
 }
 
-// mergePaths deduplicates and sorts paths.
 func mergePaths(groups ...[]string) []string {
 	seen := map[string]struct{}{}
 	var out []string
 	for _, group := range groups {
-		for _, p := range group {
-			p = strings.TrimSpace(p)
-			if p == "" {
+		for _, value := range group {
+			value = strings.TrimSpace(value)
+			if value == "" {
 				continue
 			}
-			if _, ok := seen[p]; ok {
+			if _, exists := seen[value]; exists {
 				continue
 			}
-			seen[p] = struct{}{}
-			out = append(out, p)
+			seen[value] = struct{}{}
+			out = append(out, value)
 		}
 	}
-	// Sort for determinism.
 	sortStrings(out)
 	return out
 }

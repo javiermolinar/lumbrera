@@ -20,15 +20,16 @@ type Heading struct {
 }
 
 type Analysis struct {
-	FirstH1           string
-	HasSourcesSection bool
-	Sources           []string
-	Links             []string
-	Headings          []Heading
-	Anchors           []string
-	LinkReferences    []Reference
-	SourceReferences  []Reference
-	SourceCitations   []Reference
+	FirstH1                 string
+	HasSourcesSection       bool
+	Sources                 []string
+	Links                   []string
+	Headings                []Heading
+	Anchors                 []string
+	LinkReferences          []Reference
+	SourceReferences        []Reference
+	SourceCitations         []Reference
+	HasSourceCitationSyntax bool
 }
 
 type AnalyzeOptions struct {
@@ -89,6 +90,24 @@ func AnalyzeWithOptions(repoRelativePath, body string, opts AnalyzeOptions) (Ana
 				}
 			}
 			return ast.WalkSkipChildren, nil
+		case *ast.Image:
+			if !entering {
+				return ast.WalkContinue, nil
+			}
+			if opts.IgnoreLinks {
+				return ast.WalkSkipChildren, nil
+			}
+			ref, ok, err := NormalizeReference(repoRelativePath, string(n.Destination))
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			if ok {
+				analysis.LinkReferences = append(analysis.LinkReferences, ref)
+				if !isSelfAnchorReference(repoRelativePath, ref) {
+					analysis.Links = append(analysis.Links, ref.Path)
+				}
+			}
+			return ast.WalkSkipChildren, nil
 		case *ast.CodeSpan:
 			if entering {
 				return ast.WalkSkipChildren, nil
@@ -97,7 +116,11 @@ func AnalyzeWithOptions(repoRelativePath, body string, opts AnalyzeOptions) (Ana
 			if !entering || inSources || !opts.SourceCitations {
 				return ast.WalkContinue, nil
 			}
-			refs, err := sourceCitationReferences(repoRelativePath, paragraphCitationText(n, source))
+			citationText := paragraphCitationText(n, source)
+			if hasSourceCitationSyntax(citationText) {
+				analysis.HasSourceCitationSyntax = true
+			}
+			refs, err := sourceCitationReferences(repoRelativePath, citationText)
 			if err != nil {
 				return ast.WalkStop, err
 			}

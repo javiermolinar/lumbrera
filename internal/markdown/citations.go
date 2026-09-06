@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/yuin/goldmark/ast"
 )
 
@@ -30,6 +31,15 @@ func appendCitationText(b *strings.Builder, node ast.Node, source []byte) {
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 		appendCitationText(b, child, source)
 	}
+}
+
+func hasSourceCitationSyntax(text string) bool {
+	for _, match := range sourceCitationPattern.FindAllStringSubmatchIndex(text, -1) {
+		if len(match) >= 4 && !citationIsLinkLabel(text, match[1]) {
+			return true
+		}
+	}
+	return false
 }
 
 func sourceCitationReferences(fromPath, text string) ([]Reference, error) {
@@ -64,9 +74,13 @@ func citationIsLinkLabel(text string, citationEnd int) bool {
 
 func looksLikeSourceCitationDestination(destination string) bool {
 	destination = strings.TrimSpace(destination)
-	return strings.HasPrefix(destination, "#") ||
-		strings.HasPrefix(destination, "./") ||
-		strings.HasPrefix(destination, "../") ||
-		strings.HasPrefix(destination, "sources/") ||
-		strings.HasPrefix(destination, "wiki/")
+	if strings.HasPrefix(destination, "#") || strings.HasPrefix(destination, "./") || strings.HasPrefix(destination, "../") {
+		return true
+	}
+	for _, root := range brain.ContentDirs() {
+		if strings.HasPrefix(destination, root+"/") {
+			return true
+		}
+	}
+	return false
 }

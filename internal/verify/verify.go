@@ -16,10 +16,10 @@ type Options struct {
 }
 
 // Run performs the user-facing verify command behavior, including the legacy
-// repair step for wiki documents that predate generated IDs.
+// repair step for managed documents that predate generated IDs.
 // When opts.Fix is true, stale generated files are regenerated in place.
 func Run(repo string, opts Options) error {
-	if err := brain.ValidateRepo(repo); err != nil {
+	if err := brain.RequireCurrent(repo); err != nil {
 		return err
 	}
 	if err := ValidatePathPolicy(repo); err != nil {
@@ -50,32 +50,60 @@ func Run(repo string, opts Options) error {
 // files. Commands that only need a precondition should call Check instead of
 // Run.
 func Check(repo string, opts Options) error {
-	if err := brain.ValidateRepo(repo); err != nil {
-		return err
-	}
-	if err := ValidatePathPolicy(repo); err != nil {
-		return err
-	}
-	if err := ValidateDocuments(repo); err != nil {
-		return err
-	}
-	_ = opts
-	return VerifyGeneratedFiles(repo)
+	return CheckVersion(repo, brain.Version, opts)
 }
 
-func VerifyGeneratedFiles(repo string) error {
-	files, err := generate.FilesForRepo(repo)
+// CheckVersion validates one supported closed brain contract. Older versions
+// are exposed for migration preflight; normal commands use Check.
+func CheckVersion(repo, version string, opts Options) error {
+	actual, err := brain.RepoVersion(repo)
 	if err != nil {
 		return err
 	}
-	checks := map[string]string{
+	if actual != version {
+		return fmt.Errorf("brain marker is %s; expected %s", actual, version)
+	}
+	policies, err := policiesForVersion(version)
+	if err != nil {
+		return err
+	}
+	if err := validatePathPolicyForPolicies(repo, policies); err != nil {
+		return err
+	}
+	managed, err := managedPoliciesForVersion(version)
+	if err != nil {
+		return err
+	}
+	if err := validateDocumentsForPolicies(repo, managed, version == brain.Version); err != nil {
+		return err
+	}
+	_ = opts
+	return VerifyGeneratedFilesForVersion(repo, version)
+}
+
+func VerifyGeneratedFiles(repo string) error {
+	return VerifyGeneratedFilesForVersion(repo, brain.Version)
+}
+
+func VerifyGeneratedFilesForVersion(repo, version string) error {
+	files, err := generate.FilesForRepoVersion(repo, version)
+	if err != nil {
+		return err
+	}
+	allContent := map[string]string{
 		brain.IndexPath:        files.Index,
 		brain.SourcesIndexPath: files.SourcesIndex,
+		brain.NotesIndexPath:   files.NotesIndex,
 		brain.AssetsIndexPath:  files.AssetsIndex,
 		brain.BrainSumPath:     files.BrainSum,
 		brain.TagsPath:         files.Tags,
 	}
-	for rel, want := range checks {
+	paths, err := generate.GeneratedPathsForVersion(version)
+	if err != nil {
+		return err
+	}
+	for _, rel := range paths {
+		want := allContent[rel]
 		got, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
 		if err != nil {
 			return fmt.Errorf("generated file %s is missing: %w", rel, err)

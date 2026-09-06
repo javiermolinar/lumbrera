@@ -14,7 +14,7 @@ func TestPolicyForPath(t *testing.T) {
 		{"wiki/design/spec.md", KindWiki, true},
 		{"assets/diagram.png", KindAsset, true},
 		{"assets/diagrams/arch.png", KindAsset, true},
-		{"notes/topic.md", "", false},
+		{"notes/topic.md", KindNote, true},
 		{"sources", "", false},
 		{"wiki", "", false},
 		{"wiki/", "", false},
@@ -43,14 +43,14 @@ func TestKindForPath(t *testing.T) {
 	if got := KindForPath("assets/diagram.png"); got != string(KindAsset) {
 		t.Fatalf("KindForPath assets = %q", got)
 	}
-	if got := KindForPath("notes/other.md"); got != "" {
-		t.Fatalf("KindForPath unknown = %q", got)
+	if got := KindForPath("notes/other.md"); got != string(KindNote) {
+		t.Fatalf("KindForPath notes = %q", got)
 	}
 }
 
 func TestContentDirList(t *testing.T) {
 	got := ContentDirList()
-	want := "sources/, wiki/, or assets/"
+	want := "sources/, notes/, wiki/, or assets/"
 	if got != want {
 		t.Fatalf("ContentDirList() = %q, want %q", got, want)
 	}
@@ -58,7 +58,7 @@ func TestContentDirList(t *testing.T) {
 
 func TestContentDirs(t *testing.T) {
 	dirs := ContentDirs()
-	if len(dirs) != 3 || dirs[0] != "sources" || dirs[1] != "wiki" || dirs[2] != "assets" {
+	if len(dirs) != 4 || dirs[0] != "sources" || dirs[1] != "notes" || dirs[2] != "wiki" || dirs[3] != "assets" {
 		t.Fatalf("ContentDirs() = %v", dirs)
 	}
 }
@@ -88,26 +88,34 @@ func TestEveryRootHasExactlyOnePolicy(t *testing.T) {
 			t.Fatalf("PolicyForPath(%s/doc) = (%+v, %v)", policy.Root, byPath, ok)
 		}
 	}
-	if len(seenRoots) != 3 {
-		t.Fatalf("got %d policies, want 3", len(seenRoots))
+	if len(seenRoots) != 4 {
+		t.Fatalf("got %d policies, want 4", len(seenRoots))
 	}
 }
 
 func TestManagedAndSearchRoots(t *testing.T) {
-	if got := ManagedRoots(); len(got) != 1 || got[0] != "wiki" {
-		t.Fatalf("ManagedRoots() = %v, want [wiki]", got)
+	if got := ManagedRoots(); len(got) != 2 || got[0] != "notes" || got[1] != "wiki" {
+		t.Fatalf("ManagedRoots() = %v, want [notes wiki]", got)
 	}
-	if got := SearchRoots(); len(got) != 2 || got[0] != "sources" || got[1] != "wiki" {
-		t.Fatalf("SearchRoots() = %v, want [sources wiki]", got)
+	if got := SearchRoots(); len(got) != 3 || got[0] != "sources" || got[1] != "notes" || got[2] != "wiki" {
+		t.Fatalf("SearchRoots() = %v, want [sources notes wiki]", got)
+	}
+	if got := RequiredRoots(); len(got) != 4 || got[0] != "sources" || got[1] != "notes" || got[2] != "wiki" || got[3] != "assets" {
+		t.Fatalf("RequiredRoots() = %v", got)
+	}
+	for kind, want := range map[Kind]string{KindWiki: IndexPath, KindSource: SourcesIndexPath, KindNote: NotesIndexPath, KindAsset: AssetsIndexPath} {
+		if got, ok := CatalogPathForKind(kind); !ok || got != want {
+			t.Fatalf("CatalogPathForKind(%q) = (%q, %v), want %q", kind, got, ok, want)
+		}
 	}
 
 	managed := ManagedPolicies()
-	if len(managed) != 1 || managed[0].Kind != KindWiki {
-		t.Fatalf("ManagedPolicies() = %+v, want wiki", managed)
+	if len(managed) != 2 || managed[0].Kind != KindNote || managed[1].Kind != KindWiki {
+		t.Fatalf("ManagedPolicies() = %+v, want note then wiki", managed)
 	}
 	markdown := MarkdownPolicies()
-	if len(markdown) != 2 || markdown[0].Kind != KindSource || markdown[1].Kind != KindWiki {
-		t.Fatalf("MarkdownPolicies() = %+v, want source then wiki", markdown)
+	if len(markdown) != 3 || markdown[0].Kind != KindSource || markdown[1].Kind != KindNote || markdown[2].Kind != KindWiki {
+		t.Fatalf("MarkdownPolicies() = %+v, want source, note, then wiki", markdown)
 	}
 }
 
@@ -117,6 +125,7 @@ func TestEvidencePolicy(t *testing.T) {
 		want bool
 	}{
 		{KindSource, false},
+		{KindNote, false},
 		{KindWiki, true},
 		{KindAsset, false},
 	} {
@@ -132,6 +141,9 @@ func TestEvidencePolicy(t *testing.T) {
 	if !CanUseAsEvidence(KindWiki, KindSource) {
 		t.Fatal("wiki should accept source evidence")
 	}
+	if !CanUseAsEvidence(KindWiki, KindNote) {
+		t.Fatal("wiki should accept note evidence")
+	}
 	if CanUseAsEvidence(KindWiki, KindWiki) {
 		t.Fatal("wiki should not accept wiki evidence")
 	}
@@ -141,40 +153,46 @@ func TestEvidencePolicy(t *testing.T) {
 	if CanUseAsEvidence(KindSource, KindSource) {
 		t.Fatal("source should not accept evidence")
 	}
+	if CanUseAsEvidence(KindNote, KindSource) {
+		t.Fatal("note should not accept evidence")
+	}
 	if CanUseAsEvidence(KindAsset, KindSource) {
 		t.Fatal("asset should not accept evidence")
 	}
 }
 
 func TestManagedAndEvidenceHelpers(t *testing.T) {
-	if !IsManagedKind(KindWiki) || !IsManagedPath("wiki/topic.md") {
-		t.Fatal("wiki should be managed")
+	if !IsManagedKind(KindWiki) || !IsManagedPath("wiki/topic.md") || !IsManagedKind(KindNote) || !IsManagedPath("notes/topic.md") {
+		t.Fatal("wiki and notes should be managed")
 	}
-	if IsManagedKind(KindSource) || IsManagedKind(KindAsset) || IsManagedKind("note") {
-		t.Fatal("only wiki should be managed")
+	if IsManagedKind(KindSource) || IsManagedKind(KindAsset) {
+		t.Fatal("source and asset must not be managed")
 	}
-	if IsManagedPath("sources/raw.md") || IsManagedPath("assets/diagram.png") || IsManagedPath("notes/topic.md") {
+	if IsManagedPath("sources/raw.md") || IsManagedPath("assets/diagram.png") {
 		t.Fatal("non-managed paths must fail IsManagedPath")
 	}
 	if !AcceptsEvidence(KindWiki) {
 		t.Fatal("wiki should accept evidence")
 	}
-	if AcceptsEvidence(KindSource) || AcceptsEvidence(KindAsset) || AcceptsEvidence("note") {
+	if AcceptsEvidence(KindSource) || AcceptsEvidence(KindAsset) || AcceptsEvidence(KindNote) {
 		t.Fatal("only wiki should accept evidence")
 	}
 }
 
 func TestUnknownKindsAndRootsFailClosed(t *testing.T) {
-	if _, ok := PolicyForKind("note"); ok {
-		t.Fatal("unknown kind note should fail closed")
+	if _, ok := PolicyForKind("memo"); ok {
+		t.Fatal("unknown kind memo should fail closed")
 	}
 	if _, ok := PolicyForKind(""); ok {
 		t.Fatal("empty kind should fail closed")
 	}
-	if _, ok := PolicyForPath("notes/topic.md"); ok {
-		t.Fatal("notes/ should fail closed")
+	if _, ok := PolicyForPath("memos/topic.md"); ok {
+		t.Fatal("memos/ should fail closed")
 	}
-	if CanUseAsEvidence("note", KindSource) {
+	if _, ok := CatalogPathForKind("memo"); ok {
+		t.Fatal("unknown kind memo should not have a catalog")
+	}
+	if CanUseAsEvidence("memo", KindSource) {
 		t.Fatal("unknown document kind should not accept evidence")
 	}
 }
@@ -191,7 +209,7 @@ func TestPolicyCopiesDoNotMutateTable(t *testing.T) {
 	if !ok {
 		t.Fatal("missing wiki policy after mutation")
 	}
-	if again.Root != "wiki" || len(again.EvidenceKinds) != 1 || again.EvidenceKinds[0] != KindSource {
+	if again.Root != "wiki" || len(again.EvidenceKinds) != 2 || again.EvidenceKinds[0] != KindSource || again.EvidenceKinds[1] != KindNote {
 		t.Fatalf("policy table mutated: %+v", again)
 	}
 }

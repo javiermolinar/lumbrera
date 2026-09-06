@@ -6,6 +6,7 @@ import (
 
 const (
 	KindWiki   = "wiki"
+	KindNote   = "note"
 	KindSource = "source"
 
 	TierCanonical = "canonical"

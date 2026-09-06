@@ -51,10 +51,10 @@ const (
 	candidateOlderRelevanceTopPairs = 100
 	staleRiskMinimumDays            = 30
 
-	stubPageMaxBodyLines         = 15
-	tagAnomalyMinWikiPages       = 3
-	tagAnomalyBroadRatio         = 0.40
-	sourceCoverageGapMaxReasons  = 5
+	stubPageMaxBodyLines          = 15
+	tagAnomalyMinManagedDocuments = 3
+	tagAnomalyBroadRatio          = 0.40
+	sourceCoverageGapMaxReasons   = 5
 )
 
 // CandidateOptions controls deterministic health/consolidation candidate
@@ -138,22 +138,22 @@ func HealthCandidates(ctx context.Context, db *sql.DB, opts CandidateOptions) (C
 		return CandidateResponse{}, err
 	}
 
-	wikiDocs := candidateDocumentsByKind(docsByPath, KindWiki)
+	managedDocs := candidateManagedDocuments(docsByPath)
 	sourceDocs := candidateDocumentsByKind(docsByPath, KindSource)
-	termDF := candidateTermDocumentFrequency(wikiDocs)
-	tagDF := candidateTagDocumentFrequency(wikiDocs)
-	sourceDF := candidateSourceDocumentFrequency(wikiDocs)
+	termDF := candidateTermDocumentFrequency(managedDocs)
+	tagDF := candidateTagDocumentFrequency(managedDocs)
+	sourceDF := candidateSourceDocumentFrequency(managedDocs)
 
 	var candidates []Candidate
 	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindDuplicates || normalized.Kind == CandidateKindLinks {
-		pairCandidates, err := pagePairCandidates(ctx, db, wikiDocs, termDF, tagDF, sourceDF)
+		pairCandidates, err := pagePairCandidates(ctx, db, managedDocs, termDF, tagDF, sourceDF)
 		if err != nil {
 			return CandidateResponse{}, err
 		}
 		candidates = append(candidates, pairCandidates...)
 	}
 	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindOrphans {
-		candidates = append(candidates, pageConnectivityCandidates(wikiDocs, termDF, normalized.Kind)...)
+		candidates = append(candidates, pageConnectivityCandidates(managedDocs, termDF, normalized.Kind)...)
 	}
 	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindSources {
 		candidates = append(candidates, sourceCoverageCandidates(sourceDocs, docsByPath)...)
@@ -164,10 +164,10 @@ func HealthCandidates(ctx context.Context, db *sql.DB, opts CandidateOptions) (C
 		candidates = append(candidates, gapCandidates...)
 	}
 	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindStubs {
-		candidates = append(candidates, stubPageCandidates(wikiDocs)...)
+		candidates = append(candidates, stubPageCandidates(managedDocs)...)
 	}
 	if normalized.Kind == CandidateKindAll || normalized.Kind == CandidateKindTags {
-		candidates = append(candidates, tagAnomalyCandidates(wikiDocs, tagDF)...)
+		candidates = append(candidates, tagAnomalyCandidates(managedDocs, tagDF)...)
 	}
 
 	candidates = filterCandidates(candidates, normalized)

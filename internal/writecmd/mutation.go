@@ -131,7 +131,17 @@ func applyManagedMutation(repo, absTarget, target string, policy brain.ContentPo
 		return err
 	}
 
-	analysis, err := md.AnalyzeWithOptions(target, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(policy.Kind)})
+	acceptsEvidence := brain.AcceptsEvidence(policy.Kind)
+	if !acceptsEvidence {
+		citationAnalysis, err := md.AnalyzeWithOptions(target, body, md.AnalyzeOptions{SourceCitations: true})
+		if err != nil {
+			return fmt.Errorf("%s documents must not contain source citations: %w", policy.Kind, err)
+		}
+		if citationAnalysis.HasSourceCitationSyntax {
+			return fmt.Errorf("%s documents must not contain source citations", policy.Kind)
+		}
+	}
+	analysis, err := md.AnalyzeWithOptions(target, body, md.AnalyzeOptions{SourceCitations: acceptsEvidence})
 	if err != nil {
 		return err
 	}
@@ -144,7 +154,7 @@ func applyManagedMutation(repo, absTarget, target string, policy brain.ContentPo
 	// Evidence is cumulative by design. Replacing body content does not imply
 	// removing document-level provenance; removal requires an explicit graph mutation.
 	evidence := mergePaths(existingEvidence, suppliedEvidence, citationEvidence)
-	if !brain.AcceptsEvidence(policy.Kind) && len(evidence) > 0 {
+	if !acceptsEvidence && len(evidence) > 0 {
 		return fmt.Errorf("%s documents must not contain evidence", policy.Kind)
 	}
 	if policy.RequiresEvidence && len(evidence) == 0 {

@@ -6,7 +6,7 @@ This repository contains the Lumbrera CLI implementation. It is not itself a Lum
 
 Agents working in this implementation repo may edit source files directly when implementing the CLI.
 
-The Lumbrera brain contract applies to repositories managed by the Lumbrera CLI, not automatically to this implementation repo. In a Lumbrera brain repo, mutations should go through `lumbrera write`; in this implementation repo, normal coding-agent file edits are allowed.
+The Lumbrera brain contract applies to repositories managed by the Lumbrera CLI, not automatically to this implementation repo. In a Lumbrera brain repo, mutations should go through `lumbrera write` or `lumbrera delete`; in this implementation repo, normal coding-agent file edits are allowed.
 
 ## Product-facing agent instructions
 
@@ -22,7 +22,7 @@ When testing `lumbrera init`, `lumbrera verify`, or `lumbrera write`, use a temp
 
 ## Generated brain files
 
-Files such as `INDEX.md`, `CHANGELOG.md`, `BRAIN.sum`, `sources/`, `wiki/`, and `.brain/` are generated or managed inside Lumbrera brain repos. They should not be created at the root of this implementation repo except as intentional test fixtures.
+Files such as `INDEX.md`, `NOTES.md`, `CHANGELOG.md`, `BRAIN.sum`, `sources/`, `notes/`, `wiki/`, and `.brain/` are generated or managed inside Lumbrera brain repos. They should not be created at the root of this implementation repo except as intentional test fixtures.
 
 ## Skills
 

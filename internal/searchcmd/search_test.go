@@ -2,12 +2,14 @@ package searchcmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/javiermolinar/lumbrera/internal/braintest"
+	"github.com/javiermolinar/lumbrera/internal/deletecmd"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
 )
 
@@ -97,6 +99,105 @@ func TestSearchFiltersAndFlagsAfterQuery(t *testing.T) {
 	}
 	if payload.Results[0].Kind != searchindex.KindWiki || !strings.HasPrefix(payload.Results[0].Path, "wiki/") {
 		t.Fatalf("unexpected filtered result: %#v", payload.Results[0])
+	}
+}
+
+func TestSearchNotesDefaultFilterRankingAndFreshness(t *testing.T) {
+	repo := braintest.InitBrain(t)
+	var bootstrap bytes.Buffer
+	if err := RunWithOutput([]string{"bootstrapunique", "--brain", repo}, &bootstrap); err != nil {
+		t.Fatalf("build initial search index: %v", err)
+	}
+	status, err := searchindex.CheckStatus(context.Background(), repo)
+	if err != nil || status.State != searchindex.StatusFresh {
+		t.Fatalf("initial search status = %#v err=%v, want fresh", status, err)
+	}
+
+	braintest.RunWrite(t, repo, "# Observation\n\nLifecycleunique initial behavior.\n", "notes/observation.md",
+		"--title", "Observation", "--summary", "Lifecycleunique first-party behavior.", "--tag", "operations",
+		"--reason", "Record observation", "--actor", "test")
+	status, err = searchindex.CheckStatus(context.Background(), repo)
+	if err != nil || status.State != searchindex.StatusStale {
+		t.Fatalf("status after note create = %#v err=%v, want stale", status, err)
+	}
+	braintest.RunWrite(t, repo, "# Guidance\n\nLifecycleunique canonical guidance.\n", "wiki/guidance.md",
+		"--title", "Guidance", "--summary", "Lifecycleunique canonical guidance.", "--tag", "operations", "--source", "notes/observation.md",
+		"--reason", "Create guidance", "--actor", "test")
+
+	var initial bytes.Buffer
+	if err := RunWithOutput([]string{"lifecycleunique", "--brain", repo}, &initial); err != nil {
+		t.Fatalf("default note search: %v", err)
+	}
+	payload := decodeOutput(t, initial.Bytes())
+	if len(payload.Results) < 2 || payload.Results[0].Kind != searchindex.KindWiki {
+		t.Fatalf("default search did not rank wiki first: %#v", payload.Results)
+	}
+	foundNote := false
+	for _, result := range payload.Results {
+		if result.Kind == searchindex.KindNote {
+			foundNote = true
+		}
+	}
+	if !foundNote {
+		t.Fatalf("default search omitted note: %#v", payload.Results)
+	}
+
+	var filtered bytes.Buffer
+	if err := RunWithOutput([]string{"lifecycleunique", "--brain", repo, "--kind", "note"}, &filtered); err != nil {
+		t.Fatalf("note-filtered search: %v", err)
+	}
+	for _, result := range decodeOutput(t, filtered.Bytes()).Results {
+		if result.Kind != searchindex.KindNote {
+			t.Fatalf("--kind note returned %#v", result)
+		}
+	}
+
+	var byEvidence bytes.Buffer
+	if err := RunWithOutput([]string{"lifecycleunique", "--brain", repo, "--source", "notes/observation.md"}, &byEvidence); err != nil {
+		t.Fatalf("note evidence filter: %v", err)
+	}
+	evidenceResults := decodeOutput(t, byEvidence.Bytes()).Results
+	if len(evidenceResults) == 0 {
+		t.Fatal("note evidence filter returned no wiki result")
+	}
+	for _, result := range evidenceResults {
+		if result.Kind != searchindex.KindWiki || result.Path != "wiki/guidance.md" {
+			t.Fatalf("note evidence filter returned %#v", result)
+		}
+	}
+
+	braintest.RunWrite(t, repo, "# Observation\n\nFreshnoteunique updated behavior.\n", "notes/observation.md",
+		"--reason", "Update observation", "--actor", "test")
+	status, err = searchindex.CheckStatus(context.Background(), repo)
+	if err != nil || status.State != searchindex.StatusStale {
+		t.Fatalf("status after note update = %#v err=%v, want stale", status, err)
+	}
+	var updated bytes.Buffer
+	if err := RunWithOutput([]string{"freshnoteunique", "--brain", repo, "--kind", "note"}, &updated); err != nil {
+		t.Fatalf("search updated note: %v", err)
+	}
+	if results := decodeOutput(t, updated.Bytes()).Results; len(results) == 0 || results[0].Path != "notes/observation.md" {
+		t.Fatalf("updated note not indexed: %#v", results)
+	}
+
+	if err := deletecmd.Run([]string{"wiki/guidance.md", "--brain", repo, "--reason", "Remove guidance", "--actor", "test"}); err != nil {
+		t.Fatalf("delete guidance: %v", err)
+	}
+	if err := deletecmd.Run([]string{"notes/observation.md", "--brain", repo, "--reason", "Remove observation", "--actor", "test"}); err != nil {
+		t.Fatalf("delete note: %v", err)
+	}
+	status, err = searchindex.CheckStatus(context.Background(), repo)
+	if err != nil || status.State != searchindex.StatusStale {
+		t.Fatalf("status after note delete = %#v err=%v, want stale", status, err)
+	}
+	var deleted bytes.Buffer
+	if err := RunWithOutput([]string{"freshnoteunique", "--brain", repo}, &deleted); err != nil {
+		t.Fatalf("search after note delete: %v", err)
+	}
+	for _, result := range decodeOutput(t, deleted.Bytes()).Results {
+		if result.Path == "notes/observation.md" {
+			t.Fatalf("deleted note remained indexed: %#v", result)
+		}
 	}
 }
 

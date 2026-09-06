@@ -106,6 +106,48 @@ func TestExtractMarkdownRecordsWithFactsWikiRelationships(t *testing.T) {
 	}
 }
 
+func TestExtractMarkdownRecordsNote(t *testing.T) {
+	id := "doc_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	meta := frontmatter.NewWithID(
+		id,
+		KindNote,
+		"Failed downscale",
+		"The ring retained tenant ownership.",
+		[]string{"operations"},
+		nil,
+		[]string{"wiki/downscaling.md"},
+	)
+	meta.Lumbrera.ModifiedDate = "2026-05-06"
+	content, err := frontmatter.Attach(meta, "# Failed downscale\n\nSee [Downscaling](../wiki/downscaling.md) and [Related note](./related.md).\n")
+	if err != nil {
+		t.Fatalf("attach note frontmatter: %v", err)
+	}
+
+	doc, sections, links, citations, tags, err := ExtractMarkdownRecordsWithFacts("notes/failed-downscale.md", []byte(content))
+	if err != nil {
+		t.Fatalf("extract note records: %v", err)
+	}
+	if doc.ID != id || doc.Kind != KindNote || doc.Path != "notes/failed-downscale.md" || doc.SourcesJSON != "[]" {
+		t.Fatalf("unexpected note document: %#v", doc)
+	}
+	if len(sections) != 1 || len(links) != 2 {
+		t.Fatalf("unexpected note sections/links: sections=%#v links=%#v", sections, links)
+	}
+	kindsByPath := map[string]string{}
+	for _, link := range links {
+		kindsByPath[link.ToPath] = link.Kind
+	}
+	if kindsByPath["wiki/downscaling.md"] != KindWiki || kindsByPath["notes/related.md"] != KindNote {
+		t.Fatalf("unexpected note link kinds: %#v", kindsByPath)
+	}
+	if len(citations) != 0 {
+		t.Fatalf("note produced evidence citations: %#v", citations)
+	}
+	if len(tags) != 1 || tags[0].Tag != "operations" {
+		t.Fatalf("unexpected note tags: %#v", tags)
+	}
+}
+
 func TestExtractMarkdownRecordsSource(t *testing.T) {
 	content := []byte("# Raw Source\n\nRaw body with an unresolved [local link](../missing.md).\n\n## Evidence\n\nEvidence body.\n")
 

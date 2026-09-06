@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 const (
-	brainVersion        = "lumbrera-brain-v2"
+	brainVersion        = brain.Version
 	markerPath          = "VERSION"
 	agentsPath          = "AGENTS.md"
 	claudePath          = "CLAUDE.md"
@@ -20,35 +22,44 @@ const (
 )
 
 var scaffoldDirs = []string{
-	"sources",
 	"sources/design",
 	"sources/reference",
-	"wiki",
 	"wiki/design",
-	"assets",
 	".agents/skills/lumbrera-ingest",
 	".agents/skills/lumbrera-query",
+	".agents/skills/lumbrera-note",
 	".agents/skills/lumbrera-health",
 	".agents/skills/lumbrera-delete",
 }
 
 var scaffoldFiles = map[string]string{
-	markerPath:      brainVersion + "\n",
-	"INDEX.md":      indexContent,
-	"SOURCES.md":    sourcesIndexContent,
-	"ASSETS.md":     assetsIndexContent,
-	"CHANGELOG.md":  changelogContent,
-	"BRAIN.sum":     brainSumContent,
-	"tags.md":       tagsContent,
-	agentsPath:      agentsContent,
+	markerPath:                                brainVersion + "\n",
+	mustCatalogPath(brain.KindWiki):           indexContent,
+	mustCatalogPath(brain.KindSource):         sourcesIndexContent,
+	mustCatalogPath(brain.KindNote):           notesIndexContent,
+	mustCatalogPath(brain.KindAsset):          assetsIndexContent,
+	brain.ChangelogPath:                       changelogContent,
+	brain.BrainSumPath:                        brainSumContent,
+	brain.TagsPath:                            tagsContent,
+	agentsPath:                                agentsContent,
 	".agents/skills/lumbrera-ingest/SKILL.md": ingestSkillContent,
 	".agents/skills/lumbrera-query/SKILL.md":  querySkillContent,
+	".agents/skills/lumbrera-note/SKILL.md":   noteSkillContent,
 	".agents/skills/lumbrera-health/SKILL.md": healthSkillContent,
 	".agents/skills/lumbrera-delete/SKILL.md": deleteSkillContent,
 }
 
+func mustCatalogPath(kind brain.Kind) string {
+	path, ok := brain.CatalogPathForKind(kind)
+	if !ok {
+		panic(fmt.Sprintf("missing catalog path for %s", kind))
+	}
+	return path
+}
+
 func ensureScaffold(repo string) error {
-	for _, rel := range scaffoldDirs {
+	dirs := append(brain.RequiredRoots(), scaffoldDirs...)
+	for _, rel := range dirs {
 		if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(rel)), 0o755); err != nil {
 			return err
 		}

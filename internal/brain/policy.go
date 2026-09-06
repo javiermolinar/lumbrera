@@ -6,6 +6,7 @@ type Kind string
 
 const (
 	KindSource Kind = "source"
+	KindNote   Kind = "note"
 	KindWiki   Kind = "wiki"
 	KindAsset  Kind = "asset"
 )
@@ -43,13 +44,23 @@ var contentPolicies = []ContentPolicy{
 		CatalogPath:      SourcesIndexPath,
 	},
 	{
+		Root:             "notes",
+		Kind:             KindNote,
+		Storage:          StorageManagedMarkdown,
+		RequiredRoot:     true,
+		Mutable:          true,
+		RequiresEvidence: false,
+		ProvidesEvidence: true,
+		CatalogPath:      NotesIndexPath,
+	},
+	{
 		Root:             "wiki",
 		Kind:             KindWiki,
 		Storage:          StorageManagedMarkdown,
 		RequiredRoot:     true,
 		Mutable:          true,
 		RequiresEvidence: true,
-		EvidenceKinds:    []Kind{KindSource},
+		EvidenceKinds:    []Kind{KindSource, KindNote},
 		ProvidesEvidence: false,
 		CatalogPath:      IndexPath,
 	},
@@ -125,6 +136,24 @@ func SearchRoots() []string {
 	return rootsOf(MarkdownPolicies())
 }
 
+func RequiredRoots() []string {
+	var required []ContentPolicy
+	for _, policy := range contentPolicies {
+		if policy.RequiredRoot {
+			required = append(required, policy)
+		}
+	}
+	return rootsOf(required)
+}
+
+func CatalogPathForKind(kind Kind) (string, bool) {
+	policy, ok := PolicyForKind(kind)
+	if !ok || policy.CatalogPath == "" {
+		return "", false
+	}
+	return policy.CatalogPath, true
+}
+
 func IsManagedKind(kind Kind) bool {
 	policy, ok := PolicyForKind(kind)
 	return ok && policy.Storage == StorageManagedMarkdown
@@ -179,7 +208,7 @@ func ContentDirs() []string {
 }
 
 // ContentDirList returns a human-readable list of content directories for error
-// messages, e.g. "sources/ or wiki/" or "sources/, wiki/, or assets/".
+// messages, e.g. "sources/ or wiki/" or "sources/, notes/, wiki/, or assets/".
 func ContentDirList() string {
 	dirs := ContentDirs()
 	for i := range dirs {

@@ -2,9 +2,9 @@
 
 ## Context
 
-Lumbrera now has deterministic SQLite/FTS5 search and a first-cut health workflow. The CLI includes deterministic indexing under `.brain/search.sqlite`, `lumbrera index`, JSON `lumbrera search`, and read-only `lumbrera health` candidates for LLM review. Relationship facts (`document_links`, `document_citations`, and `document_tags`) and generated wiki `modified_date` metadata support explainable health candidates.
+Lumbrera now has deterministic SQLite/FTS5 search and a first-cut health workflow. The CLI includes deterministic indexing under `.brain/search.sqlite`, `lumbrera index`, JSON `lumbrera search`, and read-only `lumbrera health` candidates for LLM review. Relationship facts (`document_links`, `document_citations`, and `document_tags`) and generated wiki/note `modified_date` metadata support explainable health candidates.
 
-This file is the active tracker for consolidated v2+ backlog ideas. Completed implementation plans should be folded into this file and removed.
+This file is the active tracker for consolidated v3+ backlog ideas. Completed implementation plans should be folded into this file and removed.
 
 ## Priority backlog
 
@@ -27,7 +27,7 @@ This file is the active tracker for consolidated v2+ backlog ideas. Completed im
 - Consolidation moves: defer a dedicated move command until there is evidence that identity-preserving renames are needed. A true move would need multi-file atomicity, document ID preservation, and link rewriting.
 - Cluster detection: intentionally deferred; first-cut health remains single-page and page-pair candidates.
 
-## Consolidated deferred v2+ backlog
+## Consolidated deferred v3+ backlog
 
 ### Search and index evolution
 

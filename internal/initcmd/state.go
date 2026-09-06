@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 type initState int
@@ -19,6 +21,9 @@ func detectInitState(repo string) (initState, error) {
 	marker, err := readMarker(repo)
 	if err != nil {
 		return 0, err
+	}
+	if marker == brain.VersionV1 || marker == brain.VersionV2 {
+		return 0, fmt.Errorf("brain is %s; run \"lumbrera migrate\" to upgrade to %s", marker, brainVersion)
 	}
 	if marker != "" && marker != brainVersion {
 		return 0, fmt.Errorf("refusing to initialize %s: unsupported Lumbrera marker %q", repo, marker)

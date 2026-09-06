@@ -15,7 +15,11 @@ import (
 // directories is ignored — the brain repo may contain arbitrary non-Lumbrera
 // files such as .github/, README.md, CI configs, etc.
 func ValidatePathPolicy(repo string) error {
-	for _, policy := range brain.Policies() {
+	return validatePathPolicyForPolicies(repo, brain.Policies())
+}
+
+func validatePathPolicyForPolicies(repo string, policies []brain.ContentPolicy) error {
+	for _, policy := range policies {
 		if err := validateContentDir(repo, policy); err != nil {
 			return err
 		}

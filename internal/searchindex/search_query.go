@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
 )
@@ -129,8 +130,11 @@ func normalizeSearchOptions(opts SearchOptions) (SearchOptions, error) {
 	if opts.Kind == "" {
 		opts.Kind = KindAll
 	}
-	if opts.Kind != KindAll && opts.Kind != KindWiki && opts.Kind != KindSource {
-		return SearchOptions{}, fmt.Errorf("invalid search kind %q", opts.Kind)
+	if opts.Kind != KindAll {
+		policy, ok := brain.PolicyForKind(brain.Kind(opts.Kind))
+		if !ok || !policy.IsMarkdown() {
+			return SearchOptions{}, fmt.Errorf("invalid search kind %q", opts.Kind)
+		}
 	}
 	prefix, err := normalizePathPrefix(opts.PathPrefix)
 	if err != nil {
@@ -188,8 +192,9 @@ func normalizeSearchSources(sources []string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid search source %q: %w", source, err)
 		}
-		if kind != KindSource {
-			return nil, fmt.Errorf("search source %q must be under sources/", source)
+		policy, ok := brain.PolicyForKind(brain.Kind(kind))
+		if !ok || !policy.ProvidesEvidence {
+			return nil, fmt.Errorf("search source %q must identify source or note evidence", source)
 		}
 		out = append(out, normalized)
 	}

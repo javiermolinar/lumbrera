@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/frontmatter"
 	md "github.com/javiermolinar/lumbrera/internal/markdown"
 	"github.com/javiermolinar/lumbrera/internal/pathpolicy"
@@ -23,19 +24,23 @@ func ExtractMarkdownRecords(relPath string, content []byte) (Document, []Section
 // ExtractMarkdownRecordsWithFacts converts one canonical Markdown file into
 // normalized document, section, and relationship fact records.
 func ExtractMarkdownRecordsWithFacts(relPath string, content []byte) (Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, error) {
-	normalizedPath, kind, err := pathpolicy.NormalizeTargetPath(relPath)
+	normalizedPath, _, err := pathpolicy.NormalizeTargetPath(relPath)
 	if err != nil {
 		return Document{}, nil, nil, nil, nil, fmt.Errorf("normalize indexed path: %w", err)
 	}
+	policy, ok := brain.PolicyForPath(normalizedPath)
+	if !ok {
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("unsupported indexed path %q", normalizedPath)
+	}
 
-	switch kind {
-	case KindWiki:
-		return extractWikiRecords(normalizedPath, content)
-	case KindSource:
+	switch policy.Storage {
+	case brain.StorageManagedMarkdown:
+		return extractManagedRecords(normalizedPath, content, policy)
+	case brain.StorageRawMarkdown:
 		doc, sections, err := extractSourceRecords(normalizedPath, content)
 		return doc, sections, nil, nil, nil, err
 	default:
-		return Document{}, nil, nil, nil, nil, fmt.Errorf("unsupported indexed path kind %q", kind)
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("unsupported indexed path kind %q", policy.Kind)
 	}
 }
 
@@ -62,23 +67,23 @@ var KnownTierDirectories = map[string]string{
 	"reference": TierReference,
 }
 
-func extractWikiRecords(relPath string, content []byte) (Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, error) {
-	meta, body, hasFrontmatter, err := frontmatter.Split(content)
+func extractManagedRecords(relPath string, content []byte, policy brain.ContentPolicy) (Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, error) {
+	meta, body, hasFrontmatter, err := frontmatter.SplitForPolicy(content, policy)
 	if err != nil {
 		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s has invalid Lumbrera frontmatter: %w", relPath, err)
 	}
 	if !hasFrontmatter {
 		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s is missing Lumbrera-generated frontmatter", relPath)
 	}
-	if meta.Lumbrera.Kind != KindWiki {
-		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, KindWiki)
+	if meta.Lumbrera.Kind != string(policy.Kind) {
+		return Document{}, nil, nil, nil, nil, fmt.Errorf("%s frontmatter kind is %q; expected %q", relPath, meta.Lumbrera.Kind, policy.Kind)
 	}
 
 	sections, err := markdownSections(meta.Lumbrera.ID, body)
 	if err != nil {
 		return Document{}, nil, nil, nil, nil, fmt.Errorf("split %s into sections: %w", relPath, err)
 	}
-	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: true})
+	analysis, err := md.AnalyzeWithOptions(relPath, body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(policy.Kind)})
 	if err != nil {
 		return Document{}, nil, nil, nil, nil, fmt.Errorf("analyze %s relationships: %w", relPath, err)
 	}
@@ -89,7 +94,7 @@ func extractWikiRecords(relPath string, content []byte) (Document, []Section, []
 	doc := Document{
 		ID:           meta.Lumbrera.ID,
 		Path:         relPath,
-		Kind:         KindWiki,
+		Kind:         string(policy.Kind),
 		Tier:         TierForPath(relPath),
 		Title:        strings.TrimSpace(meta.Title),
 		Summary:      strings.TrimSpace(meta.Summary),
@@ -103,7 +108,7 @@ func extractWikiRecords(relPath string, content []byte) (Document, []Section, []
 		Hash:         contentHash(content),
 		SizeBytes:    int64(len(content)),
 	}
-	links, citations, tags := wikiRelationshipFacts(doc, meta, analysis)
+	links, citations, tags := managedRelationshipFacts(doc, policy, meta, analysis)
 	return doc, sections, links, citations, tags, nil
 }
 
@@ -170,7 +175,7 @@ func sourceDocumentID(relPath string) string {
 	return "source_" + hex.EncodeToString(sum[:16])
 }
 
-func wikiRelationshipFacts(doc Document, meta frontmatter.Document, analysis md.Analysis) ([]DocumentLink, []DocumentCitation, []DocumentTag) {
+func managedRelationshipFacts(doc Document, policy brain.ContentPolicy, meta frontmatter.Document, analysis md.Analysis) ([]DocumentLink, []DocumentCitation, []DocumentTag) {
 	links := make([]DocumentLink, 0, len(analysis.LinkReferences))
 	for _, ref := range analysis.LinkReferences {
 		if ref.Path == "" || ref.Path == doc.Path {
@@ -185,25 +190,28 @@ func wikiRelationshipFacts(doc Document, meta frontmatter.Document, analysis md.
 		})
 	}
 
-	citations := make([]DocumentCitation, 0, len(meta.Lumbrera.Sources)+len(analysis.SourceCitations))
-	for _, source := range uniqueSortedStrings(meta.Lumbrera.Sources) {
-		citations = append(citations, DocumentCitation{
-			DocumentID:   doc.ID,
-			WikiPath:     doc.Path,
-			SourcePath:   source,
-			CitationText: source,
-			CitationKind: "frontmatter_source",
-		})
-	}
-	for _, ref := range analysis.SourceCitations {
-		citations = append(citations, DocumentCitation{
-			DocumentID:   doc.ID,
-			WikiPath:     doc.Path,
-			SourcePath:   ref.Path,
-			SourceAnchor: ref.Anchor,
-			CitationText: ref.String(),
-			CitationKind: "inline_source",
-		})
+	var citations []DocumentCitation
+	if brain.AcceptsEvidence(policy.Kind) {
+		citations = make([]DocumentCitation, 0, len(meta.Lumbrera.Sources)+len(analysis.SourceCitations))
+		for _, source := range uniqueSortedStrings(meta.Lumbrera.Sources) {
+			citations = append(citations, DocumentCitation{
+				DocumentID:   doc.ID,
+				WikiPath:     doc.Path,
+				SourcePath:   source,
+				CitationText: source,
+				CitationKind: "frontmatter_source",
+			})
+		}
+		for _, ref := range analysis.SourceCitations {
+			citations = append(citations, DocumentCitation{
+				DocumentID:   doc.ID,
+				WikiPath:     doc.Path,
+				SourcePath:   ref.Path,
+				SourceAnchor: ref.Anchor,
+				CitationText: ref.String(),
+				CitationKind: "inline_source",
+			})
+		}
 	}
 
 	tags := make([]DocumentTag, 0, len(meta.Tags))

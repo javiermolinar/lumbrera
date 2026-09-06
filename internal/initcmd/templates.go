@@ -8,6 +8,9 @@ var indexContent string
 //go:embed templates/SOURCES.md
 var sourcesIndexContent string
 
+//go:embed templates/NOTES.md
+var notesIndexContent string
+
 //go:embed templates/ASSETS.md
 var assetsIndexContent string
 
@@ -28,6 +31,9 @@ var ingestSkillContent string
 
 //go:embed templates/skills/lumbrera-query/SKILL.md
 var querySkillContent string
+
+//go:embed templates/skills/lumbrera-note/SKILL.md
+var noteSkillContent string
 
 //go:embed templates/skills/lumbrera-health/SKILL.md
 var healthSkillContent string
