@@ -389,9 +389,78 @@ func TestHealthCandidatesSourceCoverageGapSkipsUncitedSources(t *testing.T) {
 	}
 }
 
+func TestHealthCandidatesIncludesNotesInManagedChecks(t *testing.T) {
+	db := openTestDB(t)
+	docs := []Document{
+		candidateWikiDoc("doc_tempo_wiki", "wiki/tempo-retention.md", "Tempo retention", "Canonical retention guidance.", `["tempo","retention"]`, `[]`, `[]`, "2026-05-06"),
+		candidateNoteDoc("doc_tempo_note", "notes/tempo-retention.md", "Tempo retention observation", "Observed retention behavior.", `["tempo","retention"]`, `[]`, "2026-01-01"),
+		candidateNoteDoc("doc_small_note", "notes/small.md", "Small observation", "Tiny.", `["singleton"]`, `[]`, "2026-05-06"),
+	}
+	sections := []Section{
+		{DocumentID: "doc_tempo_wiki", Ordinal: 1, Heading: "Tempo retention", Anchor: "tempo-retention", Level: 1, Body: "Tempo retention compaction behavior for trace blocks."},
+		{DocumentID: "doc_tempo_note", Ordinal: 1, Heading: "Tempo retention observation", Anchor: "tempo-retention-observation", Level: 1, Body: "Tempo retention compaction behavior for trace blocks."},
+		{DocumentID: "doc_small_note", Ordinal: 1, Heading: "Small observation", Anchor: "small-observation", Level: 1, Body: "Tiny note."},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "managed-notes"}); err != nil {
+		t.Fatalf("rebuild managed note fixture: %v", err)
+	}
+
+	duplicates, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindDuplicates, Limit: 10})
+	if err != nil {
+		t.Fatalf("note duplicate candidates: %v", err)
+	}
+	if len(duplicates.Candidates) == 0 {
+		t.Fatal("wiki/note duplicate candidate was not returned")
+	}
+	assertCandidatePages(t, duplicates.Candidates[0], []string{"notes/tempo-retention.md", "wiki/tempo-retention.md"})
+	assertCandidateReason(t, duplicates.Candidates[0], ReasonOlderRelevantPage, "notes/tempo-retention.md")
+
+	links, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindLinks, Limit: 10})
+	if err != nil {
+		t.Fatalf("note link candidates: %v", err)
+	}
+	foundLinkCandidate := false
+	for _, candidate := range links.Candidates {
+		if len(candidate.Pages) == 2 && candidate.Pages[0] == "notes/tempo-retention.md" && candidate.Pages[1] == "wiki/tempo-retention.md" {
+			foundLinkCandidate = true
+		}
+	}
+	if !foundLinkCandidate {
+		t.Fatalf("wiki/note missing-link candidate was not returned: %#v", links.Candidates)
+	}
+
+	stubs, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindStubs, Limit: 10})
+	if err != nil {
+		t.Fatalf("note stub candidates: %v", err)
+	}
+	foundNote := false
+	for _, candidate := range stubs.Candidates {
+		if len(candidate.Pages) == 1 && candidate.Pages[0] == "notes/small.md" {
+			foundNote = true
+		}
+	}
+	if !foundNote {
+		t.Fatalf("note stub missing: %#v", stubs.Candidates)
+	}
+
+	tags, err := HealthCandidates(context.Background(), db, CandidateOptions{Kind: CandidateKindTags, Limit: 10})
+	if err != nil {
+		t.Fatalf("note tag candidates: %v", err)
+	}
+	foundTag := false
+	for _, candidate := range tags.Candidates {
+		if len(candidate.Pages) == 1 && candidate.Pages[0] == "notes/small.md" {
+			foundTag = true
+		}
+	}
+	if !foundTag {
+		t.Fatalf("note tag anomaly missing: %#v", tags.Candidates)
+	}
+}
+
 func TestHealthCandidatesTagAnomalySkipsSmallBrains(t *testing.T) {
 	db := openTestDB(t)
-	// Only 2 wiki pages — below the minimum threshold of 3.
+	// Only 2 managed documents — below the minimum threshold of 3.
 	docs := []Document{
 		candidateWikiDoc("doc_x", "wiki/x.md", "X", "X.", `["only"]`, `[]`, `[]`, "2026-05-06"),
 		candidateWikiDoc("doc_y", "wiki/y.md", "Y", "Y.", `["other"]`, `[]`, `[]`, "2026-05-06"),
@@ -422,6 +491,22 @@ func candidateWikiDoc(id, pathValue, title, summary, tagsJSON, sourcesJSON, link
 		Summary:      summary,
 		TagsJSON:     tagsJSON,
 		SourcesJSON:  sourcesJSON,
+		LinksJSON:    linksJSON,
+		ModifiedDate: modifiedDate,
+		Hash:         "hash-" + id,
+		SizeBytes:    100,
+	}
+}
+
+func candidateNoteDoc(id, pathValue, title, summary, tagsJSON, linksJSON, modifiedDate string) Document {
+	return Document{
+		ID:           id,
+		Path:         pathValue,
+		Kind:         KindNote,
+		Title:        title,
+		Summary:      summary,
+		TagsJSON:     tagsJSON,
+		SourcesJSON:  `[]`,
 		LinksJSON:    linksJSON,
 		ModifiedDate: modifiedDate,
 		Hash:         "hash-" + id,

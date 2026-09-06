@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
 	"github.com/javiermolinar/lumbrera/internal/indexruntime"
 	"github.com/javiermolinar/lumbrera/internal/searchindex"
@@ -28,6 +29,9 @@ func RunWithOutput(args []string, out io.Writer) error {
 
 	brainDir, err := cliutil.ResolveBrain(opts.Brain)
 	if err != nil {
+		return err
+	}
+	if err := brain.RequireCurrent(brainDir); err != nil {
 		return err
 	}
 

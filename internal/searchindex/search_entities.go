@@ -118,8 +118,24 @@ func betterResult(left, right SearchResult) bool {
 	if left.LexicalScore != right.LexicalScore {
 		return left.LexicalScore < right.LexicalScore
 	}
+	if kindRank(left.Kind) != kindRank(right.Kind) {
+		return kindRank(left.Kind) < kindRank(right.Kind)
+	}
 	if left.Path != right.Path {
 		return left.Path < right.Path
 	}
 	return left.SectionID < right.SectionID
+}
+
+func kindRank(kind string) int {
+	switch kind {
+	case KindWiki:
+		return 0
+	case KindNote:
+		return 1
+	case KindSource:
+		return 2
+	default:
+		return 3
+	}
 }

@@ -86,17 +86,21 @@ SELECT
 	sources_json,
 	links_json,
 	snippet,
-	(lexical_score - CASE kind WHEN 'wiki' THEN abs(lexical_score) * %.2f ELSE 0 END + heading_penalty) + (abs(lexical_score) * tier_penalty) AS score,
+	(lexical_score - CASE kind
+		WHEN 'wiki' THEN abs(lexical_score) * %.3f
+		WHEN 'note' THEN abs(lexical_score) * %.3f
+		ELSE 0
+	END + heading_penalty) + (abs(lexical_score) * tier_penalty) AS score,
 	lexical_score
 FROM matches
 ORDER BY
 	score ASC,
 	lexical_score ASC,
-	CASE kind WHEN 'wiki' THEN 0 ELSE 1 END,
+	CASE kind WHEN 'wiki' THEN 0 WHEN 'note' THEN 1 ELSE 2 END,
 	path ASC,
 	ordinal ASC,
 	section_id ASC
-LIMIT ?`, strings.Join(where, " AND "), wikiScoreBoost)
+LIMIT ?`, strings.Join(where, " AND "), wikiScoreBoost, noteScoreBoost)
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

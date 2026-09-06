@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 func pageConnectivityCandidates(docs []*candidateDocument, termDF map[string]int, kind string) []Candidate {
@@ -68,7 +70,7 @@ func stubPageCandidates(docs []*candidateDocument) []Candidate {
 
 func tagAnomalyCandidates(docs []*candidateDocument, tagDF map[string]int) []Candidate {
 	totalDocs := len(docs)
-	if totalDocs < tagAnomalyMinWikiPages {
+	if totalDocs < tagAnomalyMinManagedDocuments {
 		return nil
 	}
 	broadThreshold := int(tagAnomalyBroadRatio * float64(totalDocs))
@@ -249,7 +251,8 @@ func sourceCoverageCandidates(sourceDocs []*candidateDocument, docsByPath map[st
 	for _, source := range sourceDocs {
 		cited := false
 		for _, doc := range docsByPath {
-			if doc.Kind != KindWiki {
+			documentPolicy, ok := brain.PolicyForKind(brain.Kind(doc.Kind))
+			if !ok || !brain.CanUseAsEvidence(documentPolicy.Kind, brain.KindSource) {
 				continue
 			}
 			if stringSliceContainsExact(doc.Sources, source.Path) {

@@ -33,7 +33,7 @@ type indexedFile struct {
 // RebuildBrain rebuilds the disposable SQLite search cache for a Lumbrera brain
 // repository from canonical Markdown files.
 func RebuildBrain(ctx context.Context, repo string) error {
-	if err := brain.ValidateRepo(repo); err != nil {
+	if err := brain.RequireCurrent(repo); err != nil {
 		return err
 	}
 
@@ -97,6 +97,9 @@ func RecordsForRepo(repo string) ([]Document, []Section, map[string]string, erro
 // facts, and manifest metadata from all indexed Markdown files in a Lumbrera
 // brain repository.
 func RecordsForRepoWithFacts(repo string) ([]Document, []Section, []DocumentLink, []DocumentCitation, []DocumentTag, map[string]string, error) {
+	if err := brain.RequireCurrent(repo); err != nil {
+		return nil, nil, nil, nil, nil, nil, err
+	}
 	markdownFiles, err := brainfs.ReadMarkdownFiles(repo, brain.SearchRoots())
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err

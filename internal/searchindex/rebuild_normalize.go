@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 func normalizeDocuments(input []Document) ([]Document, map[string]Document, map[string]Document, error) {
@@ -58,22 +60,27 @@ func validateDocument(doc Document) error {
 	if doc.Path == "" {
 		return fmt.Errorf("search index document %q path is required", doc.ID)
 	}
-	if doc.Kind != KindWiki && doc.Kind != KindSource {
+	policy, ok := brain.PolicyForKind(brain.Kind(doc.Kind))
+	if !ok || !policy.IsMarkdown() {
 		return fmt.Errorf("search index document %q has invalid kind %q", doc.ID, doc.Kind)
+	}
+	pathPolicy, ok := brain.PolicyForPath(doc.Path)
+	if !ok || pathPolicy.Kind != policy.Kind {
+		return fmt.Errorf("search index document %q path %q does not match kind %q", doc.ID, doc.Path, doc.Kind)
 	}
 	if doc.Title == "" {
 		return fmt.Errorf("search index document %q title is required", doc.ID)
 	}
-	if doc.Kind == KindWiki {
+	if policy.Storage == brain.StorageManagedMarkdown {
 		if strings.TrimSpace(doc.ModifiedDate) == "" {
-			return fmt.Errorf("search index wiki document %q modified_date is required", doc.ID)
+			return fmt.Errorf("search index managed document %q modified_date is required", doc.ID)
 		}
 		if _, err := time.Parse(modifiedDateLayout, doc.ModifiedDate); err != nil {
-			return fmt.Errorf("search index wiki document %q modified_date %q must use YYYY-MM-DD", doc.ID, doc.ModifiedDate)
+			return fmt.Errorf("search index managed document %q modified_date %q must use YYYY-MM-DD", doc.ID, doc.ModifiedDate)
 		}
 	}
-	if doc.Kind == KindSource && doc.ModifiedDate != "" {
-		return fmt.Errorf("search index source document %q modified_date must be empty", doc.ID)
+	if policy.Storage == brain.StorageRawMarkdown && doc.ModifiedDate != "" {
+		return fmt.Errorf("search index raw document %q modified_date must be empty", doc.ID)
 	}
 	if doc.Hash == "" {
 		return fmt.Errorf("search index document %q hash is required", doc.ID)

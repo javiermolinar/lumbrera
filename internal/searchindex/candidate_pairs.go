@@ -99,14 +99,14 @@ func candidatePairTermAllowed(df, totalDocs int) bool {
 	return totalDocs > 0 && df*3 <= totalDocs
 }
 
-func pagePairCandidate(ctx context.Context, db *sql.DB, left, right *candidateDocument, totalWikiDocs int, termDF, tagDF, sourceDF map[string]int) (Candidate, bool, error) {
+func pagePairCandidate(ctx context.Context, db *sql.DB, left, right *candidateDocument, totalManagedDocs int, termDF, tagDF, sourceDF map[string]int) (Candidate, bool, error) {
 	sharedTags := intersectSortedStrings(left.Tags, right.Tags)
 	sharedSources := intersectSortedStrings(left.Sources, right.Sources)
-	lexical := lexicalOverlap(left.Terms, right.Terms, termDF, totalWikiDocs)
+	lexical := lexicalOverlap(left.Terms, right.Terms, termDF, totalManagedDocs)
 	linked := documentsLinked(left, right)
 
-	tagScore := sharedTagScore(sharedTags, tagDF, totalWikiDocs)
-	sourceScore := sharedSourceScore(sharedSources, sourceDF, totalWikiDocs)
+	tagScore := sharedTagScore(sharedTags, tagDF, totalManagedDocs)
+	sourceScore := sharedSourceScore(sharedSources, sourceDF, totalManagedDocs)
 	lexicalScore := math.Min(0.30, lexical.Score*1.5)
 	baseScore := tagScore + sourceScore + lexicalScore
 	sameEntity := candidateSamePrimaryEntity(left, right)
@@ -153,7 +153,7 @@ func pagePairCandidate(ctx context.Context, db *sql.DB, left, right *candidateDo
 		Pages:             []string{left.Path, right.Path},
 		Sources:           sharedSources,
 		Reasons:           reasons,
-		SuggestedQueries:  pairSuggestedQueries(left, right, sharedTags, sharedSources, lexical.Terms, termDF, totalWikiDocs),
+		SuggestedQueries:  pairSuggestedQueries(left, right, sharedTags, sharedSources, lexical.Terms, termDF, totalManagedDocs),
 		ReviewInstruction: reviewInstruction(candidateType),
 	}
 	return candidate, true, nil

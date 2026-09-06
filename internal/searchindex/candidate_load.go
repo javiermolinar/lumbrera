@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/javiermolinar/lumbrera/internal/brain"
 )
 
 func loadCandidateDocuments(ctx context.Context, db *sql.DB) (map[string]*candidateDocument, error) {
@@ -96,27 +98,27 @@ func loadCandidateCitations(ctx context.Context, db *sql.DB, docs map[string]*ca
 }
 
 func loadCandidateLinks(ctx context.Context, db *sql.DB, docs map[string]*candidateDocument) error {
-	rows, err := db.QueryContext(ctx, `SELECT DISTINCT from_path, to_path FROM document_links WHERE kind = 'wiki' ORDER BY from_path, to_path`)
+	rows, err := db.QueryContext(ctx, `SELECT DISTINCT from_path, to_path FROM document_links ORDER BY from_path, to_path`)
 	if err != nil {
-		return fmt.Errorf("read candidate wiki links: %w", err)
+		return fmt.Errorf("read candidate managed-document links: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var fromPath, toPath string
 		if err := rows.Scan(&fromPath, &toPath); err != nil {
-			return fmt.Errorf("scan candidate wiki link: %w", err)
+			return fmt.Errorf("scan candidate managed-document link: %w", err)
 		}
 		fromDoc := docs[fromPath]
 		toDoc := docs[toPath]
-		if fromDoc == nil || toDoc == nil || fromDoc.Kind != KindWiki || toDoc.Kind != KindWiki || fromPath == toPath {
+		if fromDoc == nil || toDoc == nil || !isManagedDocumentKind(fromDoc.Kind) || !isManagedDocumentKind(toDoc.Kind) || fromPath == toPath {
 			continue
 		}
 		fromDoc.Outgoing[toPath] = struct{}{}
 		toDoc.Incoming[fromPath] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate candidate wiki links: %w", err)
+		return fmt.Errorf("iterate candidate managed-document links: %w", err)
 	}
 	return nil
 }
@@ -174,6 +176,22 @@ func writeCandidateTermText(b *strings.Builder, text string) {
 		b.WriteByte(' ')
 	}
 	b.WriteString(text)
+}
+
+func candidateManagedDocuments(docsByPath map[string]*candidateDocument) []*candidateDocument {
+	docs := make([]*candidateDocument, 0, len(docsByPath))
+	for _, doc := range docsByPath {
+		if isManagedDocumentKind(doc.Kind) {
+			docs = append(docs, doc)
+		}
+	}
+	sort.Slice(docs, func(i, j int) bool { return docs[i].Path < docs[j].Path })
+	return docs
+}
+
+func isManagedDocumentKind(kind string) bool {
+	policy, ok := brain.PolicyForKind(brain.Kind(kind))
+	return ok && policy.Storage == brain.StorageManagedMarkdown
 }
 
 func candidateDocumentsByKind(docsByPath map[string]*candidateDocument, kind string) []*candidateDocument {
@@ -251,5 +269,5 @@ var candidateStopwords = map[string]bool{
 	"compact": true, "doc": true, "docs": true, "file": true, "files": true,
 	"generated": true, "generic": true, "index": true, "markdown": true, "may": true,
 	"must": true, "page": true, "pages": true, "section": true, "sections": true,
-	"source": true, "sources": true, "wiki": true,
+	"note": true, "notes": true, "source": true, "sources": true, "wiki": true,
 }

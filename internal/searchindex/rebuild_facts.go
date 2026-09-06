@@ -13,7 +13,8 @@ func relationshipFactsFromDocuments(documents []Document) ([]DocumentLink, []Doc
 	citations := []DocumentCitation{}
 	tags := []DocumentTag{}
 	for _, doc := range documents {
-		if doc.Kind != KindWiki {
+		policy, ok := brain.PolicyForKind(brain.Kind(doc.Kind))
+		if !ok || policy.Storage != brain.StorageManagedMarkdown {
 			continue
 		}
 		docTags, err := decodeStringArray(doc.TagsJSON)
@@ -28,14 +29,16 @@ func relationshipFactsFromDocuments(documents []Document) ([]DocumentLink, []Doc
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("decode sources for document %q: %w", doc.ID, err)
 		}
-		for _, source := range docSources {
-			citations = append(citations, DocumentCitation{
-				DocumentID:   doc.ID,
-				WikiPath:     doc.Path,
-				SourcePath:   source,
-				CitationText: source,
-				CitationKind: "frontmatter_source",
-			})
+		if brain.AcceptsEvidence(policy.Kind) {
+			for _, source := range docSources {
+				citations = append(citations, DocumentCitation{
+					DocumentID:   doc.ID,
+					WikiPath:     doc.Path,
+					SourcePath:   source,
+					CitationText: source,
+					CitationKind: "frontmatter_source",
+				})
+			}
 		}
 
 		docLinks, err := decodeStringArray(doc.LinksJSON)
@@ -88,8 +91,11 @@ func normalizeDocumentLinks(input []DocumentLink, docsByID, docsByPath map[strin
 		if links[i].Kind == "" {
 			links[i].Kind = kindForLinkedPath(links[i].ToPath)
 		}
-		if links[i].Kind != KindWiki && links[i].Kind != KindSource && links[i].Kind != "external" {
-			return nil, fmt.Errorf("document link from %s has invalid kind %q", links[i].FromPath, links[i].Kind)
+		if links[i].Kind != "external" {
+			policy, ok := brain.PolicyForKind(brain.Kind(links[i].Kind))
+			if !ok || !policy.IsMarkdown() {
+				return nil, fmt.Errorf("document link from %s has invalid kind %q", links[i].FromPath, links[i].Kind)
+			}
 		}
 	}
 	sort.Slice(links, func(i, j int) bool { return documentLinkLess(links[i], links[j]) })
@@ -110,8 +116,9 @@ func normalizeDocumentCitations(input []DocumentCitation, docsByID map[string]Do
 		if !ok {
 			return nil, fmt.Errorf("document citation references unknown document_id %q", citations[i].DocumentID)
 		}
-		if doc.Kind != KindWiki {
-			return nil, fmt.Errorf("document citation references non-wiki document %q", doc.ID)
+		documentPolicy, ok := brain.PolicyForKind(brain.Kind(doc.Kind))
+		if !ok || !brain.AcceptsEvidence(documentPolicy.Kind) {
+			return nil, fmt.Errorf("document citation references kind %q document %q that cannot use evidence", doc.Kind, doc.ID)
 		}
 		if citations[i].WikiPath == "" {
 			citations[i].WikiPath = doc.Path
@@ -119,7 +126,8 @@ func normalizeDocumentCitations(input []DocumentCitation, docsByID map[string]Do
 		if citations[i].WikiPath != doc.Path {
 			return nil, fmt.Errorf("document citation wiki_path %q does not match document %q path %q", citations[i].WikiPath, doc.ID, doc.Path)
 		}
-		if !strings.HasPrefix(citations[i].SourcePath, "sources/") {
+		evidencePolicy, ok := brain.PolicyForPath(citations[i].SourcePath)
+		if !ok || !brain.CanUseAsEvidence(documentPolicy.Kind, evidencePolicy.Kind) {
 			return nil, fmt.Errorf("document citation for %s has invalid source_path %q", citations[i].WikiPath, citations[i].SourcePath)
 		}
 		if citations[i].CitationKind != "frontmatter_source" && citations[i].CitationKind != "inline_source" {
@@ -143,8 +151,9 @@ func normalizeDocumentTags(input []DocumentTag, docsByID map[string]Document) ([
 		if !ok {
 			return nil, fmt.Errorf("document tag references unknown document_id %q", tags[i].DocumentID)
 		}
-		if doc.Kind != KindWiki {
-			return nil, fmt.Errorf("document tag references non-wiki document %q", doc.ID)
+		policy, ok := brain.PolicyForKind(brain.Kind(doc.Kind))
+		if !ok || policy.Storage != brain.StorageManagedMarkdown {
+			return nil, fmt.Errorf("document tag references non-managed document %q", doc.ID)
 		}
 		if tags[i].Path == "" {
 			tags[i].Path = doc.Path

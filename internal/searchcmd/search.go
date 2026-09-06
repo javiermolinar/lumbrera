@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/javiermolinar/lumbrera/internal/brain"
 	"github.com/javiermolinar/lumbrera/internal/cliutil"
 	"github.com/javiermolinar/lumbrera/internal/cmdutil"
 	"github.com/javiermolinar/lumbrera/internal/indexruntime"
@@ -89,6 +90,9 @@ func RunWithOutput(args []string, out io.Writer) error {
 
 	brainDir, err := cliutil.ResolveBrain(opts.Brain)
 	if err != nil {
+		return err
+	}
+	if err := brain.RequireCurrent(brainDir); err != nil {
 		return err
 	}
 
@@ -260,7 +264,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, `Search a Lumbrera brain with the local SQLite lexical index.
 
 Usage:
-  lumbrera search <query> [--brain <path>] [--limit <n>] [--kind all|wiki|source] [--path <prefix>] [--tag <tag>] [--source <path>] [--json]
+  lumbrera search <query> [--brain <path>] [--limit <n>] [--kind all|wiki|note|source] [--path <prefix>] [--tag <tag>] [--source <path>] [--json]
 
 Behavior:
   - output is JSON only in this version
@@ -273,9 +277,9 @@ Options:
   --brain <path>      target brain directory, defaults to the current directory
   --repo <path>       deprecated alias for --brain
   --limit <n>         max results, default 5, maximum 20
-  --kind <value>      restrict to all, wiki, or source; default all
+  --kind <value>      restrict to all, wiki, note, or source; default all
   --path <prefix>     restrict to a repo path prefix
-  --tag <tag>         restrict to wiki pages with an exact tag; repeatable
-  --source <path>     restrict to wiki pages citing an exact source path; repeatable
+  --tag <tag>         restrict to managed documents with an exact tag; repeatable
+  --source <path>     restrict to wiki pages citing an exact source or note path; repeatable
   --json              accepted for compatibility; output is always JSON`)
 }

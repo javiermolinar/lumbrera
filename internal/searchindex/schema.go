@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const CurrentSchemaVersion = 3
+const CurrentSchemaVersion = 4
 
 var schemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS meta(
@@ -19,7 +19,7 @@ var schemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS documents(
 		id TEXT PRIMARY KEY,
 		path TEXT UNIQUE NOT NULL,
-		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'source')),
+		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'note', 'source')),
 		tier TEXT NOT NULL DEFAULT 'canonical' CHECK(tier IN ('canonical', 'design', 'reference')),
 		title TEXT NOT NULL,
 		summary TEXT NOT NULL,
@@ -39,7 +39,7 @@ var schemaStatements = []string{
 		document_id TEXT NOT NULL,
 		ordinal INTEGER NOT NULL CHECK(ordinal >= 1),
 		path TEXT NOT NULL,
-		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'source')),
+		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'note', 'source')),
 		title TEXT NOT NULL,
 		summary TEXT NOT NULL,
 		tags_json TEXT NOT NULL,
@@ -66,7 +66,7 @@ var schemaStatements = []string{
 		to_document_id TEXT NOT NULL,
 		link_text TEXT NOT NULL,
 		source_section_id TEXT NOT NULL,
-		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'source', 'external')),
+		kind TEXT NOT NULL CHECK(kind IN ('wiki', 'note', 'source', 'external')),
 		FOREIGN KEY(from_document_id) REFERENCES documents(id) ON DELETE CASCADE
 	)`,
 	`CREATE TABLE IF NOT EXISTS document_citations(

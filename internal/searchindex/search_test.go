@@ -132,6 +132,76 @@ func TestSearchCapsResultSectionsPerDocument(t *testing.T) {
 	}
 }
 
+func TestSearchRanksWikiThenNoteThenSource(t *testing.T) {
+	db := openTestDB(t)
+	docs := []Document{
+		newTestDocument("doc_wiki_rank", "wiki/rank.md", KindWiki, "Ranking", "Rankunique guidance.", `["ranking"]`, "ranking"),
+		newTestDocument("doc_note_rank", "notes/rank.md", KindNote, "Ranking", "Rankunique observation.", `["ranking"]`, "ranking"),
+		newTestDocument("doc_source_rank", "sources/rank.md", KindSource, "Ranking", "", `[]`, ""),
+	}
+	sections := []Section{
+		{DocumentID: "doc_wiki_rank", Ordinal: 1, Heading: "Ranking", Anchor: "ranking", Level: 1, Body: "rankunique identical text"},
+		{DocumentID: "doc_note_rank", Ordinal: 1, Heading: "Ranking", Anchor: "ranking", Level: 1, Body: "rankunique identical text"},
+		{DocumentID: "doc_source_rank", Ordinal: 1, Heading: "Ranking", Anchor: "ranking", Level: 1, Body: "rankunique identical text"},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "rank-notes"}); err != nil {
+		t.Fatalf("rebuild ranking fixture: %v", err)
+	}
+
+	response, err := Search(context.Background(), db, "rankunique", SearchOptions{Limit: 10, Kind: KindAll})
+	if err != nil {
+		t.Fatalf("search ranking fixture: %v", err)
+	}
+	if len(response.Results) != 3 {
+		t.Fatalf("result count = %d, want 3: %#v", len(response.Results), response.Results)
+	}
+	for i, want := range []string{KindWiki, KindNote, KindSource} {
+		if response.Results[i].Kind != want {
+			t.Fatalf("result kind[%d] = %q, want %q: %#v", i, response.Results[i].Kind, want, response.Results)
+		}
+	}
+}
+
+func TestSearchRecommendsNoteWhenNoWikiMatches(t *testing.T) {
+	db := openTestDB(t)
+	docs := []Document{
+		newTestDocument("doc_note_only", "notes/observation.md", KindNote, "Observation", "Noteonlyunique behavior.", `["operations"]`, "operations"),
+		newTestDocument("doc_source_other", "sources/other.md", KindSource, "Other", "", `[]`, ""),
+	}
+	sections := []Section{
+		{DocumentID: "doc_note_only", Ordinal: 1, Heading: "Observation", Anchor: "observation", Level: 1, Body: "noteonlyunique behavior"},
+		{DocumentID: "doc_source_other", Ordinal: 1, Heading: "Other", Anchor: "other", Level: 1, Body: "noteonlyunique raw evidence"},
+	}
+	if err := RebuildRecords(context.Background(), db, docs, sections, map[string]string{"manifest_hash": "note-only"}); err != nil {
+		t.Fatalf("rebuild note fixture: %v", err)
+	}
+
+	response, err := Search(context.Background(), db, "noteonlyunique", SearchOptions{})
+	if err != nil {
+		t.Fatalf("search note fixture: %v", err)
+	}
+	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{"notes/observation.md"}, "note recommended read order")
+	if len(response.RecommendedSections) != 1 || response.RecommendedSections[0].Kind != KindNote {
+		t.Fatalf("note recommendation = %#v", response.RecommendedSections)
+	}
+	if !strings.Contains(response.StopRule, "note sections") {
+		t.Fatalf("note stop rule = %q", response.StopRule)
+	}
+	if len(response.Results[0].Sources) != 0 {
+		t.Fatalf("note result sources = %#v, want empty", response.Results[0].Sources)
+	}
+
+	filtered, err := Search(context.Background(), db, "noteonlyunique", SearchOptions{Kind: KindNote})
+	if err != nil {
+		t.Fatalf("note-filtered search: %v", err)
+	}
+	for _, result := range filtered.Results {
+		if result.Kind != KindNote {
+			t.Fatalf("note filter returned %#v", result)
+		}
+	}
+}
+
 func TestSearchStopwordsAndBooleanWordsAreSafe(t *testing.T) {
 	db := searchFixtureDB(t)
 
@@ -295,7 +365,7 @@ func TestSearchRecommendedReadOrderForNoResults(t *testing.T) {
 	}
 	assertStringSlicesEqual(t, response.RecommendedReadOrder, []string{}, "empty recommended read order")
 	assertRecommendedSectionTargets(t, response.RecommendedSections, []string{})
-	if response.StopRule != "No indexed content matched. Ask for clearer terms or use INDEX.md/tags.md only if fallback navigation is required; do not scan the repo." {
+	if response.StopRule != "No indexed content matched. Ask for clearer terms or use INDEX.md, NOTES.md, and tags.md only if fallback navigation is required; do not scan the repo." {
 		t.Fatalf("empty stop rule = %q", response.StopRule)
 	}
 }
@@ -303,7 +373,7 @@ func TestSearchRecommendedReadOrderForNoResults(t *testing.T) {
 func TestSearchRejectsInvalidOptions(t *testing.T) {
 	db := searchFixtureDB(t)
 
-	if _, err := Search(context.Background(), db, "tempo", SearchOptions{Kind: "note"}); err == nil {
+	if _, err := Search(context.Background(), db, "tempo", SearchOptions{Kind: "asset"}); err == nil {
 		t.Fatal("invalid kind search succeeded, want error")
 	}
 	if _, err := Search(context.Background(), db, "tempo", SearchOptions{PathPrefix: "../wiki"}); err == nil {
@@ -496,7 +566,7 @@ func newTestDocument(id, pathValue, kind, title, summary, tagsJSON, tagsText str
 		Hash:        "hash-" + id,
 		SizeBytes:   100,
 	}
-	if kind == KindWiki {
+	if kind == KindWiki || kind == KindNote {
 		doc.ModifiedDate = "2026-05-06"
 	}
 	return doc

@@ -9,7 +9,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, `Return deterministic Lumbrera health/consolidation review candidates.
 
 Usage:
-  lumbrera health [wiki/page.md|sources/source.md] [--brain <path>] [--path <prefix>] [--kind all|duplicates|links|sources|orphans|stubs|tags] [--limit <n>] [--json]
+  lumbrera health [wiki/page.md|notes/note.md|sources/source.md] [--brain <path>] [--path <prefix>] [--kind all|duplicates|links|sources|orphans|stubs|tags] [--limit <n>] [--json]
 
 Behavior:
   - candidates are deterministic review hints, not semantic drift diagnoses

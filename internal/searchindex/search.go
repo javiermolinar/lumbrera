@@ -13,6 +13,7 @@ const (
 	QueryModeAND                = "and"
 	QueryModeORFallback         = "or_fallback"
 	wikiScoreBoost              = 0.15
+	noteScoreBoost              = 0.075
 	maxSectionsPerDocument      = 3
 	maxRecommendedReadOrder     = 3
 	entityMismatchPenalty       = 15.0

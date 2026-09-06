@@ -75,7 +75,7 @@ func parseArgs(args []string) (options, error) {
 	}
 
 	if len(positional) > 1 {
-		return options{}, fmt.Errorf("health accepts at most one positional wiki/source path")
+		return options{}, fmt.Errorf("health accepts at most one positional content path")
 	}
 	if len(positional) == 1 {
 		if strings.TrimSpace(opts.PathPrefix) != "" {
