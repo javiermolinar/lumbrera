@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -81,19 +82,19 @@ func Run(args []string) (err error) {
 		return fmt.Errorf("cannot delete %s: file does not exist", target)
 	}
 
-	// Load all wiki references for cascade planning.
-	allRefs, err := loadWikiRefs(brainDir)
+	// Load every managed document before planning the complete cascade.
+	allRefs, err := loadManagedRefs(brainDir)
 	if err != nil {
 		return err
 	}
 
-	filesToDelete, wikiUpdates, err := planCascade(brainDir, target, kind, allRefs)
+	filesToDelete, managedUpdates, err := planCascade(brainDir, target, kind, allRefs)
 	if err != nil {
 		return err
 	}
 
 	// Build backup of all files we'll touch.
-	backup, err := newDeleteBackup(brainDir, filesToDelete, wikiUpdates)
+	backup, err := newDeleteBackup(brainDir, filesToDelete, managedUpdates)
 	if err != nil {
 		return err
 	}
@@ -113,9 +114,14 @@ func Run(args []string) (err error) {
 
 	mutated = true
 
-	// 1. Write updated wiki pages (those that lost a source or a link but survive).
-	for _, updated := range wikiUpdates {
-		if err := writeWikiRef(brainDir, updated); err != nil {
+	// 1. Rewrite surviving managed documents that lost evidence or a link.
+	updatedPaths := make([]string, 0, len(managedUpdates))
+	for path := range managedUpdates {
+		updatedPaths = append(updatedPaths, path)
+	}
+	sort.Strings(updatedPaths)
+	for _, path := range updatedPaths {
+		if err := writeManagedRef(brainDir, managedUpdates[path]); err != nil {
 			return fail(err)
 		}
 	}
@@ -162,43 +168,41 @@ func Run(args []string) (err error) {
 			fmt.Printf("  cascade-deleted %s\n", path)
 		}
 	}
-	for path := range wikiUpdates {
+	for _, path := range updatedPaths {
 		fmt.Printf("  updated %s\n", path)
 	}
 	fmt.Printf("Applied Lumbrera delete: [delete] [%s]: %s\n", opts.Actor, opts.Reason)
 	return nil
 }
 
-// writeWikiRef writes the updated wiki ref back to disk with regenerated frontmatter.
-func writeWikiRef(repo string, ref wikiRef) error {
+// writeManagedRef writes one planned managed-document update with regenerated
+// links, evidence metadata, and policy-controlled frontmatter.
+func writeManagedRef(repo string, ref managedRef) error {
 	absPath := filepath.Join(repo, filepath.FromSlash(ref.relPath))
-
-	// Re-analyze body to ensure links/sources are fresh.
-	analysis, err := md.AnalyzeWithOptions(ref.relPath, ref.body, md.AnalyzeOptions{SourceCitations: true})
+	analysis, err := md.AnalyzeWithOptions(ref.relPath, ref.body, md.AnalyzeOptions{SourceCitations: brain.AcceptsEvidence(ref.policy.Kind)})
 	if err != nil {
 		return fmt.Errorf("re-analyze %s: %w", ref.relPath, err)
 	}
 
-	links := filterWikiLinks(analysis.Links)
-	citationPaths := referencePaths(analysis.SourceCitations)
-	sources := mergePaths(ref.meta.Lumbrera.Sources, citationPaths)
-
+	evidence := mergePaths(ref.meta.Lumbrera.Sources, referencePaths(analysis.SourceCitations))
+	if !brain.AcceptsEvidence(ref.policy.Kind) {
+		evidence = nil
+	}
 	meta := frontmatter.NewWithID(
 		ref.meta.Lumbrera.ID,
-		ref.meta.Lumbrera.Kind,
+		string(ref.policy.Kind),
 		ref.meta.Title,
 		ref.meta.Summary,
 		ref.meta.Tags,
-		sources,
-		links,
+		evidence,
+		filterManagedLinks(analysis.Links),
 	)
 	meta.Lumbrera.ModifiedDate = ref.meta.Lumbrera.ModifiedDate
 
-	content, err := frontmatter.Attach(meta, ref.body)
+	content, err := frontmatter.AttachForPolicy(meta, ref.policy, ref.body)
 	if err != nil {
 		return fmt.Errorf("attach frontmatter %s: %w", ref.relPath, err)
 	}
-
 	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
 		return err
 	}
@@ -247,10 +251,11 @@ type deleteBackup struct {
 type fileBackup struct {
 	path    string
 	exists  bool
+	mode    os.FileMode
 	content []byte
 }
 
-func newDeleteBackup(brainDir string, filesToDelete []string, wikiUpdates map[string]wikiRef) (*deleteBackup, error) {
+func newDeleteBackup(brainDir string, filesToDelete []string, managedUpdates map[string]managedRef) (*deleteBackup, error) {
 	// Collect all paths we need to back up.
 	seen := map[string]struct{}{}
 	var paths []string
@@ -266,7 +271,7 @@ func newDeleteBackup(brainDir string, filesToDelete []string, wikiUpdates map[st
 	for _, p := range filesToDelete {
 		add(p)
 	}
-	for p := range wikiUpdates {
+	for p := range managedUpdates {
 		add(p)
 	}
 	for _, p := range brain.GeneratedFilePaths() {
@@ -279,7 +284,11 @@ func newDeleteBackup(brainDir string, filesToDelete []string, wikiUpdates map[st
 		abs := filepath.Join(brainDir, filepath.FromSlash(rel))
 		content, err := os.ReadFile(abs)
 		if err == nil {
-			backup.files = append(backup.files, fileBackup{path: abs, exists: true, content: content})
+			info, statErr := os.Stat(abs)
+			if statErr != nil {
+				return nil, statErr
+			}
+			backup.files = append(backup.files, fileBackup{path: abs, exists: true, mode: info.Mode().Perm(), content: content})
 			continue
 		}
 		if errors.Is(err, os.ErrNotExist) {
@@ -300,7 +309,10 @@ func (b *deleteBackup) Restore() error {
 			if err := os.MkdirAll(filepath.Dir(file.path), 0o755); err != nil {
 				return err
 			}
-			if err := os.WriteFile(file.path, file.content, 0o644); err != nil {
+			if err := os.WriteFile(file.path, file.content, file.mode); err != nil {
+				return err
+			}
+			if err := os.Chmod(file.path, file.mode); err != nil {
 				return err
 			}
 			continue

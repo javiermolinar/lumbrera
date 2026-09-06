@@ -78,10 +78,10 @@ func printHelp() {
 	fmt.Println(`Usage:
   lumbrera delete <path> --reason <reason> [options]
 
-Deletes a source or wiki file and cascades cleanup through referencing pages.
+Deletes a source, note, wiki page, or asset and cascades cleanup through managed documents.
 
 Required:
-  <path>              repo-relative path under sources/, wiki/, or assets/
+  <path>              repo-relative path under sources/, notes/, wiki/, or assets/
   --reason <reason>   single-line changelog reason
 
 Options:
@@ -90,19 +90,18 @@ Options:
   --actor <actor>     actor label for changelog, default LUMBRERA_ACTOR, USER, USERNAME, or human
 
 Behavior:
-  Source deletion:
-    - removes the source file
-    - strips inline [source: ...] citations from referencing wiki pages
-    - removes the source from wiki frontmatter and ## Sources sections
-    - cascade-deletes wiki pages left with zero sources
+  Evidence deletion (source or note):
+    - removes evidence metadata, Sources entries, and inline citations from wiki pages
+    - cascade-deletes wiki pages left with zero source or note evidence
 
-  Wiki deletion:
-    - removes the wiki file
-    - removes links to the deleted page from other wiki pages
-    - updates frontmatter links in referencing pages
+  Managed-document deletion (wiki or note):
+    - removes ordinary inbound links from surviving wiki pages and notes
+
+  Asset deletion:
+    - removes asset links and image embeds from wiki pages and notes without cascading
 
   All deletions:
     - log a changelog entry per deleted file
-    - regenerate INDEX.md, CHANGELOG.md, BRAIN.sum, and tags.md
+    - regenerate all catalogs, BRAIN.sum, and tags.md
     - the brain must pass lumbrera verify after the operation`)
 }
