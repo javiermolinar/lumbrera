@@ -47,7 +47,7 @@ var contentPolicies = []ContentPolicy{
 		Root:             "notes",
 		Kind:             KindNote,
 		Storage:          StorageManagedMarkdown,
-		RequiredRoot:     true,
+		RequiredRoot:     false,
 		Mutable:          true,
 		RequiresEvidence: false,
 		ProvidesEvidence: true,
