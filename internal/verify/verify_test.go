@@ -77,6 +77,24 @@ func TestFixWithoutStalenessIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestVerifyAllowsMissingEmptyNotesDirectory(t *testing.T) {
+	repo := initBrain(t)
+	if err := os.Remove(filepath.Join(repo, "notes")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := verify.Check(repo, verify.Options{}); err != nil {
+		t.Fatalf("fresh clone without an empty notes directory should verify: %v", err)
+	}
+
+	runWrite(t, repo, "# Observation\n\nObserved behavior.\n", "notes/observation.md",
+		"--title", "Observation", "--summary", "An observed behavior.", "--tag", "operations",
+		"--reason", "Record observation", "--actor", "test")
+	if err := verify.Check(repo, verify.Options{}); err != nil {
+		t.Fatalf("first note write should create notes directory and verify: %v", err)
+	}
+}
+
 func TestCheckDoesNotRepairMissingWikiDocumentID(t *testing.T) {
 	repo := initBrain(t)
 	runWrite(t, repo, "# Raw source\n\nRaw notes.\n", "sources/raw.md", "--reason", "Preserve raw source", "--actor", "test")

@@ -100,7 +100,7 @@ func TestManagedAndSearchRoots(t *testing.T) {
 	if got := SearchRoots(); len(got) != 3 || got[0] != "sources" || got[1] != "notes" || got[2] != "wiki" {
 		t.Fatalf("SearchRoots() = %v, want [sources notes wiki]", got)
 	}
-	if got := RequiredRoots(); len(got) != 4 || got[0] != "sources" || got[1] != "notes" || got[2] != "wiki" || got[3] != "assets" {
+	if got := RequiredRoots(); len(got) != 3 || got[0] != "sources" || got[1] != "wiki" || got[2] != "assets" {
 		t.Fatalf("RequiredRoots() = %v", got)
 	}
 	for kind, want := range map[Kind]string{KindWiki: IndexPath, KindSource: SourcesIndexPath, KindNote: NotesIndexPath, KindAsset: AssetsIndexPath} {
