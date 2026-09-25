@@ -33,6 +33,8 @@ go install github.com/javiermolinar/lumbrera/cmd/lumbrera@latest
 
 The module root is not an installable command package; use `/cmd/lumbrera`. Check the installed version with `lumbrera version`.
 
+Docker images (Linux amd64/arm64) bundle Lumbrera and Git and are published to [Docker Hub](https://hub.docker.com/r/javimolinar/lumbrera) with release tags, for example `javimolinar/lumbrera:v0.3.1`.
+
 ## Initialize a brain
 
 ```sh
