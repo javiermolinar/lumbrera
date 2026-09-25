@@ -1,0 +1,448 @@
+{
+  "contract_version": "1",
+  "status": "native-server-contract",
+  "tools": [
+    {
+      "name": "brain_search",
+      "description": "Search the configured brain using the same lexical search and JSON output as the CLI.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "Nonempty lexical query passed directly to the shared Go search engine."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "all",
+              "wiki",
+              "note",
+              "source"
+            ],
+            "default": "all"
+          },
+          "path_prefix": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Normalized allowed repository path; apply ADR path authorization in addition to schema validation."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "description": "Normalized allowed repository path; apply ADR path authorization in addition to schema validation."
+            }
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "canonical",
+                "design",
+                "reference"
+              ]
+            }
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "query_mode": {
+            "type": "string"
+          },
+          "recommended_sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "section_id": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "anchor": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "heading": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "section_id",
+                "target",
+                "path",
+                "kind",
+                "title",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "agent_instructions": {
+            "type": "object",
+            "properties": {
+              "read_first": {
+                "type": "string"
+              },
+              "do_not": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "fallback": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "read_first",
+              "do_not",
+              "fallback"
+            ],
+            "additionalProperties": false
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "missing": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "missing"
+            ],
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "section_id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "anchor": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "tier": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "heading": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "snippet": {
+                  "type": "string"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "score": {
+                  "type": "number"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "section_id",
+                "path",
+                "kind",
+                "tier",
+                "title",
+                "summary",
+                "snippet",
+                "tags",
+                "score",
+                "sources",
+                "links"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "recommended_read_order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stop_rule": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "query_mode",
+          "recommended_sections",
+          "agent_instructions",
+          "coverage",
+          "results",
+          "recommended_read_order",
+          "stop_rule"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "brain_read",
+      "description": "Read current brain Markdown by path and optional section anchor, with bounded UTF-8 pagination.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Normalized allowed repository path; apply ADR path authorization in addition to schema validation."
+          },
+          "anchor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536,
+            "default": 32768
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Normalized allowed repository path; apply ADR path authorization in addition to schema validation."
+          },
+          "anchor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bytes_returned": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "anchor",
+          "heading",
+          "content",
+          "offset",
+          "bytes_returned",
+          "has_more",
+          "next_offset"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "brain_status",
+      "description": "Report current brain readiness and index health without rebuilding the index.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "brain_format": {
+            "const": "lumbrera-brain-v3"
+          },
+          "index_state": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "preparing",
+              "missing",
+              "stale",
+              "incompatible",
+              "failed"
+            ]
+          },
+          "writes_enabled": {
+            "const": false
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "search_limit_max": {
+                "const": 20
+              },
+              "read_max_bytes": {
+                "const": 65536
+              },
+              "read_default_bytes": {
+                "const": 32768
+              },
+              "request_max_bytes": {
+                "const": 65536
+              },
+              "response_max_bytes": {
+                "const": 2097152
+              },
+              "search_timeout_seconds": {
+                "const": 30
+              }
+            },
+            "required": [
+              "search_limit_max",
+              "read_max_bytes",
+              "read_default_bytes",
+              "request_max_bytes",
+              "response_max_bytes",
+              "search_timeout_seconds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ready",
+          "brain_format",
+          "index_state",
+          "writes_enabled",
+          "limits"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ]
+}

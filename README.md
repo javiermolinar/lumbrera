@@ -156,6 +156,23 @@ lumbrera index --status
 lumbrera index --rebuild
 ```
 
+## Serve a brain over MCP
+
+Serve a local brain through native, read-only Streamable HTTP MCP:
+
+```sh
+lumbrera serve --brain ./brain
+```
+
+Connect an MCP client to `http://127.0.0.1:8080/mcp`:
+
+- `brain_search` returns the same JSON as CLI search, including filters, recommended sections and evidence paths.
+- `brain_read` returns current Markdown by `path`, optionally selecting an `anchor` or paging with `offset` and `max_bytes`.
+- `brain_status` reports readiness, current index health and limits. `/livez` reports process liveness; `/readyz` reports whether the current index is
+  fresh. After a failed preparation, searches can retry once the brain is fixed.
+  The default listener is loopback. Set `--listen` only for a deployment behind
+  private, authenticated ingress.
+
 ## Verify and review health
 
 ```sh

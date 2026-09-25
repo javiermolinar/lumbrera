@@ -11,6 +11,7 @@ import (
 	initcmd "github.com/javiermolinar/lumbrera/internal/initcmd"
 	"github.com/javiermolinar/lumbrera/internal/migratecmd"
 	"github.com/javiermolinar/lumbrera/internal/searchcmd"
+	"github.com/javiermolinar/lumbrera/internal/servecmd"
 	"github.com/javiermolinar/lumbrera/internal/verifycmd"
 	"github.com/javiermolinar/lumbrera/internal/writecmd"
 )
@@ -44,6 +45,8 @@ func run(args []string) error {
 		return indexcmd.Run(rest)
 	case "health":
 		return healthcmd.Run(rest)
+	case "serve":
+		return servecmd.Run(rest, version)
 	case "search":
 		return searchcmd.Run(rest)
 	case "verify":
@@ -87,6 +90,7 @@ Commands:
   init <repo>              Initialize a Lumbrera brain repo
   migrate [options]        Upgrade a v1 or v2 brain to v3
   index [options]          Manage the local SQLite search index
+  serve [options]          Serve read-only HTTP MCP from a local brain directory
   health [options]         Return deterministic health/consolidation candidates
   search <query> [options] Search the local SQLite index with JSON output
   verify [--brain <path>]  Check deterministic brain integrity
